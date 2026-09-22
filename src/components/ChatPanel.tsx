@@ -91,7 +91,7 @@ export function ChatPanel() {
 
     let fullResponse = ''
     let consumedLength = 0
-    let buffered: { action: AgentAction } | null = null
+    const pendingActions: AgentAction[] = []
     const assistantMsg: ChatMessage = { id: uuid(), role: 'assistant', content: '', timestamp: new Date().toISOString(), actions: [] }
     addMessage(assistantMsg)
 
@@ -109,15 +109,12 @@ export function ChatPanel() {
           // During streaming we only record actions — they are gated and
           // executed when the response completes (fewer Jev calls, one
           // coherent batch).
-          for (const action of result.actions) {
-            buffered = { action }
-            agentDiagnostics.actionsParsed++
-          }
+          pendingActions.push(...result.actions)
           // Read current messages from store (not stale closure)
           const currentMessages = useStore.getState().project.viewports
             .find(v => v.id === activeViewportId)?.messages ?? []
           const updated = currentMessages.map((m) =>
-            m.id === assistantMsg.id ? { ...m, content: fullResponse } : m
+            m.id === assistantMsg.id ? { ...m, content: fullResponse, actions: [...(m.actions || []), ...result.actions] } : m
           )
           if (!updated.some(m => m.id === assistantMsg.id)) updated.push({ ...assistantMsg, content: fullResponse })
           saveMessages(updated)
@@ -125,8 +122,7 @@ export function ChatPanel() {
         async () => {
           // Final pass — catch any remaining blocks
           const finalResult = parseActionsIncremental(fullResponse, consumedLength)
-          const allActions = [...(buffered ? [buffered.action] : []), ...finalResult.actions]
-          buffered = null
+          const allActions = [...pendingActions, ...finalResult.actions]
           agentDiagnostics.actionsParsed = allActions.length
 
           await gateAndExecute(allActions, retriesLeft, assistantMsg)
