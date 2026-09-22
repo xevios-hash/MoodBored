@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { v4 as uuid } from 'uuid'
-import { repositionItem } from '@/lib/api'
+import { repositionItem, agentDiagnostics } from '@/lib/api'
 import { showToast } from '@/lib/toasts'
 import type {
   Project,
@@ -156,7 +156,7 @@ const defaultProject: Project = {
   settings: {
     apiKey: '',
     defaultModel: 'anthropic/claude-sonnet-4',
-    jevThreshold: 0.7,
+    jevThreshold: 0.2,
     theme: 'light',
     canvasBg: '#e0f2fe',
     canvasBgType: 'color',
@@ -840,19 +840,25 @@ export const useStore = create<AppState>()(
   executeActions: (actions) => {
     const { addItem, removeItem, updateItem, addConnection } = get()
     for (const action of actions) {
-      switch (action.type) {
-        case 'add_item':
-          if (action.item) addItem(action.item)
-          break
-        case 'remove_item':
-          if (action.itemId) removeItem(action.itemId)
-          break
-        case 'update_item':
-          if (action.itemId && action.item) updateItem(action.itemId, action.item)
-          break
-        case 'add_connection':
-          if (action.connection) addConnection(action.connection)
-          break
+      try {
+        switch (action.type) {
+          case 'add_item':
+            if (action.item) addItem(action.item)
+            break
+          case 'remove_item':
+            if (action.itemId) removeItem(action.itemId)
+            break
+          case 'update_item':
+            if (action.itemId && action.item) updateItem(action.itemId, action.item)
+            break
+          case 'add_connection':
+            if (action.connection) addConnection(action.connection)
+            break
+        }
+        agentDiagnostics.actionsExecuted++
+      } catch (err) {
+        agentDiagnostics.lastError = `${action.type} on ${action.itemId ?? action.item?.id}: ${err instanceof Error ? err.message : err}`
+        console.warn('[MoodBored] executeActions failed:', agentDiagnostics.lastError)
       }
     }
   },

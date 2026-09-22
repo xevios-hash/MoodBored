@@ -36,7 +36,7 @@ export const TEMPLATES: ProjectTemplate[] = [
       name,
       viewports: [{ id: uuid(), name: 'Main Board', items: [], connections: [], messages: [], camX: 0, camY: 0, zoom: 1 }],
       components: [],
-      settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.7, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
+      settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.2, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
       created: new Date().toISOString(),
       updated: new Date().toISOString(),
     }),
@@ -65,7 +65,7 @@ export const TEMPLATES: ProjectTemplate[] = [
         id: uuid(), name,
         viewports: [{ id: uuid(), name: 'Brand Board', items, connections: [], messages: [], camX: 0, camY: 0, zoom: 1 }],
         components: [],
-        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.7, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
+        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.2, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
       }
@@ -95,7 +95,7 @@ export const TEMPLATES: ProjectTemplate[] = [
         id: uuid(), name,
         viewports: [{ id: uuid(), name: 'Room Board', items, connections: [], messages: [], camX: 0, camY: 0, zoom: 1 }],
         components: [],
-        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.7, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
+        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.2, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
       }
@@ -129,7 +129,7 @@ export const TEMPLATES: ProjectTemplate[] = [
         id: uuid(), name,
         viewports: [{ id: uuid(), name: 'Collection Board', items, connections: [], messages: [], camX: 0, camY: 0, zoom: 1 }],
         components: [],
-        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.7, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
+        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.2, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
       }
@@ -164,7 +164,7 @@ export const TEMPLATES: ProjectTemplate[] = [
         id: uuid(), name,
         viewports: [{ id: uuid(), name: 'Film Board', items, connections: [], messages: [], camX: 0, camY: 0, zoom: 1 }],
         components: [],
-        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.7, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
+        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.2, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
       }
@@ -194,7 +194,7 @@ export const TEMPLATES: ProjectTemplate[] = [
         id: uuid(), name,
         viewports: [{ id: uuid(), name: 'Product Board', items, connections: [], messages: [], camX: 0, camY: 0, zoom: 1 }],
         components: [],
-        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.7, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
+        settings: { apiKey: '', defaultModel: 'anthropic/claude-sonnet-4', jevThreshold: 0.2, theme: 'light', canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '', customBgUrls: [] },
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
       }

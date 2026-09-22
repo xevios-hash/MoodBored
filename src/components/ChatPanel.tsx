@@ -3,10 +3,12 @@ import { useStore } from '@/stores/useStore'
 import {
   streamChat, parseActionsIncremental, buildSystemPrompt,
   summarizeProject, describeBoard, resetJevCounter,
+  gateItems, getAgentDiagnostics, resetAgentDiagnostics, agentDiagnostics,
+  type ParsedActions,
 } from '@/lib/api'
 import { Send, Trash2, StopCircle, AlertCircle, MessageSquare } from 'lucide-react'
 import { v4 as uuid } from 'uuid'
-import type { ChatMessage } from '@/types'
+import type { ChatMessage, AgentAction } from '@/types'
 import { showToast } from '@/lib/toasts'
 
 function cleanContent(content: string): string {
@@ -58,23 +60,38 @@ export function ChatPanel() {
 
     addMessage({ id: uuid(), role: 'user', content: text, timestamp: new Date().toISOString() })
     setInput('')
+    resetAgentDiagnostics()
+    await requestCompletion([], 1)
+  }
+
+  // One streaming request; when Jev rejects the proposed batch we retry
+  // once with the feedback injected as a corrective system note.
+  const requestCompletion = async (
+    correctiveNotes: string[],
+    retriesLeft: number,
+  ) => {
     setStreaming(true)
 
-    const summary = summarizeProject(allItems)
-    const boardDesc = describeBoard(allItems)
-    const systemPrompt = buildSystemPrompt(summary, boardDesc, activeViewport?.name)
-    // Read current messages from store (not stale closure)
+    const systemPrompt = buildSystemPrompt(
+      summarizeProject(allItemsItemsForPrompt()),
+      describeBoard(allItemsItemsForPrompt()),
+      activeViewport?.name,
+    )
     const currentMessages = useStore.getState().project.viewports
       .find(v => v.id === activeViewportId)?.messages ?? []
     const apiMessages = [
       { role: 'system', content: systemPrompt },
-      ...currentMessages.map((m) => ({ role: m.role, content: m.content })),
-      { role: 'user', content: text },
+      ...currentMessages
+        .filter((m) => m.role !== 'system')
+        .map((m) => ({ role: m.role, content: m.content })),
+      ...(correctiveNotes.length > 0
+        ? [{ role: 'system', content: 'Refine your last proposal.\n' + correctiveNotes.join('\n') } as { role: string; content: string }]
+        : []),
     ]
 
     let fullResponse = ''
     let consumedLength = 0
-    let totalAdded = 0
+    let buffered: { action: AgentAction } | null = null
     const assistantMsg: ChatMessage = { id: uuid(), role: 'assistant', content: '', timestamp: new Date().toISOString(), actions: [] }
     addMessage(assistantMsg)
 
@@ -85,35 +102,38 @@ export function ChatPanel() {
       await streamChat(
         apiMessages, settings.apiKey, settings.defaultModel,
         (chunk) => {
+          agentDiagnostics.chunksSeen++
           fullResponse += chunk
           const result = parseActionsIncremental(fullResponse, consumedLength)
-          if (result.actions.length > 0) {
-            executeActions(result.actions)
-            totalAdded += result.actions.length
-          }
           consumedLength = result.consumedLength
+          // During streaming we only record actions — they are gated and
+          // executed when the response completes (fewer Jev calls, one
+          // coherent batch).
+          for (const action of result.actions) {
+            buffered = { action }
+            agentDiagnostics.actionsParsed++
+          }
           // Read current messages from store (not stale closure)
           const currentMessages = useStore.getState().project.viewports
             .find(v => v.id === activeViewportId)?.messages ?? []
           const updated = currentMessages.map((m) =>
-            m.id === assistantMsg.id ? { ...m, content: fullResponse, actions: [...(m.actions || []), ...(result.actions.length > 0 ? result.actions : [])] } : m
+            m.id === assistantMsg.id ? { ...m, content: fullResponse } : m
           )
           if (!updated.some(m => m.id === assistantMsg.id)) updated.push({ ...assistantMsg, content: fullResponse })
           saveMessages(updated)
         },
-        () => {
-          // Final pass - catch any remaining blocks
+        async () => {
+          // Final pass — catch any remaining blocks
           const finalResult = parseActionsIncremental(fullResponse, consumedLength)
-          if (finalResult.actions.length > 0) {
-            executeActions(finalResult.actions)
-            totalAdded += finalResult.actions.length
-          }
-          if (totalAdded > 0) {
-            addMessage({ id: uuid(), role: 'system', content: `${totalAdded} item${totalAdded > 1 ? 's' : ''} added to board.`, timestamp: new Date().toISOString() })
-          }
+          const allActions = [...(buffered ? [buffered.action] : []), ...finalResult.actions]
+          buffered = null
+          agentDiagnostics.actionsParsed = allActions.length
+
+          await gateAndExecute(allActions, retriesLeft, assistantMsg)
           setStreaming(false)
         },
         (err) => {
+          agentDiagnostics.lastError = err
           // Read current messages from store
           const currentMessages = useStore.getState().project.viewports
             .find(v => v.id === activeViewportId)?.messages ?? []
@@ -128,6 +148,36 @@ export function ChatPanel() {
       setStreaming(false)
     } finally {
       abortRef.current = null
+    }
+  }
+
+  // snapshot the CURRENT items of the active viewport (post previous turns)
+  const allItemsItemsForPrompt = () => currentViewportItems()
+  const currentViewportItems = () =>
+    useStore.getState().project.viewports.find(v => v.id === useStore.getState().activeViewportId)?.items ?? []
+
+  // Jev gate — runs once per completed response against the whole batch.
+  const gateAndExecute = async (actions: AgentAction[], retriesLeft: number, assistantMsg: ChatMessage) => {
+    if (actions.length === 0) {
+      console.info('[MoodBored] diagnostics — no actions parsed:', getAgentDiagnostics().timeline)
+      return
+    }
+    const proposals = actions.map((a: any) => ({
+      kind: a.item?.kind ?? 'unknown',
+      description: a.item?.description ?? a.item?.text ?? a.item?.subjectDesc ?? a.item?.label ?? a.item?.url ?? '',
+    }))
+    const result = await gateItems(describeBoard(currentViewportItems()), proposals, settings.apiKey, settings.jevThreshold)
+    if (result.accepted) {
+      executeActions(actions)
+      const msg = `Jev gate passed (${(result.score * 100).toFixed(0)}%) — executing batch. ${result.reasoning}`
+      addMessage({ id: uuid(), role: 'system', content: msg, timestamp: new Date().toISOString() })
+      showToast(`Added ${actions.length} item${actions.length > 1 ? 's' : ''}`, 'success')
+    } else if (retriesLeft > 0) {
+      addMessage({ id: uuid(), role: 'system', content: `Jev gate rejected (score ${(result.score * 100).toFixed(0)}% vs threshold ${(settings.jevThreshold * 100).toFixed(0)}%) — asking AI to refine. ${result.reasoning}`, timestamp: new Date().toISOString() })
+      await requestCompletion([`Previous proposal scored ${(result.score * 100).toFixed(0)}%. Reasoning: ${result.reasoning}. Rework the JSON block with more on-theme, less redundant items.`], retriesLeft - 1)
+    } else {
+      addMessage({ id: uuid(), role: 'system', content: `Jev gate rejected again (final score ${(result.score * 100).toFixed(0)}%): ${result.reasoning}`, timestamp: new Date().toISOString() })
+      showToast('Items rejected by quality gate', 'info')
     }
   }
 

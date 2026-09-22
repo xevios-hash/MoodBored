@@ -115,20 +115,23 @@ export interface JevResult {
 let jevCallCount = 0
 const JEV_MAX_CALLS_PER_SESSION = 50
 
+export type JevQuestions = Record<string, {
+  type: 'noul' | 'choice' | 'score'
+  instructions: string
+  criteria?: any
+}>
+
 export async function callJev(
   state: string,
-  questions: Record<string, {
-    type: 'noul' | 'choice' | 'score'
-    instructions: string
-    criteria?: any
-  }>,
+  questions: JevQuestions,
   apiKey: string,
+  transport: (url: string, init: RequestInit) => Promise<Response> = fetch,
 ): Promise<Record<string, { score?: number; choice?: string; noul?: number; confidence?: number }> | null> {
   if (jevCallCount >= JEV_MAX_CALLS_PER_SESSION) return null
   jevCallCount++
 
   try {
-    const res = await fetch('https://openrouter.ai/api/alpha/decisions', {
+    const res = await transport('https://openrouter.ai/api/alpha/decisions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -151,24 +154,30 @@ export async function callJev(
   }
 }
 
-export function resetJevCounter() {
-  jevCallCount = 0
+// ─── Agent Gate (replaces old scoreProposedItems/scoreBoardCoherence) ─
+//
+// Previously there were two near-identical questions (fit_score and
+// coherence) and neither was ever invoked — dead code. This is now the
+// single gate, wired into the agent path from ChatPanel. The question
+// builder is separated from the transport so tests can experiment with
+// different question sequences without hitting the network.
+
+export interface Proposal {
+  kind: string
+  description: string
 }
 
-export async function scoreProposedItems(
-  currentBoardSummary: string,
-  proposedItems: Array<{ kind: string; description: string }>,
-  apiKey: string,
-  threshold: number,
-): Promise<JevResult> {
-  const proposedDesc = proposedItems
-    .map((i) => `- ${i.kind}: ${i.description}`)
-    .join('\n')
+// Sequences are named so tests can A/B them:
+//   'fit-only'    — original single question
+//   'fit+novelty' — adds a redundancy check (default)
+export type QuestionSequence = 'fit-only' | 'fit+novelty'
 
-  const state = `Current mood board:\n${currentBoardSummary}\n\nProposed additions:\n${proposedDesc}`
-
-  const answers = await callJev(state, {
-    fit_score: {
+export function buildJevQuestions(
+  proposals: Proposal[],
+  sequence: QuestionSequence = 'fit+novelty',
+): JevQuestions {
+  const questions: JevQuestions = {
+    fit: {
       type: 'score',
       instructions: 'How well do these proposed items fit the existing mood board in terms of theme, aesthetic coherence, and creative direction?',
       criteria: [
@@ -179,56 +188,101 @@ export async function scoreProposedItems(
         'Excellent fit: items perfectly enhance and extend the board vision',
       ],
     },
-  }, apiKey)
+  }
+  if (sequence === 'fit+novelty') {
+    questions.novelty = {
+      type: 'score',
+      instructions: 'How much do these proposed items ADD rather than repeat? Penalize items that duplicate imagery, wording, or concepts already heavily represented; reward variety that broadens the board.',
+      criteria: [
+        'Redundant: near-duplicates of items already on the board',
+        'Slightly redundant: mostly restates what exists',
+        'Mixed: some repetition, some new direction',
+        'Mostly fresh: new angles with good variety',
+        'Brilliantly diverse: meaningfully extends the board with fresh ideas',
+      ],
+    }
+  }
+  return questions
+}
 
-  if (!answers?.fit_score) {
+const SEQUENCE_WEIGHTS: Record<QuestionSequence, Record<string, number>> = {
+  'fit-only': { fit: 1 },
+  'fit+novelty': { fit: 0.65, novelty: 0.35 },
+}
+
+export async function gateItems(
+  boardDescription: string,
+  proposed: Proposal[],
+  apiKey: string,
+  threshold: number,
+  transport: (url: string, init: RequestInit) => Promise<Response> = fetch,
+  sequence: QuestionSequence = 'fit+novelty',
+): Promise<JevResult> {
+  const proposedDesc = proposed.map((i) => `- ${i.kind}: ${i.description}`).join('\n')
+  const state = `Current mood board:\n${boardDescription}\n\nProposed additions:\n${proposedDesc}`
+
+  const answers = await callJev(state, buildJevQuestions(proposed, sequence), apiKey, transport)
+
+  if (!answers) {
     return { score: 0.5, reasoning: 'Jev unavailable (session limit or API error) — gate bypassed', accepted: true }
   }
 
-  const rawScore = answers.fit_score.score ?? 2
-  const normalizedScore = rawScore / 4 // 0-4 scale to 0-1
-  const confidence = answers.fit_score.confidence ?? 0.5
-
-  return {
-    score: normalizedScore,
-    reasoning: `Coherence: ${(normalizedScore * 100).toFixed(0)}%, confidence: ${(confidence * 100).toFixed(0)}%`,
-    accepted: normalizedScore >= threshold,
+  // Unavailable question halves → weight falls to the remaining one.
+  const weights = SEQUENCE_WEIGHTS[sequence]
+  let total = 0, weightSum = 0
+  for (const [key, weight] of Object.entries(weights)) {
+    const answer = answers[key]
+    if (!answer || answer.score == null) continue
+    total += (answer.score / 4) * weight
+    weightSum += weight
   }
+  // Fit drives the threshold; other questions act as hard floors.
+  const fitRaw = answers.fit?.score
+  if (fitRaw == null) {
+    return { score: 0.5, reasoning: 'Jev returned no usable answers — gate bypassed', accepted: true }
+  }
+  const fitNorm = fitRaw / 4
+
+  // Hard redundancy veto: a batch that is ≥75% repeats is rejected even if
+  // it "fits" — the fit question alone would happily accept junk.
+  const noveltyRaw = answers.novelty?.score
+  if (noveltyRaw != null && noveltyRaw / 4 < 0.25) {
+    return { score: 0, reasoning: `gate: rejected for redundancy (novelty ${Math.round((noveltyRaw / 4) * 100)}%, fit ${(fitNorm * 100).toFixed(0)}%)`, accepted: false }
+  }
+
+  const combined = total / weightSum
+  const floors = noveltyRaw != null ? { fit: fitNorm >= threshold, novelty: (noveltyRaw / 4) >= 0.25 } : { fit: fitNorm >= threshold }
+  const accepted = Object.values(floors).every(Boolean)
+
+  return { score: combined, reasoning: `gate: fit ${(fitNorm * 100).toFixed(0)}% vs threshold ${(threshold * 100).toFixed(0)}%, novelty ${(((noveltyRaw ?? 4) / 4) * 100).toFixed(0)}%`, accepted }
 }
 
-export async function scoreBoardCoherence(
-  currentBoardSummary: string,
-  apiKey: string,
-): Promise<JevResult> {
-  const state = `Current mood board:\n${currentBoardSummary}`
+export function resetJevCounter() {
+  jevCallCount = 0
+}
 
-  const answers = await callJev(state, {
-    coherence: {
-      type: 'score',
-      instructions: 'How coherent and complete is this mood board? Does it feel like a unified creative vision?',
-      criteria: [
-        'Fragmented: items feel random and disconnected',
-        'Loose: some thematic connection but lacks unity',
-        'Moderate: recognizable theme but could be tighter',
-        'Coherent: clear vision with good variety',
-        'Unified: perfect balance of variety and thematic consistency',
-      ],
-    },
-  }, apiKey)
+// ─── Agent Diagnostics ──────────────────────────────────────────────
+// Why isn't the board populating? These counters surface where the
+// pipeline stalls: LLM → streamed text → parsed JSON blocks → actions
+// → executed items. Inspect with getAgentDiagnostics() after a chat.
 
-  if (!answers?.coherence) {
-    return { score: 0.5, reasoning: 'Jev unavailable', accepted: false }
-  }
+export const agentDiagnostics = {
+  chunksSeen: 0,
+  jsonBlockMatches: 0,
+  actionsParsed: 0,
+  actionsExecuted: 0,
+  lastError: null as string | null,
+  timeline: [] as string[],
+}
 
-  const rawScore = answers.coherence.score ?? 2
-  const normalizedScore = rawScore / 4
-  const confidence = answers.coherence.confidence ?? 0.5
+function diag(msg: string) {
+  agentDiagnostics.timeline.push(`${new Date().toISOString().slice(11, 23)} ${msg}`)
+  if (agentDiagnostics.timeline.length > 100) agentDiagnostics.timeline.shift()
+}
 
-  return {
-    score: normalizedScore,
-    reasoning: `Board coherence: ${(normalizedScore * 100).toFixed(0)}%, confidence: ${(confidence * 100).toFixed(0)}%`,
-    accepted: normalizedScore >= 0.75,
-  }
+export function getAgentDiagnostics() { return agentDiagnostics }
+export function resetAgentDiagnostics() {
+  Object.assign(agentDiagnostics, { chunksSeen: 0, jsonBlockMatches: 0, actionsParsed: 0, actionsExecuted: 0, lastError: null, timeline: [] })
 }
 
 // ─── JSON Action Parsing (incremental for streaming) ────────────────
@@ -246,11 +300,12 @@ export function parseActionsIncremental(text: string, lastConsumed: number): Par
   let match
 
   while ((match = jsonBlockRegex.exec(text)) !== null) {
+    agentDiagnostics.jsonBlockMatches++
     const blockEnd = match.index + match[0].length
     if (blockEnd <= lastConsumed) continue // already processed
 
     const jsonStr = match[1].trim()
-    if (!jsonStr.startsWith('{') && !jsonStr.startsWith('[')) continue // not JSON
+    if (!jsonStr.startsWith('{') && !jsonStr.startsWith('[')) { diag('block skipped: not JSON'); continue }
 
     try {
       const parsed = JSON.parse(jsonStr)
@@ -261,6 +316,7 @@ export function parseActionsIncremental(text: string, lastConsumed: number): Par
         }
       }
     } catch {
+      diag(`strict parse failed on ${jsonStr.length} chars — attempting repair`)
       // Try to fix common JSON issues (trailing commas, etc.)
       try {
         const fixed = jsonStr
@@ -274,10 +330,11 @@ export function parseActionsIncremental(text: string, lastConsumed: number): Par
           }
         }
       } catch {
-        // skip invalid JSON
+        diag(`repair failed: block discarded (${jsonStr.slice(0, 80)}...)`)
       }
     }
   }
+  agentDiagnostics.actionsParsed += actions.length
 
   return { actions, consumedLength: text.length }
 }

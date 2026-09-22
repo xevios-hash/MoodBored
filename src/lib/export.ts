@@ -284,7 +284,7 @@ export function importFromBundle(
       project.settings = {
         apiKey: '',
         defaultModel: 'anthropic/claude-sonnet-4',
-        jevThreshold: 0.7,
+        jevThreshold: 0.2,
         theme: 'light',
         canvasBg: '#e0f2fe',
         canvasBgType: 'color',
