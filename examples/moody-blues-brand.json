@@ -1,0 +1,90 @@
+{
+  "id": "example-mood-board-001",
+  "name": "Moody Blues - Brand Redesign",
+  "viewports": [
+    {
+      "id": "vp-main",
+      "name": "Main Board",
+      "items": [
+        {
+          "kind": "note",
+          "id": "note-1",
+          "text": "Brand direction: Deep, contemplative blues with modern minimalism. Target audience: creative professionals aged 25-40.",
+          "purpose": "Set the creative direction for the entire project",
+          "importance": "This note anchors every other decision on the board",
+          "tags": ["brief", "direction"],
+          "pos": { "x": 100, "y": 100 }
+        },
+        {
+          "kind": "image",
+          "id": "img-1",
+          "thumbnail": "https://images.unsplash.com/photo-1557683316-973673baf926?w=300",
+          "fullSource": "https://images.unsplash.com/photo-1557683316-973673baf926",
+          "description": "Gradient of deep indigo to light blue, smooth transition",
+          "purpose": "Primary color palette reference",
+          "importance": "Establishes the core color story for the brand",
+          "source": "Unsplash - free to use",
+          "tags": ["color", "palette", "blue"],
+          "pos": { "x": 100, "y": 350 },
+          "size": { "w": 300, "h": 200 }
+        },
+        {
+          "kind": "link",
+          "id": "link-1",
+          "url": "https://www.typewolf.com/site-of-the-day/awwwards-2024",
+          "title": "Typewolf - Typography Inspiration",
+          "summary": "Curated collection of modern typography examples",
+          "description": "Collection of award-winning type pairings",
+          "purpose": "Typography inspiration for headers and body copy",
+          "importance": "Helps define the typographic voice of the brand",
+          "source": "Typewolf.com",
+          "tags": ["typography", "fonts", "inspiration"],
+          "pos": { "x": 450, "y": 100 }
+        },
+        {
+          "kind": "text",
+          "id": "text-1",
+          "raw": "Key words: Depth, Clarity, Calm, Professional, Modern, Accessible",
+          "pos": { "x": 450, "y": 300 },
+          "size": { "w": 280, "h": 100 }
+        },
+        {
+          "kind": "note",
+          "id": "note-2",
+          "text": "Avoid: Neon colors, overly playful fonts, cluttered layouts. Keep whitespace generous.",
+          "purpose": "Negative constraints to guide design decisions",
+          "importance": "Prevents common mistakes in the redesign",
+          "tags": ["constraints", "anti-patterns"],
+          "pos": { "x": 100, "y": 600 }
+        },
+        {
+          "kind": "video",
+          "id": "vid-1",
+          "source": "https://example.com/brand-motion-ref.mp4",
+          "startTs": 0,
+          "duration": 15,
+          "subjectDesc": "Smooth blue gradient animation with particle effects",
+          "motionDesc": "Slow left-to-right gradient sweep, particles fade in from bottom, gentle float upward with slight horizontal drift",
+          "purpose": "Motion reference for brand animations",
+          "importance": "Defines the kinetic language for the brand",
+          "source_url": "https://dribbble.com/shots/brand-animation",
+          "tags": ["motion", "animation", "reference"],
+          "pos": { "x": 450, "y": 450 },
+          "size": { "w": 280, "h": 180 }
+        }
+      ],
+      "camX": 0,
+      "camY": 0,
+      "zoom": 1
+    }
+  ],
+  "settings": {
+    "apiKey": "",
+    "defaultModel": "anthropic/claude-sonnet-4",
+    "jevThreshold": 0.7,
+    "theme": "dark",
+    "canvasBg": "#0a0a0f"
+  },
+  "created": "2026-01-15T10:00:00.000Z",
+  "updated": "2026-01-19T14:30:00.000Z"
+}

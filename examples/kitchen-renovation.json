@@ -1,0 +1,90 @@
+{
+  "id": "example-kitchen-002",
+  "name": "Kitchen Renovation Planning",
+  "viewports": [
+    {
+      "id": "vp-layout",
+      "name": "Layout Ideas",
+      "items": [
+        {
+          "kind": "note",
+          "id": "k-note-1",
+          "text": "Budget: $25,000. Timeline: 6 weeks. Must keep existing plumbing locations to save cost.",
+          "purpose": "Project constraints and budget",
+          "importance": "All decisions must respect these constraints",
+          "tags": ["budget", "constraints"],
+          "pos": { "x": 50, "y": 50 }
+        },
+        {
+          "kind": "image",
+          "id": "k-img-1",
+          "thumbnail": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300",
+          "fullSource": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136",
+          "description": "Modern white kitchen with marble countertops and brass fixtures",
+          "purpose": "Primary style reference for the renovation",
+          "importance": "Captures the exact aesthetic we want to achieve",
+          "source": "Unsplash",
+          "tags": ["style", "modern", "white"],
+          "pos": { "x": 50, "y": 250 },
+          "size": { "w": 320, "h": 220 }
+        },
+        {
+          "kind": "link",
+          "id": "k-link-1",
+          "url": "https://www.ikea.com/us/en/cat/kitchen-cabinets-24264/",
+          "title": "IKEA Kitchen Cabinets",
+          "summary": "Affordable modular kitchen cabinet systems",
+          "description": "Budget-friendly cabinet options that look premium",
+          "purpose": "Cabinet sourcing - best value for money",
+          "importance": "Could save $5-8k vs custom cabinets",
+          "source": "IKEA.com",
+          "tags": ["cabinets", "budget", "ikea"],
+          "pos": { "x": 420, "y": 50 }
+        },
+        {
+          "kind": "note",
+          "id": "k-note-2",
+          "text": "Countertop options:\n1. Quartz ($60/sqft) - durable, low maintenance\n2. Marble ($80/sqft) - beautiful but stains\n3. Butcher block ($40/sqft) - warm, needs sealing",
+          "purpose": "Countertop material comparison",
+          "importance": "Major cost and aesthetic decision",
+          "tags": ["countertops", "materials"],
+          "pos": { "x": 420, "y": 300 }
+        }
+      ],
+      "camX": 0,
+      "camY": 0,
+      "zoom": 1
+    },
+    {
+      "id": "vp-materials",
+      "name": "Materials & Colors",
+      "items": [
+        {
+          "kind": "image",
+          "id": "k-img-2",
+          "thumbnail": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=300",
+          "fullSource": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c",
+          "description": "Warm white paint swatch with subtle gray undertones",
+          "purpose": "Wall color reference",
+          "importance": "Sets the room's overall tone",
+          "source": "Benjamin Moore - White Dove OC-17",
+          "tags": ["paint", "color", "white"],
+          "pos": { "x": 50, "y": 50 },
+          "size": { "w": 250, "h": 180 }
+        }
+      ],
+      "camX": 0,
+      "camY": 0,
+      "zoom": 1
+    }
+  ],
+  "settings": {
+    "apiKey": "",
+    "defaultModel": "anthropic/claude-sonnet-4",
+    "jevThreshold": 0.7,
+    "theme": "dark",
+    "canvasBg": "#0a0a0f"
+  },
+  "created": "2026-02-01T09:00:00.000Z",
+  "updated": "2026-02-10T16:45:00.000Z"
+}

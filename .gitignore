@@ -1,0 +1,12 @@
+.terraform/
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+src-tauri/target/
+MoodBored/
+ios/MoodBored.xcodeproj/xcuserdata/
+node_modules
