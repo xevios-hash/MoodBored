@@ -587,6 +587,21 @@ export function Canvas() {
 
 // ─── Draw Functions ─────────────────────────────────────────────────
 
+// ─── Draw Constants (world coordinates, scaled by ctx.transform) ────
+// These are intentionally NOT divided by zoom — the canvas transform
+// handles scaling. Text and thin chrome use /zoom to stay readable
+// at any zoom level (constant screen-pixel size).
+const CARD_RADIUS = 10
+const PAD = 14
+const KIND_STRIP_HEIGHT = 1
+const HEADER_FONT = '600 9px Inter, sans-serif'
+const LABEL_FONT = '500 12px Inter, sans-serif'
+const BODY_FONT = '400 10px Inter, sans-serif'
+const SMALL_FONT = '400 8px Inter, sans-serif'
+const TAG_FONT = '400 9px Inter, sans-serif'
+
+// ─── Draw Functions ─────────────────────────────────────────────────
+
 function drawPorts(ctx: CanvasRenderingContext2D, item: BoardItem, zoom: number) {
   if (!('ports' in item) || !item.ports) return
   for (const port of item.ports) {
@@ -660,233 +675,205 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
   const w = item.size?.w ?? 250; const h = item.size?.h ?? 150
   const kindColor = KIND_COLORS[item.kind] || accent()
 
-  ctx.shadowColor = shadow(selected); ctx.shadowBlur = selected ? 16 / zoom : 6 / zoom; ctx.shadowOffsetY = 2 / zoom
+  // Card shadow and fill — world coordinates, scales with zoom
+  ctx.shadowColor = shadow(selected); ctx.shadowBlur = (selected ? 16 : 6) / zoom; ctx.shadowOffsetY = 2 / zoom
   ctx.fillStyle = cardBg(selected)
-  ctx.beginPath(); roundRect(ctx, x, y, w, h, 10 / zoom); ctx.fill()
+  ctx.beginPath(); roundRect(ctx, x, y, w, h, CARD_RADIUS); ctx.fill()
   ctx.shadowColor = 'transparent'
 
+  // Card border — thin chrome, constant screen size
   ctx.strokeStyle = cardBorder(selected); ctx.lineWidth = (selected ? 1.5 : 0.75) / zoom
-  ctx.beginPath(); roundRect(ctx, x, y, w, h, 10 / zoom); ctx.stroke()
+  ctx.beginPath(); roundRect(ctx, x, y, w, h, CARD_RADIUS); ctx.stroke()
 
-  ctx.strokeStyle = kindColor; ctx.lineWidth = 2 / zoom
-  ctx.beginPath(); ctx.moveTo(x + 14 / zoom, y + 1 / zoom); ctx.lineTo(x + w - 14 / zoom, y + 1 / zoom); ctx.stroke()
+  // Kind accent strip at top — fixed height in world coords
+  ctx.strokeStyle = kindColor; ctx.lineWidth = KIND_STRIP_HEIGHT / zoom
+  ctx.beginPath(); ctx.moveTo(x + PAD, y + KIND_STRIP_HEIGHT); ctx.lineTo(x + w - PAD, y + KIND_STRIP_HEIGHT); ctx.stroke()
 
   ctx.save()
-  ctx.beginPath(); roundRect(ctx, x, y, w, h, 10 / zoom); ctx.clip()
-  const pad = 14 / zoom
+  ctx.beginPath(); roundRect(ctx, x, y, w, h, CARD_RADIUS); ctx.clip()
 
   switch (item.kind) {
-    case 'image': drawImageItem(ctx, item, x, y, w, h, pad, zoom); break
-    case 'palette': drawPaletteItem(ctx, item, x, y, w, h, pad, zoom); break
-    case 'gradient': drawGradientItem(ctx, item, x, y, w, h, pad, zoom); break
-    case 'font': drawFontItem(ctx, item, x, y, w, h, pad, zoom); break
-    case 'swatch': drawSwatchItem(ctx, item, x, y, w, h, pad, zoom); break
-    case 'sizeguide': drawSizeGuideItem(ctx, item, x, y, w, h, pad, zoom); break
-    case 'container': drawContainerItem(ctx, item, x, y, w, h, pad, zoom); break
-    default: drawTextBasedItem(ctx, item, x, y, w, h, pad, zoom); break
+    case 'image': drawImageItem(ctx, item, x, y, w, h, zoom); break
+    case 'palette': drawPaletteItem(ctx, item, x, y, w, h, zoom); break
+    case 'gradient': drawGradientItem(ctx, item, x, y, w, h, zoom); break
+    case 'font': drawFontItem(ctx, item, x, y, w, h, zoom); break
+    case 'swatch': drawSwatchItem(ctx, item, x, y, w, h, zoom); break
+    case 'sizeguide': drawSizeGuideItem(ctx, item, x, y, w, h, zoom); break
+    case 'container': drawContainerItem(ctx, item, x, y, w, h, zoom); break
+    default: drawTextBasedItem(ctx, item, x, y, w, h, zoom); break
   }
   ctx.restore()
 }
 
-function drawImageItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, pad: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('IMAGE', x + pad, y + pad + 9 / zoom)
-  const imgTop = y + pad + 16 / zoom; const imgH = h - pad * 2 - 36 / zoom; const imgW = w - pad * 2
+function drawImageItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('IMAGE', x + PAD, y + PAD + 9 / zoom)
+  const imgTop = y + PAD + 20; const imgH = h - PAD * 2 - 40; const imgW = w - PAD * 2
   const img = getImage(item.thumbnail || item.fullSource)
   if (img) {
     const ir = img.naturalWidth / img.naturalHeight; const ar = imgW / imgH
     let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight
     if (ir > ar) { sw = img.naturalHeight * ar; sx = (img.naturalWidth - sw) / 2 }
     else { sh = img.naturalWidth / ar; sy = (img.naturalHeight - sh) / 2 }
-    ctx.save(); roundRect(ctx, x + pad, imgTop, imgW, imgH, 4 / zoom); ctx.clip()
-    ctx.drawImage(img, sx, sy, sw, sh, x + pad, imgTop, imgW, imgH); ctx.restore()
+    ctx.save(); roundRect(ctx, x + PAD, imgTop, imgW, imgH, 4); ctx.clip()
+    ctx.drawImage(img, sx, sy, sw, sh, x + PAD, imgTop, imgW, imgH); ctx.restore()
   } else if (item.fullSource?.startsWith('http')) {
-    // Show URL as clickable text
-    ctx.fillStyle = isDark() ? '#1a1a25' : '#f1f5f9'; ctx.fillRect(x + pad, imgTop, imgW, imgH)
+    ctx.fillStyle = isDark() ? '#1a1a25' : '#f1f5f9'; ctx.fillRect(x + PAD, imgTop, imgW, imgH)
     ctx.fillStyle = txtMuted(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
-    ctx.fillText('Loading image...', x + w / 2, imgTop + imgH / 2 + 4 / zoom); ctx.textAlign = 'start'
+    ctx.fillText('Loading image...', x + w / 2, imgTop + imgH / 2 + 4); ctx.textAlign = 'start'
   } else {
-    ctx.fillStyle = isDark() ? '#1a1a25' : '#f1f5f9'; ctx.fillRect(x + pad, imgTop, imgW, imgH)
+    ctx.fillStyle = isDark() ? '#1a1a25' : '#f1f5f9'; ctx.fillRect(x + PAD, imgTop, imgW, imgH)
     ctx.fillStyle = txtMuted(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
-    ctx.fillText('No image', x + w / 2, imgTop + imgH / 2 + 4 / zoom); ctx.textAlign = 'start'
+    ctx.fillText('No image', x + w / 2, imgTop + imgH / 2 + 4); ctx.textAlign = 'start'
   }
-  ctx.fillStyle = txtPrimary(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.fillText(item.description || '', x + pad, y + h - pad - 2 / zoom)
+  ctx.fillStyle = txtPrimary(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.fillText(item.description || '', x + PAD, y + h - PAD)
 }
 
-function drawPaletteItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, pad: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('PALETTE', x + pad, y + pad + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + pad, y + pad + 24 / zoom)
+function drawPaletteItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('PALETTE', x + PAD, y + PAD + 9 / zoom)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24 / zoom)
   const colors = item.colors || []
-  const sw = Math.min(60, (w - pad * 2 - (colors.length - 1) * 4 / zoom) / Math.max(colors.length, 1))
-  const sh = h - pad * 2 - 40 / zoom
+  const sw = Math.min(60, (w - PAD * 2 - (colors.length - 1) * 4) / Math.max(colors.length, 1))
+  const sh = h - PAD * 2 - 44
   for (let i = 0; i < colors.length; i++) {
-    const sx = x + pad + i * (sw + 4 / zoom)
-    ctx.fillStyle = colors[i].hex || '#000'; ctx.beginPath(); roundRect(ctx, sx, y + pad + 32 / zoom, sw, sh, 4 / zoom); ctx.fill()
+    const sx = x + PAD + i * (sw + 4)
+    ctx.fillStyle = colors[i].hex || '#000'; ctx.beginPath(); roundRect(ctx, sx, y + PAD + 32, sw, sh, 4); ctx.fill()
     ctx.fillStyle = txtSecondary(); ctx.font = `${8 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
-    ctx.fillText(colors[i].hex || '', sx + sw / 2, y + pad + 32 / zoom + sh + 12 / zoom); ctx.textAlign = 'start'
+    ctx.fillText(colors[i].hex || '', sx + sw / 2, y + PAD + 32 + sh + 12); ctx.textAlign = 'start'
   }
 }
 
-function drawGradientItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, pad: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('GRADIENT', x + pad, y + pad + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + pad, y + pad + 24 / zoom)
+function drawGradientItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('GRADIENT', x + PAD, y + PAD + 9 / zoom)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24 / zoom)
   const stops = item.stops || []
   if (stops.length >= 2) {
     const dir = (item.direction || 90) * Math.PI / 180
-    const bx = x + pad; const by = y + pad + 30 / zoom; const bw = w - pad * 2; const bh = h - pad * 2 - 30 / zoom
+    const bx = x + PAD; const by = y + PAD + 32; const bw = w - PAD * 2; const bh = h - PAD * 2 - 36
     const grad = ctx.createLinearGradient(bx + bw / 2 - Math.cos(dir) * bw / 2, by + bh / 2 - Math.sin(dir) * bh / 2, bx + bw / 2 + Math.cos(dir) * bw / 2, by + bh / 2 + Math.sin(dir) * bh / 2)
     for (const s of stops) grad.addColorStop(Math.max(0, Math.min(1, s.position)), s.color)
-    ctx.fillStyle = grad; ctx.beginPath(); roundRect(ctx, bx, by, bw, bh, 6 / zoom); ctx.fill()
+    ctx.fillStyle = grad; ctx.beginPath(); roundRect(ctx, bx, by, bw, bh, 6); ctx.fill()
   }
 }
 
-function drawFontItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, pad: number, zoom: number) {
+function drawFontItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
   const ff = item.fontFamily || 'Inter'; loadFont(ff)
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('FONT', x + pad, y + pad + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${11 / zoom}px Inter, sans-serif`; ctx.fillText(ff, x + pad, y + pad + 24 / zoom)
+  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('FONT', x + PAD, y + PAD + 9 / zoom)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${11 / zoom}px Inter, sans-serif`; ctx.fillText(ff, x + PAD, y + PAD + 24 / zoom)
   const sample = item.sampleText || 'The quick brown fox'
-  const sizes = [24, 16, 12]; let ty = y + pad + 44 / zoom
+  const sizes = [24, 16, 12]; let ty = y + PAD + 44
   for (const size of sizes) {
-    ctx.fillStyle = txtPrimary(); ctx.font = `400 ${size / zoom}px "${ff}", sans-serif`
-    ctx.fillText(sample.slice(0, 40), x + pad, ty); ty += (size + 8) / zoom; if (ty > y + h - pad) break
+    ctx.fillStyle = txtPrimary(); ctx.font = `400 ${size}px "${ff}", sans-serif`
+    ctx.fillText(sample.slice(0, 40), x + PAD, ty); ty += size + 8; if (ty > y + h - PAD) break
   }
 }
 
-function drawSwatchItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, pad: number, zoom: number) {
+function drawSwatchItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
   const bh = h * 0.55
-  ctx.fillStyle = item.hex || '#000'; ctx.beginPath(); roundRect(ctx, x + pad, y + pad, w - pad * 2, bh, 6 / zoom); ctx.fill()
-  ctx.fillStyle = txtPrimary(); ctx.font = `600 ${13 / zoom}px Inter, sans-serif`; ctx.fillText(item.name || item.hex, x + pad, y + pad + bh + 18 / zoom)
-  ctx.fillStyle = txtSecondary(); ctx.font = `${11 / zoom}px Inter, sans-serif`; ctx.fillText(item.hex, x + pad, y + pad + bh + 34 / zoom)
-  if (item.usage) { ctx.fillStyle = txtMuted(); ctx.font = `${10 / zoom}px Inter, sans-serif`; wrapText(ctx, item.usage, x + pad, y + pad + bh + 50 / zoom, w - pad * 2, 14 / zoom, h - pad - bh - 50 / zoom) }
+  ctx.fillStyle = item.hex || '#000'; ctx.beginPath(); roundRect(ctx, x + PAD, y + PAD, w - PAD * 2, bh, 6); ctx.fill()
+  ctx.fillStyle = txtPrimary(); ctx.font = `600 ${13 / zoom}px Inter, sans-serif`; ctx.fillText(item.name || item.hex, x + PAD, y + PAD + bh + 18 / zoom)
+  ctx.fillStyle = txtSecondary(); ctx.font = `${11 / zoom}px Inter, sans-serif`; ctx.fillText(item.hex, x + PAD, y + PAD + bh + 34 / zoom)
+  if (item.usage) { ctx.fillStyle = txtMuted(); ctx.font = `${10 / zoom}px Inter, sans-serif`; wrapText(ctx, item.usage, x + PAD, y + PAD + bh + 50, w - PAD * 2, 14, h - PAD - bh - 54) }
 }
 
-function drawSizeGuideItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, pad: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('SIZE', x + pad, y + pad + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + pad, y + pad + 24 / zoom)
-  const mw = w - pad * 2; const mh = h - pad * 2 - 45 / zoom; const aspect = (item.width || 1) / (item.height || 1)
+function drawSizeGuideItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('SIZE', x + PAD, y + PAD + 9 / zoom)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24 / zoom)
+  const mw = w - PAD * 2; const mh = h - PAD * 2 - 48; const aspect = (item.width || 1) / (item.height || 1)
   let bw = mw * 0.8; let bh = bw / aspect; if (bh > mh) { bh = mh; bw = bh * aspect }
-  const cx = x + pad + (mw - bw) / 2; const by = y + pad + 32 / zoom
+  const cx = x + PAD + (mw - bw) / 2; const by = y + PAD + 34
   ctx.strokeStyle = '#0d9488'; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4 / zoom, 3 / zoom]); ctx.strokeRect(cx, by, bw, bh); ctx.setLineDash([])
-  ctx.fillStyle = accent(); ctx.font = `500 ${10 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
-  ctx.fillText(`${item.width}${item.unit}`, cx + bw / 2, by + bh + 14 / zoom)
-  ctx.save(); ctx.translate(cx - 8 / zoom, by + bh / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(`${item.height}${item.unit}`, 0, 0); ctx.restore()
-  ctx.fillStyle = txtMuted(); ctx.font = `${9 / zoom}px Inter, sans-serif`; ctx.fillText(item.orientation, cx + bw / 2, by + bh + 26 / zoom); ctx.textAlign = 'start'
+  ctx.fillStyle = accent(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
+  ctx.fillText(`${item.width}${item.unit}`, cx + bw / 2, by + bh + 14)
+  ctx.save(); ctx.translate(cx - 8, by + bh / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(`${item.height}${item.unit}`, 0, 0); ctx.restore()
+  ctx.fillStyle = txtMuted(); ctx.font = `${9 / zoom}px Inter, sans-serif`; ctx.fillText(item.orientation, cx + bw / 2, by + bh + 26); ctx.textAlign = 'start'
 }
 
-function drawContainerItem(ctx: CanvasRenderingContext2D, item: ContainerItem, x: number, y: number, w: number, h: number, pad: number, zoom: number) {
-  ctx.fillStyle = '#059669'; ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('CONTAINER', x + pad, y + pad + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + pad, y + pad + 24 / zoom)
+function drawContainerItem(ctx: CanvasRenderingContext2D, item: ContainerItem, x: number, y: number, w: number, h: number, zoom: number) {
+  ctx.fillStyle = '#059669'; ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('CONTAINER', x + PAD, y + PAD + 9 / zoom)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24 / zoom)
   ctx.fillStyle = txtMuted(); ctx.font = `${10 / zoom}px Inter, sans-serif`
   const childCount = item.children?.length || 0
-  ctx.fillText(`${childCount} items · ${item.layout}${item.collapsed ? ' · collapsed' : ''}`, x + pad, y + pad + 38 / zoom)
+  ctx.fillText(`${childCount} items · ${item.layout}${item.collapsed ? ' · collapsed' : ''}`, x + PAD, y + PAD + 40 / zoom)
 
-  // Draw expand/collapse indicator
-  const iconX = x + w - pad - 16 / zoom
-  const iconY = y + pad + 4 / zoom
+  const iconX = x + w - PAD - 16
+  const iconY = y + PAD + 4
   ctx.strokeStyle = txtMuted(); ctx.lineWidth = 1.5 / zoom
   ctx.beginPath()
   if (item.collapsed) {
-    // Plus icon
-    ctx.moveTo(iconX, iconY + 6 / zoom); ctx.lineTo(iconX + 12 / zoom, iconY + 6 / zoom)
-    ctx.moveTo(iconX + 6 / zoom, iconY); ctx.lineTo(iconX + 6 / zoom, iconY + 12 / zoom)
+    ctx.moveTo(iconX, iconY + 6); ctx.lineTo(iconX + 6, iconY); ctx.lineTo(iconX + 12, iconY + 6)
   } else {
-    // Minus icon
-    ctx.moveTo(iconX, iconY + 6 / zoom); ctx.lineTo(iconX + 12 / zoom, iconY + 6 / zoom)
+    ctx.moveTo(iconX, iconY + 6); ctx.lineTo(iconX + 12, iconY + 6)
+    ctx.moveTo(iconX + 6, iconY); ctx.lineTo(iconX + 6, iconY + 12)
   }
   ctx.stroke()
 
-  // When expanded, draw children as mini-previews
-  if (!item.collapsed && item.children?.length > 0) {
-    const previewY = y + pad + 50 / zoom
-    const previewH = h - pad * 2 - 50 / zoom
-    const cols = Math.max(1, Math.min(4, Math.floor((w - pad * 2) / (60 / zoom))))
-    const cellW = (w - pad * 2 - (cols - 1) * 4 / zoom) / cols
-    const cellH = Math.min(40 / zoom, previewH / Math.ceil(item.children.length / cols))
-
-    for (let i = 0; i < Math.min(12, item.children.length); i++) {
+  if (!item.collapsed && item.children?.length) {
+    const previewY = y + PAD + 52
+    const previewH = h - PAD * 2 - 56
+    const cols = Math.max(1, Math.min(4, Math.floor((w - PAD * 2) / 64)))
+    const cellW = (w - PAD * 2 - (cols - 1) * 4) / cols
+    const cellH = Math.min(40, previewH / Math.ceil(item.children.length / cols))
+    for (let i = 0; i < item.children.length; i++) {
       const child = item.children[i]
-      if (!('pos' in child)) continue
       const col = i % cols
       const row = Math.floor(i / cols)
-      const cx = x + pad + col * (cellW + 4 / zoom)
-      const cy = previewY + row * (cellH + 4 / zoom)
-
-      // Mini card
-      ctx.fillStyle = isDark() ? '#1a1a25' : '#f8f9fa'
-      ctx.strokeStyle = isDark() ? '#2a2a3a' : '#dee2e6'
+      const cx = x + PAD + col * (cellW + 4)
+      const cy = previewY + row * (cellH + 4)
+      const ccolor = KIND_COLORS[child.kind] || accent()
+      ctx.fillStyle = ccolor + '22'; ctx.strokeStyle = ccolor
       ctx.lineWidth = 0.5 / zoom
-      ctx.beginPath(); roundRect(ctx, cx, cy, cellW, cellH, 3 / zoom); ctx.fill(); ctx.stroke()
-
-      // Kind label
-      const kindColor = KIND_COLORS[child.kind] || '#6b7280'
-      ctx.fillStyle = kindColor
+      ctx.beginPath(); roundRect(ctx, cx, cy, cellW, cellH, 3); ctx.fill(); ctx.stroke()
+      ctx.fillStyle = ccolor
       ctx.font = `600 ${6 / zoom}px Inter, sans-serif`
-      ctx.fillText(child.kind.toUpperCase(), cx + 4 / zoom, cy + 10 / zoom)
-
-      // Content preview
-      ctx.fillStyle = txtPrimary()
-      ctx.font = `${8 / zoom}px Inter, sans-serif`
+      ctx.fillText(child.kind.toUpperCase(), cx + 4, cy + 10)
       let preview = ''
-      switch (child.kind) {
-        case 'note': preview = (child as any).text?.slice(0, 20) || ''; break
-        case 'text': preview = (child as any).raw?.slice(0, 20) || ''; break
-        case 'image': preview = (child as any).description?.slice(0, 20) || ''; break
-        case 'palette': preview = (child as any).label || ''; break
-        default: preview = child.kind; break
-      }
-      ctx.fillText(preview, cx + 4 / zoom, cy + 22 / zoom)
+      if ('text' in (child as any)) preview = (child as any).text?.slice(0, 20) || ''
+      else if ('description' in (child as any)) preview = (child as any).description?.slice(0, 20) || ''
+      else if ('url' in (child as any)) preview = (child as any).url?.slice(0, 20) || ''
+      else if ('raw' in (child as any)) preview = (child as any).raw?.slice(0, 20) || ''
+      ctx.fillStyle = txtSecondary()
+      ctx.font = `${8 / zoom}px Inter, sans-serif`
+      ctx.fillText(preview, cx + 4, cy + 22)
     }
-
-    if (item.children.length > 12) {
-      ctx.fillStyle = txtMuted(); ctx.font = `${9 / zoom}px Inter, sans-serif`
-      ctx.fillText(`+${item.children.length - 12} more`, x + pad, y + h - pad)
-    }
+  } else if (item.collapsed || !item.children?.length) {
+    ctx.fillStyle = txtMuted(); ctx.font = `${9 / zoom}px Inter, sans-serif`
+    if (childCount === 0) ctx.fillText('Empty — drag items here or add via chat', x + PAD, y + PAD + 56)
   }
 }
 
-function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, pad: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${10 / zoom}px Inter, sans-serif`; ctx.fillText(item.kind.toUpperCase(), x + pad, y + pad + 10 / zoom)
+function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  const label = item.kind.charAt(0).toUpperCase() + item.kind.slice(1).toLowerCase()
+  ctx.fillStyle = accent(); ctx.font = `600 ${10 / zoom}px Inter, sans-serif`; ctx.fillText(label, x + PAD, y + PAD + 10 / zoom)
+  const text = item.text || item.raw || item.content || ''
   ctx.fillStyle = txtPrimary(); ctx.font = `${12 / zoom}px Inter, sans-serif`
-  let text = ''
-  switch (item.kind) {
-    case 'text': text = item.raw; break
-    case 'link': text = item.title || item.url; break
-    case 'video': text = item.subjectDesc || 'Video'; break
-    default: text = item.text || ''; break
+
+  if (text.length > 60 || text.includes('\n')) {
+    wrapText(ctx, text, x + PAD, y + PAD + 24 / zoom, w - PAD * 2, 16 / zoom, h - PAD * 2 - 10 / zoom)
+  } else if (text.length > 30) {
+    ctx.font = `500 ${9 / zoom}px Inter, sans-serif`
+    ctx.fillText(text.slice(0, 30), x + PAD, y + PAD + 24 / zoom)
+  } else if (text.length > 0) {
+    ctx.font = `500 ${10 / zoom}px Inter, sans-serif`
+    ctx.fillText(text.slice(0, 60), x + PAD, y + PAD + 24 / zoom)
   }
 
-  // Check if expanded (from store)
-  const expandedId = useStore.getState().expandedItemId
-  const isExpanded = expandedId === item.id
+  if (item.purpose && h > 100) {
+    ctx.fillStyle = txtMuted(); ctx.font = `500 ${9 / zoom}px Inter, sans-serif`
+    ctx.fillText(item.purpose.slice(0, 40), x + PAD, y + PAD + 40 / zoom)
+  }
 
-  if (isExpanded) {
-    // Expanded: show full text with wrapping
-    wrapText(ctx, text, x + pad, y + pad + 24 / zoom, w - pad * 2, 16 / zoom, h - pad * 2 - 10 / zoom)
-    // Collapse indicator
-    ctx.fillStyle = accent()
-    ctx.font = `500 ${9 / zoom}px Inter, sans-serif`
-    ctx.fillText('▲ click to collapse', x + pad, y + h - pad)
-  } else if (zoom < 0.5) {
-    ctx.font = `500 ${10 / zoom}px Inter, sans-serif`
-    ctx.fillText(text.slice(0, 30) || item.kind, x + pad, y + pad + 24 / zoom)
-  } else if (zoom < 1) {
-    ctx.font = `500 ${11 / zoom}px Inter, sans-serif`
-    ctx.fillText(text.slice(0, 60), x + pad, y + pad + 24 / zoom)
-    if (item.purpose) {
-      ctx.fillStyle = txtMuted(); ctx.font = `${9 / zoom}px Inter, sans-serif`
-      ctx.fillText(item.purpose.slice(0, 40), x + pad, y + pad + 40 / zoom)
-    }
+  const summary = [item.purpose, item.importance].filter(Boolean).join(' · ')
+  if (summary) {
+    wrapText(ctx, summary, x + PAD, y + PAD + 28 / zoom, w - PAD * 2, 16 / zoom, h - PAD * 2 - 24 / zoom)
   } else {
-    // Normal zoom: show truncated with expand hint
-    wrapText(ctx, text, x + pad, y + pad + 28 / zoom, w - pad * 2, 16 / zoom, h - pad * 2 - 24 / zoom)
-    // Expand hint
-    ctx.fillStyle = accent()
-    ctx.font = `${9 / zoom}px Inter, sans-serif`
-    ctx.fillText('▼ click to expand', x + pad, y + h - pad)
-    const tags = item.tags || []
-    if (tags.length > 0) {
-      ctx.fillStyle = txtMuted(); ctx.font = `${8 / zoom}px Inter, sans-serif`
-      ctx.fillText(tags.slice(0, 3).join(', '), x + pad, y + h - pad + 14 / zoom)
-    }
+    ctx.font = `500 ${9 / zoom}px Inter, sans-serif`
+    ctx.fillText(item.text?.slice(0, 30) || item.kind, x + PAD, y + PAD + 28 / zoom)
+  }
+
+  if ('tags' in item && item.tags?.length) {
+    const tags = item.tags.join(', ')
+    ctx.fillStyle = txtMuted(); ctx.font = `${8 / zoom}px Inter, sans-serif`
+    ctx.fillText(tags.slice(0, 3).join(', '), x + PAD, y + h - PAD + 14 / zoom)
   }
 }
 
