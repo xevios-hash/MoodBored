@@ -11,6 +11,7 @@ import { SplashScreen } from '@/components/SplashScreen'
 import { StartScreen } from '@/components/StartScreen'
 import { MobileLayout } from '@/components/MobileLayout'
 import { Lightbox } from '@/components/Lightbox'
+import { ExportModal } from '@/components/ExportModal'
 
 export default function App() {
   const [phase, setPhase] = useState<'splash' | 'start' | 'workspace'>('splash')
@@ -21,6 +22,7 @@ export default function App() {
   const inspectorOpen = useStore((s) => s.inspectorOpen)
   const theme = useStore((s) => s.project.settings.theme)
   const [lightboxItem, setLightboxItem] = useState<any>(null)
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
   useEffect(() => {
     document.body.classList.remove('light', 'dark')
@@ -55,6 +57,10 @@ export default function App() {
     setPhase('workspace')
   }, [])
 
+  const handleExportForCreation = useCallback(() => {
+    setExportModalOpen(true)
+  }, [])
+
   // Mobile layout
   if (isMobile && phase === 'workspace') {
     return (
@@ -85,7 +91,7 @@ export default function App() {
           <Sidebar />
         </div>
         <main className="flex flex-col flex-1 min-w-0">
-          <TopBar />
+          <TopBar onExportForCreation={handleExportForCreation} />
           <div className="flex flex-1 min-h-0">
             <Canvas />
             <div className={`transition-all duration-200 ease-in-out ${chatOpen ? 'w-80 opacity-100' : 'w-0 opacity-0 overflow-hidden'}`}>
@@ -98,7 +104,23 @@ export default function App() {
         </main>
         {settingsOpen && <SettingsModal />}
         {searchOpen && <SearchOverlay />}
+        {exportModalOpen && <ExportModalWrapper onClose={() => setExportModalOpen(false)} />}
       </div>
     </>
   )
+}
+
+function ExportModalWrapper({ onClose }: { onClose: () => void }) {
+  const project = useStore((s) => s.project)
+  const activeViewportId = useStore((s) => s.activeViewportId)
+  const selectedIds = useStore((s) => s.selectedIds)
+  const viewport = project.viewports.find(v => v.id === activeViewportId) ?? project.viewports[0]
+  const allItems = viewport?.items ?? []
+  const selectedItems = allItems.filter(i => selectedIds.has(i.id))
+  const items = selectedItems.length > 0 ? selectedItems : allItems
+  const label = selectedItems.length > 0
+    ? `${selectedItems.length} selected items`
+    : `All ${allItems.length} items on "${viewport?.name}"`
+
+  return <ExportModal items={items} boardName={project.name} onClose={onClose} />
 }
