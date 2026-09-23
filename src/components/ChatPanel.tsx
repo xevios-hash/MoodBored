@@ -3,8 +3,7 @@ import { useStore } from '@/stores/useStore'
 import {
   streamChat, parseActionsIncremental, buildSystemPrompt,
   summarizeProject, describeBoard, resetJevCounter,
-  gateItems, getAgentDiagnostics, resetAgentDiagnostics, agentDiagnostics,
-  type ParsedActions,
+  getAgentDiagnostics, resetAgentDiagnostics, agentDiagnostics,
 } from '@/lib/api'
 import { Send, Trash2, StopCircle, AlertCircle, MessageSquare, Activity } from 'lucide-react'
 import { v4 as uuid } from 'uuid'
@@ -153,36 +152,26 @@ export function ChatPanel() {
   const currentViewportItems = () =>
     useStore.getState().project.viewports.find(v => v.id === useStore.getState().activeViewportId)?.items ?? []
 
-  // Jev gate — runs once per completed response against the whole batch.
+  // Agent execution — runs once per completed response against the whole batch.
+  // Jev gate is disabled until proven stable; direct execution for debugging.
   const gateAndExecute = async (actions: AgentAction[], retriesLeft: number, assistantMsg: ChatMessage, allowFormatRetry: boolean = true) => {
+    addMessage({ id: uuid(), role: 'system', content: `[debug] actions parsed: ${actions.length}`, timestamp: new Date().toISOString() })
+
     if (actions.length === 0) {
-      console.info('[MoodBored] diagnostics — no actions parsed:', getAgentDiagnostics().timeline)
       // Model drifted into prose without emitting json blocks — retry once.
       if (retriesLeft > 0 && allowFormatRetry) {
-        addMessage({ id: uuid(), role: 'system', content: 'No items parsed from the response — asking the AI to reformat them as json blocks.', timestamp: new Date().toISOString() })
-        await requestCompletion(['Your previous response contained NO ```json blocks, so nothing was added to the board. Re-emit ALL items now as one or more ```json blocks per the ITEM TYPES spec. Do not write markdown lists or headings; put that content inside the json objects.'], retriesLeft, true)
+        addMessage({ id: uuid(), role: 'system', content: 'No items parsed — asking AI to reformat as json blocks.', timestamp: new Date().toISOString() })
+        await requestCompletion(['Your previous response contained NO ```json blocks, so nothing was added to the board. Re-emit ALL items now as one or more ```json blocks per the ITEM TYPES spec. Do not write markdown lists or headings; put that content inside the json objects.'], retriesLeft, false)
         return
       }
       showToast('No items returned — try rephrasing', 'info')
       return
     }
-    const proposals = actions.map((a: any) => ({
-      kind: a.item?.kind ?? 'unknown',
-      description: a.item?.description ?? a.item?.text ?? a.item?.subjectDesc ?? a.item?.label ?? a.item?.url ?? '',
-    }))
-    const result = await gateItems(describeBoard(currentViewportItems()), proposals, settings.apiKey, settings.jevThreshold)
-    if (result.accepted) {
-      executeActions(actions)
-      const msg = `Jev gate passed (${(result.score * 100).toFixed(0)}%) — executing batch. ${result.reasoning}`
-      addMessage({ id: uuid(), role: 'system', content: msg, timestamp: new Date().toISOString() })
-      showToast(`Added ${actions.length} item${actions.length > 1 ? 's' : ''}`, 'success')
-    } else if (retriesLeft > 0) {
-      addMessage({ id: uuid(), role: 'system', content: `Jev gate rejected (score ${(result.score * 100).toFixed(0)}% vs threshold ${(settings.jevThreshold * 100).toFixed(0)}%) — asking AI to refine. ${result.reasoning}`, timestamp: new Date().toISOString() })
-      await requestCompletion([`Previous proposal scored ${(result.score * 100).toFixed(0)}%. Reasoning: ${result.reasoning}. Rework the JSON block with more on-theme, less redundant items.`], retriesLeft - 1)
-    } else {
-      addMessage({ id: uuid(), role: 'system', content: `Jev gate rejected again (final score ${(result.score * 100).toFixed(0)}%): ${result.reasoning}`, timestamp: new Date().toISOString() })
-      showToast('Items rejected by quality gate', 'info')
-    }
+
+    // Direct execution — no Jev gate in the way while we debug
+    executeActions(actions)
+    addMessage({ id: uuid(), role: 'system', content: `[debug] executed ${actions.length} actions. Items on board: ${currentViewportItems().length}`, timestamp: new Date().toISOString() })
+    showToast(`Added ${actions.length} item${actions.length > 1 ? 's' : ''}`, 'success')
   }
 
   const handleClear = () => {
