@@ -6,7 +6,7 @@ import {
   gateItems, getAgentDiagnostics, resetAgentDiagnostics, agentDiagnostics,
   type ParsedActions,
 } from '@/lib/api'
-import { Send, Trash2, StopCircle, AlertCircle, MessageSquare } from 'lucide-react'
+import { Send, Trash2, StopCircle, AlertCircle, MessageSquare, Activity } from 'lucide-react'
 import { v4 as uuid } from 'uuid'
 import type { ChatMessage, AgentAction } from '@/types'
 import { showToast } from '@/lib/toasts'
@@ -182,13 +182,24 @@ export function ChatPanel() {
     if (confirm('Clear all chat messages?')) { saveMessages([]); resetJevCounter(); showToast('Chat cleared', 'info') }
   }
 
+  const showDiagnostics = () => {
+    const d = getAgentDiagnostics()
+    const summary = `chunks ${d.chunksSeen} · blocks ${d.jsonBlockMatches} · parsed ${d.actionsParsed} · executed ${d.actionsExecuted}${d.lastError ? ` · last error: ${d.lastError}` : ''}\n\n${d.timeline.slice(-6).join('\n')}`
+    showToast(summary || 'No agent activity yet', d.lastError ? 'error' : 'info', 8000)
+  }
+
   return (
     <div className="h-full glass-panel border-l border-surface-4 flex flex-col">
       <div className="p-3 border-b border-surface-4 flex items-center justify-between">
         <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Chat</h2>
-        <button onClick={handleClear} className="btn p-1 text-text-muted hover:text-danger hover:bg-danger-light rounded">
-          <Trash2 size={14} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={showDiagnostics} className="text-text-muted hover:text-text-primary p-1" aria-label="Show agent diagnostics" title="Pipeline diagnostics">
+            <Activity size={14} />
+          </button>
+          <button onClick={handleClear} className="btn p-1 text-text-muted hover:text-danger hover:bg-danger-light rounded" aria-label="Clear chat">
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
