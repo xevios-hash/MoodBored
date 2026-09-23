@@ -69,6 +69,7 @@ export function ChatPanel() {
   const requestCompletion = async (
     correctiveNotes: string[],
     retriesLeft: number,
+    allowFormatRetry: boolean = true,
   ) => {
     setStreaming(true)
 
@@ -125,7 +126,7 @@ export function ChatPanel() {
           const allActions = [...pendingActions, ...finalResult.actions]
           agentDiagnostics.actionsParsed = allActions.length
 
-          await gateAndExecute(allActions, retriesLeft, assistantMsg)
+          await gateAndExecute(allActions, retriesLeft, assistantMsg, allowFormatRetry)
           setStreaming(false)
         },
         (err) => {
@@ -153,9 +154,16 @@ export function ChatPanel() {
     useStore.getState().project.viewports.find(v => v.id === useStore.getState().activeViewportId)?.items ?? []
 
   // Jev gate — runs once per completed response against the whole batch.
-  const gateAndExecute = async (actions: AgentAction[], retriesLeft: number, assistantMsg: ChatMessage) => {
+  const gateAndExecute = async (actions: AgentAction[], retriesLeft: number, assistantMsg: ChatMessage, allowFormatRetry: boolean = true) => {
     if (actions.length === 0) {
       console.info('[MoodBored] diagnostics — no actions parsed:', getAgentDiagnostics().timeline)
+      // Model drifted into prose without emitting json blocks — retry once.
+      if (retriesLeft > 0 && allowFormatRetry) {
+        addMessage({ id: uuid(), role: 'system', content: 'No items parsed from the response — asking the AI to reformat them as json blocks.', timestamp: new Date().toISOString() })
+        await requestCompletion(['Your previous response contained NO ```json blocks, so nothing was added to the board. Re-emit ALL items now as one or more ```json blocks per the ITEM TYPES spec. Do not write markdown lists or headings; put that content inside the json objects.'], retriesLeft, true)
+        return
+      }
+      showToast('No items returned — try rephrasing', 'info')
       return
     }
     const proposals = actions.map((a: any) => ({
