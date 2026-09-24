@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '@/stores/useStore'
 import { hitTestItem } from '@/lib/layout'
 import { loadFont } from '@/lib/fonts'
@@ -150,6 +150,10 @@ export function Canvas() {
   const lastSize = useRef({ w: 0, h: 0 })
   const dragRef = useRef<any>(null)
   const mouseWorld = useRef({ x: 0, y: 0 })
+  const lassoRef = useRef<{ sx: number; sy: number; cx: number; cy: number } | null>(null)
+  const snapGuides = useRef<{ x: number[]; y: number[] }>({ x: [], y: [] })
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; wx: number; wy: number; itemId?: string } | null>(null)
+  const [showLayers, setShowLayers] = useState(false)
 
   const project = useStore((s) => s.project)
   const activeViewportId = useStore((s) => s.activeViewportId)
@@ -264,6 +268,36 @@ export function Canvas() {
         if ('ports' in item && item.ports) drawPorts(ctx, item, c.zoom)
       }
 
+      // Alignment guides (snap lines during drag)
+      if (dragRef.current?.type === 'item' && snapGuides.current.x.length + snapGuides.current.y.length > 0) {
+        ctx.save()
+        ctx.strokeStyle = isDark() ? 'rgba(45,212,191,0.6)' : 'rgba(13,148,136,0.6)'
+        ctx.lineWidth = 1 / c.zoom
+        ctx.setLineDash([4 / c.zoom, 4 / c.zoom])
+        for (const gx of snapGuides.current.x) {
+          ctx.beginPath(); ctx.moveTo(gx, -10000); ctx.lineTo(gx, 10000); ctx.stroke()
+        }
+        for (const gy of snapGuides.current.y) {
+          ctx.beginPath(); ctx.moveTo(-10000, gy); ctx.lineTo(10000, gy); ctx.stroke()
+        }
+        ctx.setLineDash([])
+        ctx.restore()
+      }
+
+      // Lasso selection rectangle
+      if (lassoRef.current) {
+        const l = lassoRef.current
+        const lx = Math.min(l.sx, l.cx); const ly = Math.min(l.sy, l.cy)
+        const lw = Math.abs(l.cx - l.sx); const lh = Math.abs(l.cy - l.sy)
+        ctx.fillStyle = isDark() ? 'rgba(45,212,191,0.08)' : 'rgba(13,148,136,0.08)'
+        ctx.fillRect(lx, ly, lw, lh)
+        ctx.strokeStyle = isDark() ? 'rgba(45,212,191,0.5)' : 'rgba(13,148,136,0.5)'
+        ctx.lineWidth = 1.5 / c.zoom
+        ctx.setLineDash([6 / c.zoom, 4 / c.zoom])
+        ctx.strokeRect(lx, ly, lw, lh)
+        ctx.setLineDash([])
+      }
+
       // Empty state
       if (its.filter(i => i.kind !== 'connector').length === 0) {
         ctx.fillStyle = txtSecondary()
@@ -292,6 +326,9 @@ export function Canvas() {
     const state = useStore.getState()
     const wx = (e.clientX - rect.left - state.canvas.panX) / state.canvas.zoom
     const wy = (e.clientY - rect.top - state.canvas.panY) / state.canvas.zoom
+
+    // Close context menu on any click
+    setContextMenu(null)
 
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       dragRef.current = { type: 'pan', sx: e.clientX - state.canvas.panX, sy: e.clientY - state.canvas.panY }
@@ -364,7 +401,9 @@ export function Canvas() {
         dragRef.current = { type: 'item', sx: e.clientX, sy: e.clientY, starts }
       }
     } else {
-      state.clearSelection()
+      // Start lasso selection on empty canvas
+      lassoRef.current = { sx: wx, sy: wy, cx: wx, cy: wy }
+      if (!e.shiftKey) state.clearSelection()
       if (state.connectingFrom) state.endConnect()
     }
   }
@@ -380,6 +419,17 @@ export function Canvas() {
     needsRedraw.current = true
 
     const d = dragRef.current
+    if (!d && !lassoRef.current) return
+
+    // Lasso tracking
+    if (lassoRef.current) {
+      const wx = (e.clientX - rect.left - state.canvas.panX) / state.canvas.zoom
+      const wy = (e.clientY - rect.top - state.canvas.panY) / state.canvas.zoom
+      lassoRef.current.cx = wx
+      lassoRef.current.cy = wy
+      return
+    }
+
     if (!d) return
 
     if (d.type === 'pan') {
@@ -387,6 +437,40 @@ export function Canvas() {
     } else if (d.type === 'item' && d.starts) {
       const dx = (e.clientX - d.sx) / state.canvas.zoom
       const dy = (e.clientY - d.sy) / state.canvas.zoom
+      // Alignment snapping — find nearest edges of other items
+      const SNAP_THRESHOLD = 8 / state.canvas.zoom
+      const guidesX: number[] = []
+      const guidesY: number[] = []
+      const vp = state.project.viewports.find(v => v.id === state.activeViewportId) ?? state.project.viewports[0]
+      const others = (vp?.items ?? []).filter(i => i.kind !== 'connector' && 'pos' in i && !d.starts.has(i.id))
+      for (const [id, start] of d.starts) {
+        const movedItem = (vp?.items ?? []).find(i => i.id === id)
+        if (!movedItem || !('pos' in movedItem)) continue
+        const w = (movedItem as any).size?.w ?? 250
+        const h = (movedItem as any).size?.h ?? 150
+        const nx = start.x + dx; const ny = start.y + dy
+        for (const other of others) {
+          if (!('pos' in other)) continue
+          const ow = (other as any).size?.w ?? 250
+          const oh = (other as any).size?.h ?? 150
+          // Left-to-left, left-to-right, right-to-right, center-to-center
+          const xPairs = [
+            [nx, other.pos.x], [nx, other.pos.x + ow], [nx + w, other.pos.x], [nx + w, other.pos.x + ow],
+            [nx + w / 2, other.pos.x + ow / 2],
+          ]
+          for (const [a, b] of xPairs) {
+            if (Math.abs(a - b) < SNAP_THRESHOLD) { guidesX.push(b); break }
+          }
+          const yPairs = [
+            [ny, other.pos.y], [ny, other.pos.y + oh], [ny + h, other.pos.y], [ny + h, other.pos.y + oh],
+            [ny + h / 2, other.pos.y + oh / 2],
+          ]
+          for (const [a, b] of yPairs) {
+            if (Math.abs(a - b) < SNAP_THRESHOLD) { guidesY.push(b); break }
+          }
+        }
+      }
+      snapGuides.current = { x: [...new Set(guidesX)], y: [...new Set(guidesY)] }
       for (const [id, start] of d.starts) {
         state.moveItem(id, { x: start.x + dx, y: start.y + dy })
       }
@@ -417,6 +501,30 @@ export function Canvas() {
       }
       state.endConnect()
     }
+    // Complete lasso selection
+    if (lassoRef.current) {
+      const l = lassoRef.current
+      const lx = Math.min(l.sx, l.cx); const ly = Math.min(l.sy, l.cy)
+      const rx = Math.max(l.sx, l.cx); const ry = Math.max(l.sy, l.cy)
+      const vp = state.project.viewports.find(v => v.id === state.activeViewportId) ?? state.project.viewports[0]
+      const newSel = new Set<string>()
+      for (const item of (vp?.items ?? [])) {
+        if (item.kind === 'connector' || !('pos' in item)) continue
+        const w = (item as any).size?.w ?? 250; const h = (item as any).size?.h ?? 150
+        if (item.pos.x + w > lx && item.pos.x < rx && item.pos.y + h > ly && item.pos.y < ry) {
+          newSel.add(item.id)
+        }
+      }
+      if (newSel.size > 0) {
+        useStore.setState({ selectedIds: newSel })
+      }
+      lassoRef.current = null
+      return
+    }
+
+    // Clear snap guides
+    snapGuides.current = { x: [], y: [] }
+
     dragRef.current = null
   }
 
@@ -481,7 +589,16 @@ export function Canvas() {
     const wy = (e.clientY - rect.top - state.canvas.panY) / state.canvas.zoom
     const vp = state.project.viewports.find(v => v.id === state.activeViewportId) ?? state.project.viewports[0]
     const hit = hitTestItem(vp?.items ?? [], wx, wy)
-    if (!hit) return
+
+    // Double-click on empty canvas → create a new note
+    if (!hit) {
+      state.addItem({
+        kind: 'note', id: crypto.randomUUID(), text: '',
+        purpose: '', importance: '', tags: [],
+        pos: { x: wx - 125, y: wy - 75 },
+      })
+      return
+    }
 
     // Double-click on image that's already selected → open lightbox
     if (hit.kind === 'image' && state.selectedIds.has(hit.id)) {
@@ -508,6 +625,114 @@ export function Canvas() {
     }
   }
 
+  // Right-click context menu
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const state = useStore.getState()
+    const wx = (e.clientX - rect.left - state.canvas.panX) / state.canvas.zoom
+    const wy = (e.clientY - rect.top - state.canvas.panY) / state.canvas.zoom
+    const vp = state.project.viewports.find(v => v.id === state.activeViewportId) ?? state.project.viewports[0]
+    const hit = hitTestItem(vp?.items ?? [], wx, wy)
+    if (hit && !state.selectedIds.has(hit.id)) state.selectItem(hit.id)
+    setContextMenu({ x: e.clientX, y: e.clientY, wx, wy, itemId: hit?.id })
+  }
+
+  const handleContextAction = (action: string) => {
+    const state = useStore.getState()
+    if (!contextMenu) return
+    switch (action) {
+      case 'delete':
+        for (const id of state.selectedIds) state.removeItem(id)
+        break
+      case 'duplicate':
+        state.copySelected(); state.paste({ x: 30, y: 30 })
+        break
+      case 'bring-front': {
+        const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
+        if (!vp) break
+        const selected = vp.items.filter(i => state.selectedIds.has(i.id))
+        const rest = vp.items.filter(i => !state.selectedIds.has(i.id))
+        useStore.setState((s) => ({
+          project: { ...s.project, viewports: s.project.viewports.map(v =>
+            v.id === s.activeViewportId ? { ...v, items: [...rest, ...selected] } : v
+          )},
+        }))
+        break
+      }
+      case 'send-back': {
+        const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
+        if (!vp) break
+        const selected = vp.items.filter(i => state.selectedIds.has(i.id))
+        const rest = vp.items.filter(i => !state.selectedIds.has(i.id))
+        useStore.setState((s) => ({
+          project: { ...s.project, viewports: s.project.viewports.map(v =>
+            v.id === s.activeViewportId ? { ...v, items: [...selected, ...rest] } : v
+          )},
+        }))
+        break
+      }
+      case 'select-all':
+        state.selectAll()
+        break
+      case 'new-note':
+        state.addItem({ kind: 'note', id: crypto.randomUUID(), text: '', purpose: '', importance: '', tags: [], pos: { x: contextMenu.wx - 125, y: contextMenu.wy - 75 } })
+        break
+    }
+    setContextMenu(null)
+  }
+
+  // Touch gestures — pinch-to-zoom and touch-drag
+  const touchRef = useRef<{ id: number; x: number; y: number }[] | null>(null)
+  const pinchRef = useRef<{ dist: number; zoom: number; cx: number; cy: number } | null>(null)
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const touches = Array.from(e.touches).map(t => ({ id: t.identifier, x: t.clientX, y: t.clientY }))
+    if (touches.length === 2) {
+      const dx = touches[1].x - touches[0].x
+      const dy = touches[1].y - touches[0].y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const state = useStore.getState()
+      pinchRef.current = { dist, zoom: state.canvas.zoom, cx: (touches[0].x + touches[1].x) / 2, cy: (touches[0].y + touches[1].y) / 2 }
+    }
+    touchRef.current = touches
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault()
+    const touches = Array.from(e.touches).map(t => ({ id: t.identifier, x: t.clientX, y: t.clientY }))
+    const state = useStore.getState()
+
+    if (touches.length === 2 && pinchRef.current && touchRef.current) {
+      const dx = touches[1].x - touches[0].x
+      const dy = touches[1].y - touches[0].y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const scale = dist / pinchRef.current.dist
+      const newZoom = Math.max(0.1, Math.min(5, pinchRef.current.zoom * scale))
+      const rect = canvasRef.current?.getBoundingClientRect()
+      if (rect) {
+        const cx = pinchRef.current.cx - rect.left
+        const cy = pinchRef.current.cy - rect.top
+        const factor = newZoom / state.canvas.zoom
+        state.setPan(cx - (cx - state.canvas.panX) * factor, cy - (cy - state.canvas.panY) * factor)
+      }
+      state.setZoom(newZoom)
+    } else if (touches.length === 1 && touchRef.current?.length === 1) {
+      const dx = touches[0].x - touchRef.current[0].x
+      const dy = touches[0].y - touchRef.current[0].y
+      state.setPan(state.canvas.panX + dx, state.canvas.panY + dy)
+    }
+
+    touchRef.current = touches
+    needsRedraw.current = true
+  }
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) pinchRef.current = null
+    if (e.touches.length === 0) touchRef.current = null
+  }
+
   const itemCount = items.filter(i => i.kind !== 'connector').length
   const bgType = project.settings.canvasBgType || 'color'
   const bgVideo = project.settings.canvasBgVideo || ''
@@ -525,9 +750,10 @@ export function Canvas() {
         </video>
       )}
 
-      <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 1, background: 'transparent' }}
+      <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 1, background: 'transparent', touchAction: 'none' }}
         onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
-        onClick={onClick} onDoubleClick={onDoubleClick} onWheel={onWheel} onContextMenu={e => e.preventDefault()} />
+        onClick={onClick} onDoubleClick={onDoubleClick} onWheel={onWheel} onContextMenu={onContextMenu}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} />
 
       {/* Status bar */}
       <div style={{ position: 'absolute', bottom: 12, left: 12, fontSize: 11, color: '#6b7280', background: 'rgba(255,255,255,0.9)', padding: '6px 10px', borderRadius: 6, display: 'flex', gap: 12, alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)' }}>
@@ -581,13 +807,174 @@ export function Canvas() {
           {itemCount} items on board
         </div>
       )}
+
+      {/* Minimap */}
+      {itemCount > 0 && (
+        <Minimap items={items} canvas={canvas} canvasRef={canvasRef} />
+      )}
+
+      {/* Layers panel toggle */}
+      <button
+        onClick={() => setShowLayers(!showLayers)}
+        style={{ position: 'absolute', top: 12, left: 12, fontSize: 10, color: '#6b7280', background: 'rgba(255,255,255,0.9)', padding: '4px 8px', borderRadius: 4, border: 'none', cursor: 'pointer', backdropFilter: 'blur(8px)', zIndex: 10 }}
+        title="Toggle layers"
+      >
+        Layers
+      </button>
+
+      {/* Layers panel */}
+      {showLayers && (
+        <LayersPanel items={items} onClose={() => setShowLayers(false)} />
+      )}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 100, background: isDark() ? '#1e1e2e' : '#ffffff', borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.2)', border: `1px solid ${isDark() ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`, padding: 4, minWidth: 160 }}
+          onMouseLeave={() => setContextMenu(null)}
+        >
+          {contextMenu.itemId ? (
+            <>
+              <CtxItem label="Duplicate" shortcut="⌘C ⌘V" onClick={() => handleContextAction('duplicate')} />
+              <CtxItem label="Bring to Front" onClick={() => handleContextAction('bring-front')} />
+              <CtxItem label="Send to Back" onClick={() => handleContextAction('send-back')} />
+              <div style={{ height: 1, background: isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', margin: '4px 0' }} />
+              <CtxItem label="Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
+              <div style={{ height: 1, background: isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', margin: '4px 0' }} />
+              <CtxItem label="Delete" shortcut="⌫" onClick={() => handleContextAction('delete')} danger />
+            </>
+          ) : (
+            <>
+              <CtxItem label="New Note Here" onClick={() => handleContextAction('new-note')} />
+              <CtxItem label="Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Context Menu Item ──────────────────────────────────────────────
+
+function CtxItem({ label, shortcut, onClick, danger }: { label: string; shortcut?: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        width: '100%', padding: '6px 10px', border: 'none', borderRadius: 4,
+        background: 'transparent', cursor: 'pointer', fontSize: 12,
+        color: danger ? '#ef4444' : (isDark() ? '#e8e8ec' : '#1f2937'),
+        textAlign: 'left',
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+    >
+      <span>{label}</span>
+      {shortcut && <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 16 }}>{shortcut}</span>}
+    </button>
+  )
+}
+
+// ─── Minimap ────────────────────────────────────────────────────────
+
+function Minimap({ items, canvas, canvasRef }: { items: BoardItem[]; canvas: any; canvasRef: React.RefObject<HTMLCanvasElement | null> }) {
+  const W = 140; const H = 100
+  const nonConn = items.filter(i => i.kind !== 'connector' && 'pos' in i)
+  if (nonConn.length === 0) return null
+
+  const minX = Math.min(...nonConn.map((i: any) => i.pos.x))
+  const minY = Math.min(...nonConn.map((i: any) => i.pos.y))
+  const maxX = Math.max(...nonConn.map((i: any) => i.pos.x + (i.size?.w ?? 250)))
+  const maxY = Math.max(...nonConn.map((i: any) => i.pos.y + (i.size?.h ?? 150)))
+  const pad = 50
+  const worldW = maxX - minX + pad * 2
+  const worldH = maxY - minY + pad * 2
+  const scale = Math.min(W / worldW, H / worldH)
+
+  const rect = canvasRef.current?.getBoundingClientRect()
+  const vpW = (rect?.width ?? 800) / canvas.zoom
+  const vpH = (rect?.height ?? 600) / canvas.zoom
+  const vpX = -canvas.panX / canvas.zoom
+  const vpY = -canvas.panY / canvas.zoom
+
+  return (
+    <div style={{ position: 'absolute', bottom: 48, right: 12, width: W, height: H, background: isDark() ? 'rgba(22,22,31,0.9)' : 'rgba(255,255,255,0.9)', borderRadius: 6, border: `1px solid ${isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, overflow: 'hidden', backdropFilter: 'blur(8px)', zIndex: 10 }}>
+      <svg width={W} height={H}>
+        {nonConn.map((item: any) => {
+          const x = (item.pos.x - minX + pad) * scale
+          const y = (item.pos.y - minY + pad) * scale
+          const w = Math.max(2, (item.size?.w ?? 250) * scale)
+          const h = Math.max(2, (item.size?.h ?? 150) * scale)
+          return <rect key={item.id} x={x} y={y} width={w} height={h} fill={accent()} opacity={0.3} rx={1} />
+        })}
+        <rect
+          x={(vpX - minX + pad) * scale}
+          y={(vpY - minY + pad) * scale}
+          width={vpW * scale}
+          height={vpH * scale}
+          fill="none"
+          stroke={accent()}
+          strokeWidth={1.5}
+          opacity={0.6}
+        />
+      </svg>
+    </div>
+  )
+}
+
+// ─── Layers Panel ───────────────────────────────────────────────────
+
+function LayersPanel({ items, onClose }: { items: BoardItem[]; onClose: () => void }) {
+  const nonConn = items.filter(i => i.kind !== 'connector')
+  const selectedIds = useStore((s) => s.selectedIds)
+  const selectItem = useStore((s) => s.selectItem)
+  const toggleSelect = useStore((s) => s.toggleSelect)
+
+  const kindIcons: Record<string, string> = {
+    note: '📝', text: '📄', image: '🖼️', link: '🔗', video: '🎬',
+    palette: '🎨', gradient: '🌈', font: '🔤', swatch: '🟧',
+    sizeguide: '📐', container: '📦',
+  }
+
+  return (
+    <div style={{ position: 'absolute', top: 36, left: 12, width: 200, maxHeight: 300, background: isDark() ? 'rgba(22,22,31,0.95)' : 'rgba(255,255,255,0.95)', borderRadius: 8, border: `1px solid ${isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', overflow: 'hidden', zIndex: 10, backdropFilter: 'blur(8px)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderBottom: `1px solid ${isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
+        <span style={{ fontSize: 10, fontWeight: 600, color: isDark() ? '#a1a1b5' : '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Layers</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '0 2px' }}>×</button>
+      </div>
+      <div style={{ overflowY: 'auto', maxHeight: 260, padding: 4 }}>
+        {[...nonConn].reverse().map((item) => {
+          const sel = selectedIds.has(item.id)
+          const label = ('text' in item && item.text) ? item.text.slice(0, 20) :
+                        ('description' in item && item.description) ? item.description.slice(0, 20) :
+                        ('label' in item && item.label) ? item.label.slice(0, 20) :
+                        ('url' in item && item.url) ? item.url.slice(0, 20) : item.kind
+          return (
+            <button
+              key={item.id}
+              onClick={(e) => e.shiftKey ? toggleSelect(item.id) : selectItem(item.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+                padding: '4px 8px', border: 'none', borderRadius: 4,
+                background: sel ? (isDark() ? 'rgba(45,212,191,0.15)' : 'rgba(13,148,136,0.1)') : 'transparent',
+                cursor: 'pointer', fontSize: 11, textAlign: 'left',
+                color: sel ? accent() : (isDark() ? '#e8e8ec' : '#1f2937'),
+              }}
+            >
+              <span style={{ fontSize: 12, width: 18, textAlign: 'center' }}>{kindIcons[item.kind] || '•'}</span>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+              <span style={{ fontSize: 9, color: '#9ca3af' }}>{item.kind}</span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
 // ─── Draw Functions ─────────────────────────────────────────────────
-
-// ─── Draw Constants (world coordinates, scaled by ctx.transform) ────
 // These are intentionally NOT divided by zoom — the canvas transform
 // handles scaling. Text and thin chrome use /zoom to stay readable
 // at any zoom level (constant screen-pixel size).
