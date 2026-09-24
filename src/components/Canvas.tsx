@@ -804,15 +804,15 @@ export function Canvas() {
         onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} />
 
       {/* Status bar */}
-      <div style={{ position: 'absolute', bottom: 12, left: 12, fontSize: 11, color: '#6b7280', background: 'rgba(255,255,255,0.9)', padding: '6px 10px', borderRadius: 6, display: 'flex', gap: 12, alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)' }}>
-        <button onClick={() => { useStore.getState().setZoom(canvas.zoom * 0.8); needsRedraw.current = true }} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, fontWeight: 600, padding: '0 4px' }}>−</button>
-        <span style={{ minWidth: 36, textAlign: 'center' }}>{Math.round(canvas.zoom * 100)}%</span>
-        <button onClick={() => { useStore.getState().setZoom(canvas.zoom * 1.25); needsRedraw.current = true }} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, fontWeight: 600, padding: '0 4px' }}>+</button>
-        <div style={{ width: 1, height: 12, background: '#e2e4e8' }} />
+      <div className="status-bar" style={{ position: 'absolute', bottom: 12, left: 12, zIndex: 10 }}>
+        <button className="status-bar-btn" onClick={() => { useStore.getState().setZoom(canvas.zoom * 0.8); needsRedraw.current = true }}>−</button>
+        <span style={{ minWidth: 36, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(canvas.zoom * 100)}%</span>
+        <button className="status-bar-btn" onClick={() => { useStore.getState().setZoom(canvas.zoom * 1.25); needsRedraw.current = true }}>+</button>
+        <div className="status-divider" />
         <span>{itemCount} items</span>
-        <div style={{ width: 1, height: 12, background: '#e2e4e8' }} />
-        <button onClick={handleEyedropper} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 11, padding: '0 4px' }} title="Pick color from screen">🎨</button>
-        <button onClick={() => {
+        <div className="status-divider" />
+        <button className="status-bar-btn" onClick={handleEyedropper} title="Pick color from screen">🎨</button>
+        <button className="status-bar-btn" onClick={() => {
           const s = useStore.getState()
           const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
           if (!vp) return
@@ -828,7 +828,7 @@ export function Canvas() {
           const z = Math.min((r.width - pad * 2) / (maxX - minX), (r.height - pad * 2) / (maxY - minY), 2)
           s.setZoom(z)
           s.setPan(r.width / 2 - ((minX + maxX) / 2) * z, r.height / 2 - ((minY + maxY) / 2) * z)
-        }} style={{ background: 'none', border: 'none', color: '#0d9488', cursor: 'pointer', fontSize: 11, fontWeight: 500 }}>Fit All</button>
+        }} style={{ color: '#0d9488', fontWeight: 600 }}>Fit All</button>
         <button onClick={() => {
           const cvs = canvasRef.current
           if (!cvs) return
@@ -836,7 +836,7 @@ export function Canvas() {
           a.download = 'moodboard.png'
           a.href = cvs.toDataURL('image/png')
           a.click()
-        }} style={{ background: 'none', border: 'none', color: '#0d9488', cursor: 'pointer', fontSize: 11, fontWeight: 500 }}>Export PNG</button>
+        }} className="status-bar-btn" style={{ color: '#0d9488', fontWeight: 600 }}>Export PNG</button>
       </div>
 
       {/* Video/GIF overlays */}
@@ -852,7 +852,7 @@ export function Canvas() {
       })}
 
       {itemCount > 0 && (
-        <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '4px 8px', borderRadius: 4 }}>
+        <div className="badge badge-accent" style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
           {itemCount} items on board
         </div>
       )}

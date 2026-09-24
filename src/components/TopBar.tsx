@@ -160,7 +160,7 @@ function ToolbarButton({ icon, onClick, title, active }: { icon: React.ReactNode
   return (
     <button
       onClick={onClick}
-      className={`btn p-1.5 rounded-lg ${active ? 'bg-accent text-white hover:bg-accent-hover' : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'}`}
+      className={`toolbar-btn ${active ? 'active' : ''}`}
       title={title}
     >
       {icon}
