@@ -4,15 +4,17 @@ import {
   MessageSquare, Settings, Search, PanelLeft, Layers,
   Download, Upload, Keyboard, FileText, Check, Cloud,
   LayoutGrid, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
-  RotateCcw, Group, ArrowUpDown, Sparkles, ImageIcon,
+  RotateCcw, Group, ArrowUpDown, Sparkles, ImageIcon, Share2,
 } from 'lucide-react'
 
 interface Props {
   onExportForCreation?: () => void
   onUnsplashSearch?: () => void
+  onShare?: () => void
+  presenceBar?: React.ReactNode
 }
 
-export function TopBar({ onExportForCreation, onUnsplashSearch }: Props) {
+export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, presenceBar }: Props) {
   const project = useStore((s) => s.project)
   const [saved, setSaved] = useState(true)
   const [showOrgMenu, setShowOrgMenu] = useState(false)
@@ -112,6 +114,7 @@ export function TopBar({ onExportForCreation, onUnsplashSearch }: Props) {
             <span>Saving...</span>
           </div>
         )}
+        {presenceBar && <div className="ml-2">{presenceBar}</div>}
       </div>
 
       <div className="flex items-center gap-1">
@@ -124,6 +127,7 @@ export function TopBar({ onExportForCreation, onUnsplashSearch }: Props) {
         <ToolbarButton icon={<Upload size={16} />} onClick={handleImport} title="Import project" />
         <ToolbarButton icon={<Sparkles size={16} />} onClick={onExportForCreation ?? (() => {})} title="Export for Creation — generate a creative brief for another LLM" />
         <ToolbarButton icon={<ImageIcon size={16} />} onClick={onUnsplashSearch ?? (() => {})} title="Search Unsplash for images" />
+        <ToolbarButton icon={<Share2 size={16} />} onClick={onShare ?? (() => {})} title="Share board — generate view or edit links" />
         <div className="w-px h-5 bg-surface-4 mx-1" />
         <div className="relative">
           <ToolbarButton icon={<LayoutGrid size={16} />} onClick={() => setShowOrgMenu(!showOrgMenu)} title="Arrange items" />
