@@ -9,7 +9,7 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
-  base: './',
+  base: process.env.BASE_URL || '/',
   server: {
     port: 1420,
     strictPort: false,

@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Project } from '@/types'
 
-const SUPABASE_URL = 'https://riryaptlqpbuswjtiivg.supabase.co'
-const SUPABASE_ANON_KEY = 'sb_publishable_o4mTwfp_iYzFtWIMgWXZHA_KQZ2wpb-'
+// @ts-expect-error import.meta.env is Vite-specific
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://riryaptlqpbuswjtiivg.supabase.co'
+// @ts-expect-error import.meta.env is Vite-specific
+const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_o4mTwfp_iYzFtWIMgWXZHA_KQZ2wpb-'
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
