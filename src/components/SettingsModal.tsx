@@ -105,6 +105,37 @@ export function SettingsModal() {
             </div>
           </Section>
 
+          <Section title="MCP Server (connect to Claude Desktop, Cursor, etc.)">
+            <div className="p-3 bg-accent/5 rounded-lg border border-accent/10">
+              <p className="text-xs text-text-muted mb-2">
+                MoodBored exposes an MCP server that lets other LLMs read and write to your board.
+                Add the config below to Claude Desktop or any MCP client to connect.
+              </p>
+              <p className="text-2xs text-text-muted mb-1">Board state is synced to:</p>
+              <code className="text-2xs bg-surface-0 rounded p-1 block mb-2 text-text-secondary break-all">~/Library/Application Support/MoodBored/board.json</code>
+              <p className="text-2xs text-text-muted mb-1">MCP server location:</p>
+              <code className="text-2xs bg-surface-0 rounded p-1 block mb-2 text-text-secondary break-all">mcp/mcp-server.ts (in your MoodBored project folder)</code>
+              <button
+                onClick={() => {
+                  const config = JSON.stringify({
+                    mcpServers: {
+                      moodbored: {
+                        command: 'npx',
+                        args: ['tsx', '/path/to/MoodBored/mcp/mcp-server.ts'],
+                      },
+                    },
+                  }, null, 2)
+                  navigator.clipboard.writeText(config)
+                  showToast('MCP config copied — update /path/to/MoodBored to your actual project path', 'info')
+                }}
+                className="btn btn-ghost text-xs mt-1 w-full"
+              >
+                Copy Claude Desktop Config
+              </button>
+              <p className="text-2xs text-text-muted mt-2">To use: update the path in the copied config to your actual MoodBored project folder, then paste into Claude Desktop settings.</p>
+            </div>
+          </Section>
+
           <Section title="Appearance">
             {/* Theme toggle */}
             <div>
