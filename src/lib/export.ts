@@ -285,6 +285,7 @@ export function importFromBundle(
         apiKey: '',
         defaultModel: 'anthropic/claude-sonnet-4',
         jevThreshold: 0.2,
+        multiAgent: false,
         theme: 'light',
         canvasBg: '#e0f2fe',
         canvasBgType: 'color',

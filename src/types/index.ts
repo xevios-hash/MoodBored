@@ -233,6 +233,7 @@ export interface Settings {
   apiKey: string
   defaultModel: string
   jevThreshold: number
+  multiAgent: boolean
   theme: 'dark' | 'light'
   canvasBg: string
   canvasBgType: 'color' | 'video'
@@ -277,6 +278,7 @@ export const DEFAULT_SETTINGS: Settings = {
   apiKey: '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',
   defaultModel: 'anthropic/claude-sonnet-4',
   jevThreshold: 0.2,
+  multiAgent: false,
   theme: 'light',
   canvasBg: '#e0f2fe',
   canvasBgType: 'color',

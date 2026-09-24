@@ -105,6 +105,24 @@ export function SettingsModal() {
             </div>
           </Section>
 
+          <Section title="Multi-Agent Mode">
+            <div className="p-3 bg-accent/5 rounded-lg border border-accent/10">
+              <p className="text-xs text-text-muted mb-2">
+                Enable multiple specialized AI agents (Color Theorist, Typographer, Spatial Designer, etc.)
+                working together on your board. Default is single-agent mode.
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.multiAgent || false}
+                  onChange={(e) => updateSettings({ multiAgent: e.target.checked })}
+                  className="accent-accent"
+                />
+                <span className="text-sm text-text-primary">Enable multi-agent mode</span>
+              </label>
+            </div>
+          </Section>
+
           <Section title="MCP Server (connect to Claude Desktop, Cursor, etc.)">
             <div className="p-3 bg-accent/5 rounded-lg border border-accent/10">
               <p className="text-xs text-text-muted mb-2">

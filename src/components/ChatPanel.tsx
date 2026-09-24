@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStore } from '@/stores/useStore'
 import {
-  streamChat, parseActionsIncremental, buildSystemPrompt,
+  streamChat, streamChatWithTools, parseActionsIncremental, buildSystemPrompt,
   summarizeProject, describeBoard, resetJevCounter,
   getAgentDiagnostics, resetAgentDiagnostics, agentDiagnostics,
 } from '@/lib/api'
+import { BOARD_TOOLS, processToolCalls, buildToolSystemPrompt } from '@/lib/tools'
+import { getAgentsForTask, buildMultiAgentSystemPrompt } from '@/lib/agents'
 import { Send, Trash2, StopCircle, AlertCircle, MessageSquare, Activity } from 'lucide-react'
 import { v4 as uuid } from 'uuid'
 import type { ChatMessage, AgentAction } from '@/types'
@@ -63,8 +65,9 @@ export function ChatPanel() {
     await requestCompletion([], 1)
   }
 
-  // One streaming request; when Jev rejects the proposed batch we retry
-  // once with the feedback injected as a corrective system note.
+  // One streaming request; supports both tool-calling and regex-parsed modes.
+  // Tool-calling is more reliable — the LLM returns structured function calls
+  // instead of hoping JSON blocks appear in the text.
   const requestCompletion = async (
     correctiveNotes: string[],
     retriesLeft: number,
@@ -72,11 +75,24 @@ export function ChatPanel() {
   ) => {
     setStreaming(true)
 
-    const systemPrompt = buildSystemPrompt(
-      summarizeProject(allItemsItemsForPrompt()),
-      describeBoard(allItemsItemsForPrompt()),
-      activeViewport?.name,
-    )
+    const items = allItemsItemsForPrompt()
+    const summary = summarizeProject(items)
+    const boardDesc = describeBoard(items)
+    const useToolCalling = BOARD_TOOLS.length > 0
+
+    // Multi-agent mode: detect which specialists are needed based on the user's message
+    const currentMessagesForPrompt = useStore.getState().project.viewports
+      .find(v => v.id === activeViewportId)?.messages ?? []
+    const lastUserMsg = [...currentMessagesForPrompt].reverse().find(m => m.role === 'user')
+    const userMessage = correctiveNotes.length > 0 ? correctiveNotes.join(' ') : lastUserMsg?.content || ''
+    const isMultiAgent = settings.multiAgent && useToolCalling
+
+    const systemPrompt = isMultiAgent
+      ? buildMultiAgentSystemPrompt(getAgentsForTask(userMessage), summary, boardDesc, activeViewport?.name)
+      : useToolCalling
+        ? buildToolSystemPrompt(summary, boardDesc, activeViewport?.name)
+        : buildSystemPrompt(summary, boardDesc, activeViewport?.name)
+
     const currentMessages = useStore.getState().project.viewports
       .find(v => v.id === activeViewportId)?.messages ?? []
     const apiMessages = [
@@ -90,7 +106,6 @@ export function ChatPanel() {
     ]
 
     let fullResponse = ''
-    let consumedLength = 0
     const pendingActions: AgentAction[] = []
     const assistantMsg: ChatMessage = { id: uuid(), role: 'assistant', content: '', timestamp: new Date().toISOString(), actions: [] }
     addMessage(assistantMsg)
@@ -99,46 +114,115 @@ export function ChatPanel() {
     abortRef.current = abortController
 
     try {
-      await streamChat(
-        apiMessages, settings.apiKey, settings.defaultModel,
-        (chunk) => {
-          agentDiagnostics.chunksSeen++
-          fullResponse += chunk
-          const result = parseActionsIncremental(fullResponse, consumedLength)
-          consumedLength = result.consumedLength
-          // During streaming we only record actions — they are gated and
-          // executed when the response completes (fewer Jev calls, one
-          // coherent batch).
-          pendingActions.push(...result.actions)
-          // Read current messages from store (not stale closure)
-          const currentMessages = useStore.getState().project.viewports
-            .find(v => v.id === activeViewportId)?.messages ?? []
-          const updated = currentMessages.map((m) =>
-            m.id === assistantMsg.id ? { ...m, content: fullResponse, actions: [...(m.actions || []), ...result.actions] } : m
-          )
-          if (!updated.some(m => m.id === assistantMsg.id)) updated.push({ ...assistantMsg, content: fullResponse })
-          saveMessages(updated)
-        },
-        async () => {
-          // Final pass — catch any remaining blocks
-          const finalResult = parseActionsIncremental(fullResponse, consumedLength)
-          const allActions = [...pendingActions, ...finalResult.actions]
-          agentDiagnostics.actionsParsed = allActions.length
+      if (useToolCalling) {
+        // ─── Tool-calling mode ──────────────────────────────────────
+        await streamChatWithTools(
+          apiMessages as any, settings.apiKey, settings.defaultModel, BOARD_TOOLS,
+          (chunk) => {
+            agentDiagnostics.chunksSeen++
+            fullResponse += chunk
+            const currentMessages = useStore.getState().project.viewports
+              .find(v => v.id === activeViewportId)?.messages ?? []
+            const updated = currentMessages.map((m) =>
+              m.id === assistantMsg.id ? { ...m, content: fullResponse } : m
+            )
+            if (!updated.some(m => m.id === assistantMsg.id)) updated.push({ ...assistantMsg, content: fullResponse })
+            saveMessages(updated)
+          },
+          (toolCalls) => {
+            // Execute tool calls and return results
+            const actions = processToolCalls(toolCalls)
+            const results: { tool_call_id: string; content: string }[] = []
 
-          await gateAndExecute(allActions, retriesLeft, assistantMsg, allowFormatRetry)
-          setStreaming(false)
-        },
-        (err) => {
-          agentDiagnostics.lastError = err
-          // Read current messages from store
-          const currentMessages = useStore.getState().project.viewports
-            .find(v => v.id === activeViewportId)?.messages ?? []
-          const updated = currentMessages.map((m) => m.id === assistantMsg.id ? { ...m, content: `Error: ${err}` } : m)
-          saveMessages(updated)
-          setStreaming(false)
-        },
-        abortController.signal,
-      )
+            for (const action of actions) {
+              try {
+                if (action.type === 'add_item' && action.item) {
+                  pendingActions.push({ type: 'add_item', item: action.item })
+                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Added ${action.item.kind} item` })
+                } else if (action.type === 'remove_item' && action.itemId) {
+                  pendingActions.push({ type: 'remove_item', itemId: action.itemId })
+                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Removed item ${action.itemId}` })
+                } else if (action.type === 'update_item' && action.itemId) {
+                  pendingActions.push({ type: 'update_item', itemId: action.itemId, item: action.updates })
+                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Updated item ${action.itemId}` })
+                } else if (action.type === 'group_items') {
+                  useStore.getState().groupSelected(action.label || 'Group')
+                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Grouped items into "${action.label}"` })
+                } else if (action.type === 'arrange_items') {
+                  const s = useStore.getState()
+                  if (action.layout === 'grid') s.arrangeGrid(action.cols || 4, action.gap || 20)
+                  else if (action.layout === 'stack-h') s.arrangeStack('h', action.gap || 20)
+                  else if (action.layout === 'stack-v') s.arrangeStack('v', action.gap || 20)
+                  else if (action.layout === 'spiral') s.arrangeSpiral(action.gap || 30)
+                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Arranged items in ${action.layout} layout` })
+                } else {
+                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: 'Unknown action' })
+                }
+              } catch (err) {
+                results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Error: ${err}` })
+              }
+            }
+
+            // Execute accumulated add/remove/update actions
+            if (pendingActions.length > 0) {
+              executeActions(pendingActions)
+              agentDiagnostics.actionsExecuted += pendingActions.length
+            }
+
+            return results
+          },
+          () => {
+            if (pendingActions.length > 0) {
+              addMessage({ id: uuid(), role: 'system', content: `[debug] executed ${pendingActions.length} actions. Items on board: ${currentViewportItems().length}`, timestamp: new Date().toISOString() })
+              showToast(`Added ${pendingActions.length} item${pendingActions.length > 1 ? 's' : ''}`, 'success')
+            }
+            setStreaming(false)
+          },
+          (err) => {
+            agentDiagnostics.lastError = err
+            const currentMessages = useStore.getState().project.viewports
+              .find(v => v.id === activeViewportId)?.messages ?? []
+            const updated = currentMessages.map((m) => m.id === assistantMsg.id ? { ...m, content: `Error: ${err}` } : m)
+            saveMessages(updated)
+            setStreaming(false)
+          },
+          abortController.signal,
+        )
+      } else {
+        // ─── Regex-parsed mode (legacy fallback) ────────────────────
+        await streamChat(
+          apiMessages, settings.apiKey, settings.defaultModel,
+          (chunk) => {
+            agentDiagnostics.chunksSeen++
+            fullResponse += chunk
+            const result = parseActionsIncremental(fullResponse, 0)
+            pendingActions.push(...result.actions)
+            const currentMessages = useStore.getState().project.viewports
+              .find(v => v.id === activeViewportId)?.messages ?? []
+            const updated = currentMessages.map((m) =>
+              m.id === assistantMsg.id ? { ...m, content: fullResponse, actions: [...(m.actions || []), ...result.actions] } : m
+            )
+            if (!updated.some(m => m.id === assistantMsg.id)) updated.push({ ...assistantMsg, content: fullResponse })
+            saveMessages(updated)
+          },
+          async () => {
+            const finalResult = parseActionsIncremental(fullResponse, 0)
+            const allActions = [...pendingActions, ...finalResult.actions]
+            agentDiagnostics.actionsParsed = allActions.length
+            await gateAndExecute(allActions, retriesLeft, assistantMsg, allowFormatRetry)
+            setStreaming(false)
+          },
+          (err) => {
+            agentDiagnostics.lastError = err
+            const currentMessages = useStore.getState().project.viewports
+              .find(v => v.id === activeViewportId)?.messages ?? []
+            const updated = currentMessages.map((m) => m.id === assistantMsg.id ? { ...m, content: `Error: ${err}` } : m)
+            saveMessages(updated)
+            setStreaming(false)
+          },
+          abortController.signal,
+        )
+      }
     } catch (err) {
       addMessage({ id: uuid(), role: 'system', content: `Stream error: ${err instanceof Error ? err.message : 'Unknown'}`, timestamp: new Date().toISOString() })
       setStreaming(false)

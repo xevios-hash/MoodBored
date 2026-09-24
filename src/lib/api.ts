@@ -75,6 +75,158 @@ export async function streamChat(
   }
 }
 
+// ─── Tool-Calling Streaming ─────────────────────────────────────────
+// Handles the full tool-calling loop: send messages + tools, execute
+// tool calls, send results back, repeat until the LLM stops calling tools.
+// Falls back to text streaming if no tools are provided.
+
+export interface ToolCall {
+  id: string
+  function: { name: string; arguments: string }
+}
+
+export interface ToolResult {
+  tool_call_id: string
+  content: string
+}
+
+export async function streamChatWithTools(
+  messages: { role: string; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string }[],
+  apiKey: string,
+  model: string,
+  tools: any[],
+  onChunk: (text: string) => void,
+  onToolCalls: (calls: ToolCall[]) => ToolResult[],
+  onDone: () => void,
+  onError: (err: string) => void,
+  signal?: AbortSignal,
+  maxIterations = 5,
+) {
+  let currentMessages = [...messages]
+
+  for (let i = 0; i < maxIterations; i++) {
+    const body: any = {
+      model,
+      messages: currentMessages,
+      stream: true,
+      temperature: 0.8,
+      max_tokens: 4096,
+    }
+    if (tools.length > 0 && i === 0) {
+      body.tools = tools
+      body.tool_choice = 'auto'
+    }
+
+    let responseText = ''
+    let toolCalls: ToolCall[] = []
+    let hasToolCalls = false
+    let finished = false
+
+    try {
+      const res = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://moodbored.app',
+          'X-Title': 'MoodBored',
+        },
+        body: JSON.stringify(body),
+        signal,
+      })
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        onError(`API error ${res.status}: ${errText || res.statusText}`)
+        return
+      }
+
+      const reader = res.body?.getReader()
+      if (!reader) { onError('No response body'); return }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') { finished = true; break }
+          try {
+            const parsed = JSON.parse(data)
+            const delta = parsed.choices?.[0]?.delta
+
+            // Text content
+            if (delta?.content) {
+              responseText += delta.content
+              onChunk(delta.content)
+            }
+
+            // Tool calls (streamed in parts)
+            if (delta?.tool_calls) {
+              hasToolCalls = true
+              for (const tc of delta.tool_calls) {
+                const idx = tc.index ?? 0
+                if (!toolCalls[idx]) {
+                  toolCalls[idx] = { id: tc.id || `call_${idx}`, function: { name: tc.function?.name || '', arguments: '' } }
+                }
+                if (tc.id) toolCalls[idx].id = tc.id
+                if (tc.function?.name) toolCalls[idx].function.name = tc.function.name
+                if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments
+              }
+            }
+
+            // Finish reason
+            if (parsed.choices?.[0]?.finish_reason === 'tool_calls') {
+              hasToolCalls = true
+            }
+          } catch { /* skip */ }
+        }
+        if (finished) break
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') { onDone(); return }
+      onError(err instanceof Error ? err.message : 'Unknown error')
+      return
+    }
+
+    // If no tool calls, we're done
+    if (!hasToolCalls || toolCalls.length === 0) {
+      onDone()
+      return
+    }
+
+    // Execute tool calls and get results
+    const results = onToolCalls(toolCalls)
+
+    // Add assistant message with tool calls to history
+    currentMessages.push({
+      role: 'assistant',
+      content: responseText || null,
+      tool_calls: toolCalls,
+    })
+
+    // Add tool results
+    for (const result of results) {
+      currentMessages.push({
+        role: 'tool' as any,
+        content: result.content,
+        tool_call_id: result.tool_call_id,
+      } as any)
+    }
+
+    // Loop to let the LLM respond to tool results
+    // (next iteration will not pass tools to avoid infinite tool-calling)
+  }
+
+  onDone()
+}
+
 // ─── Stable Diffusion via OpenRouter ────────────────────────────────
 
 export async function generateImage(
