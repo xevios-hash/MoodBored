@@ -10,6 +10,11 @@ import './index.css'
 preloadFonts()
 initMcpSync()
 
+// Register service worker for PWA
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('/sw.js').catch(() => {})
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>

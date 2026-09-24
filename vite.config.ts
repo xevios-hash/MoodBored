@@ -17,6 +17,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     target: 'es2020',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          store: ['zustand'],
+          ui: ['lucide-react'],
+        },
+      },
+    },
   },
   test: {
     environment: 'node',

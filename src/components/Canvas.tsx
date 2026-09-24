@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '@/stores/useStore'
 import { hitTestItem } from '@/lib/layout'
 import { loadFont } from '@/lib/fonts'
+import { showToast } from '@/lib/toasts'
 import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner } from '@/types'
 
 // ─── Theme ──────────────────────────────────────────────────────────
@@ -154,6 +155,7 @@ export function Canvas() {
   const snapGuides = useRef<{ x: number[]; y: number[] }>({ x: [], y: [] })
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; wx: number; wy: number; itemId?: string } | null>(null)
   const [showLayers, setShowLayers] = useState(false)
+  const [eyedropperActive, setEyedropperActive] = useState(false)
 
   const project = useStore((s) => s.project)
   const activeViewportId = useStore((s) => s.activeViewportId)
@@ -754,6 +756,31 @@ export function Canvas() {
     if (e.touches.length === 0) touchRef.current = null
   }
 
+  const handleEyedropper = async () => {
+    // Use native EyeDropper API if available (Chrome, Edge)
+    if ('EyeDropper' in window) {
+      try {
+        const dropper = new (window as any).EyeDropper()
+        const result = await dropper.open()
+        const hex = result.sRGBHex
+        const state = useStore.getState()
+        state.addItem({
+          kind: 'swatch', id: crypto.randomUUID(), hex, name: '',
+          usage: 'Picked from screen', purpose: 'Color reference',
+          importance: 'User-picked color', tags: ['eyedropper'],
+          pos: { x: 100 + Math.random() * 400, y: 100 + Math.random() * 300 },
+          size: { w: 160, h: 180 },
+        } as any)
+        showToast(`Picked color: ${hex}`, 'success')
+      } catch {
+        // User cancelled
+      }
+    } else {
+      showToast('Eyedropper not supported in this browser — use Chrome or Edge', 'info')
+    }
+    setEyedropperActive(false)
+  }
+
   const itemCount = items.filter(i => i.kind !== 'connector').length
   const bgType = project.settings.canvasBgType || 'color'
   const bgVideo = project.settings.canvasBgVideo || ''
@@ -784,6 +811,7 @@ export function Canvas() {
         <div style={{ width: 1, height: 12, background: '#e2e4e8' }} />
         <span>{itemCount} items</span>
         <div style={{ width: 1, height: 12, background: '#e2e4e8' }} />
+        <button onClick={handleEyedropper} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 11, padding: '0 4px' }} title="Pick color from screen">🎨</button>
         <button onClick={() => {
           const s = useStore.getState()
           const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
