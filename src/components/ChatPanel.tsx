@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStore } from '@/stores/useStore'
 import {
-  streamChat, streamChatWithTools, parseActionsIncremental, buildSystemPrompt,
+  streamChat, streamChatWithTools, parseActionsIncremental, buildSystemPrompt, generateImage,
   summarizeProject, describeBoard, resetJevCounter,
   getAgentDiagnostics, resetAgentDiagnostics, agentDiagnostics,
 } from '@/lib/api'
@@ -155,6 +155,23 @@ export function ChatPanel() {
                   else if (action.layout === 'stack-v') s.arrangeStack('v', action.gap || 20)
                   else if (action.layout === 'spiral') s.arrangeSpiral(action.gap || 30)
                   results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Arranged items in ${action.layout} layout` })
+                } else if (action.type === 'generate_image') {
+                  // Generate image asynchronously, add to board when ready
+                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: 'Generating image...' })
+                  const imgPrompt = action.prompt || 'A beautiful image'
+                  generateImage(imgPrompt, settings.apiKey).then((url) => {
+                    if (url) {
+                      useStore.getState().addItem({
+                        kind: 'image', id: crypto.randomUUID(),
+                        thumbnail: url, fullSource: url,
+                        description: action.description || action.prompt,
+                        source: 'generated', purpose: action.purpose || 'AI generated',
+                        importance: 'Generated reference', tags: action.tags || ['generated'],
+                        pos: { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 },
+                        size: { w: 300, h: 300 },
+                      } as any)
+                    }
+                  })
                 } else {
                   results.push({ tool_call_id: toolCalls[0]?.id || '', content: 'Unknown action' })
                 }

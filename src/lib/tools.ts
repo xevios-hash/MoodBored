@@ -160,6 +160,23 @@ export const BOARD_TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'generate_image',
+      description: 'Generate an image using AI and add it to the board. Use this when the user wants a custom image that doesn\'t exist on Unsplash.',
+      parameters: {
+        type: 'object' as const,
+        required: ['prompt'],
+        properties: {
+          prompt: { type: 'string' as const, description: 'Detailed image generation prompt. Include style, mood, composition, lighting, and subject matter.' },
+          description: { type: 'string' as const, description: 'Short description of the generated image for the board item' },
+          purpose: { type: 'string' as const, description: 'Why this image is on the board' },
+          tags: { type: 'array' as const, items: { type: 'string' as const }, description: 'Tags for the image' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'export_brief',
       description: 'Export the board as a structured creative brief for another LLM',
       parameters: {
@@ -201,7 +218,7 @@ ${boardDescription}`
 }
 
 // Process tool calls from the LLM response into AgentActions
-export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove_item' | 'update_item' | 'group_items' | 'arrange_items'; item?: any; itemId?: string; updates?: any; label?: string; layout?: string; cols?: number; gap?: number }[] {
+export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove_item' | 'update_item' | 'group_items' | 'arrange_items' | 'generate_image'; item?: any; itemId?: string; updates?: any; label?: string; layout?: string; cols?: number; gap?: number; prompt?: string; description?: string; purpose?: string; tags?: string[] }[] {
   const actions: any[] = []
   for (const tc of toolCalls) {
     const fn = tc.function
@@ -235,6 +252,9 @@ export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove
         break
       case 'arrange_items':
         actions.push({ type: 'arrange_items', layout: args.layout, cols: args.cols, gap: args.gap })
+        break
+      case 'generate_image':
+        actions.push({ type: 'generate_image', prompt: args.prompt, description: args.description, purpose: args.purpose, tags: args.tags })
         break
     }
   }
