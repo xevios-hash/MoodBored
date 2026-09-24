@@ -4,14 +4,15 @@ import {
   MessageSquare, Settings, Search, PanelLeft, Layers,
   Download, Upload, Keyboard, FileText, Check, Cloud,
   LayoutGrid, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
-  RotateCcw, Group, ArrowUpDown, Sparkles,
+  RotateCcw, Group, ArrowUpDown, Sparkles, ImageIcon,
 } from 'lucide-react'
 
 interface Props {
   onExportForCreation?: () => void
+  onUnsplashSearch?: () => void
 }
 
-export function TopBar({ onExportForCreation }: Props) {
+export function TopBar({ onExportForCreation, onUnsplashSearch }: Props) {
   const project = useStore((s) => s.project)
   const [saved, setSaved] = useState(true)
   const [showOrgMenu, setShowOrgMenu] = useState(false)
@@ -122,6 +123,7 @@ export function TopBar({ onExportForCreation }: Props) {
         <ToolbarButton icon={<FileText size={16} />} onClick={handleExportSummary} title="Export Markdown" />
         <ToolbarButton icon={<Upload size={16} />} onClick={handleImport} title="Import project" />
         <ToolbarButton icon={<Sparkles size={16} />} onClick={onExportForCreation ?? (() => {})} title="Export for Creation — generate a creative brief for another LLM" />
+        <ToolbarButton icon={<ImageIcon size={16} />} onClick={onUnsplashSearch ?? (() => {})} title="Search Unsplash for images" />
         <div className="w-px h-5 bg-surface-4 mx-1" />
         <div className="relative">
           <ToolbarButton icon={<LayoutGrid size={16} />} onClick={() => setShowOrgMenu(!showOrgMenu)} title="Arrange items" />

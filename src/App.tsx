@@ -12,6 +12,7 @@ import { StartScreen } from '@/components/StartScreen'
 import { MobileLayout } from '@/components/MobileLayout'
 import { Lightbox } from '@/components/Lightbox'
 import { ExportModal } from '@/components/ExportModal'
+import { UnsplashSearch } from '@/components/UnsplashSearch'
 
 export default function App() {
   const [phase, setPhase] = useState<'splash' | 'start' | 'workspace'>('splash')
@@ -23,6 +24,7 @@ export default function App() {
   const theme = useStore((s) => s.project.settings.theme)
   const [lightboxItem, setLightboxItem] = useState<any>(null)
   const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [unsplashOpen, setUnsplashOpen] = useState(false)
 
   useEffect(() => {
     document.body.classList.remove('light', 'dark')
@@ -61,6 +63,10 @@ export default function App() {
     setExportModalOpen(true)
   }, [])
 
+  const handleUnsplashSearch = useCallback(() => {
+    setUnsplashOpen(true)
+  }, [])
+
   // Mobile layout
   if (isMobile && phase === 'workspace') {
     return (
@@ -91,7 +97,7 @@ export default function App() {
           <Sidebar />
         </div>
         <main className="flex flex-col flex-1 min-w-0">
-          <TopBar onExportForCreation={handleExportForCreation} />
+          <TopBar onExportForCreation={handleExportForCreation} onUnsplashSearch={handleUnsplashSearch} />
           <div className="flex flex-1 min-h-0">
             <Canvas />
             <div className={`transition-all duration-200 ease-in-out ${chatOpen ? 'w-80 opacity-100' : 'w-0 opacity-0 overflow-hidden'}`}>
@@ -105,6 +111,7 @@ export default function App() {
         {settingsOpen && <SettingsModal />}
         {searchOpen && <SearchOverlay />}
         {exportModalOpen && <ExportModalWrapper onClose={() => setExportModalOpen(false)} />}
+        {unsplashOpen && <UnsplashSearch onClose={() => setUnsplashOpen(false)} />}
       </div>
     </>
   )

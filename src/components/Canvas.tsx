@@ -576,6 +576,27 @@ export function Canvas() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'y') { e.preventDefault(); s.redo() }
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') { e.preventDefault(); s.copySelected() }
       if ((e.metaKey || e.ctrlKey) && e.key === 'v') { e.preventDefault(); s.paste() }
+      // Paste images from clipboard
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+        navigator.clipboard.read?.().then(async (items) => {
+          for (const item of items) {
+            for (const type of item.types) {
+              if (type.startsWith('image/')) {
+                const blob = await item.getType(type)
+                const url = URL.createObjectURL(blob)
+                s.addItem({
+                  kind: 'image', id: crypto.randomUUID(),
+                  thumbnail: url, fullSource: url,
+                  description: 'Pasted image', source: 'clipboard',
+                  purpose: 'Pasted by user', importance: 'User reference',
+                  tags: ['pasted'], pos: { x: 100 + Math.random() * 400, y: 100 + Math.random() * 300 },
+                  size: { w: 300, h: 200 },
+                } as any)
+              }
+            }
+          }
+        }).catch(() => {})
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
