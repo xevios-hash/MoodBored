@@ -879,7 +879,8 @@ export function Canvas() {
       {/* Context menu */}
       {contextMenu && (
         <div
-          style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 100, background: isDark() ? '#1e1e2e' : '#ffffff', borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.2)', border: `1px solid ${isDark() ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`, padding: 4, minWidth: 160 }}
+          className="glass-card"
+          style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 100, padding: 4, minWidth: 160 }}
           onMouseLeave={() => setContextMenu(null)}
         >
           {contextMenu.itemId ? (
@@ -887,9 +888,9 @@ export function Canvas() {
               <CtxItem label="Duplicate" shortcut="⌘C ⌘V" onClick={() => handleContextAction('duplicate')} />
               <CtxItem label="Bring to Front" onClick={() => handleContextAction('bring-front')} />
               <CtxItem label="Send to Back" onClick={() => handleContextAction('send-back')} />
-              <div style={{ height: 1, background: isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', margin: '4px 0' }} />
+              <div className="status-divider" style={{ margin: '4px 0' }} />
               <CtxItem label="Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
-              <div style={{ height: 1, background: isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', margin: '4px 0' }} />
+              <div className="status-divider" style={{ margin: '4px 0' }} />
               <CtxItem label="Delete" shortcut="⌫" onClick={() => handleContextAction('delete')} danger />
             </>
           ) : (
@@ -910,18 +911,12 @@ function CtxItem({ label, shortcut, onClick, danger }: { label: string; shortcut
   return (
     <button
       onClick={onClick}
-      style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        width: '100%', padding: '6px 10px', border: 'none', borderRadius: 4,
-        background: 'transparent', cursor: 'pointer', fontSize: 12,
-        color: danger ? '#ef4444' : (isDark() ? '#e8e8ec' : '#1f2937'),
-        textAlign: 'left',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+      className={`w-full flex justify-between items-center px-3 py-1.5 rounded text-xs text-left transition-fast ${
+        danger ? 'text-danger hover:bg-danger-light' : 'text-text-primary hover:bg-surface-2'
+      }`}
     >
       <span>{label}</span>
-      {shortcut && <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 16 }}>{shortcut}</span>}
+      {shortcut && <span className="text-2xs text-text-muted ml-4">{shortcut}</span>}
     </button>
   )
 }
@@ -949,7 +944,7 @@ function Minimap({ items, canvas, canvasRef }: { items: BoardItem[]; canvas: any
   const vpY = -canvas.panY / canvas.zoom
 
   return (
-    <div style={{ position: 'absolute', bottom: 48, right: 12, width: W, height: H, background: isDark() ? 'rgba(22,22,31,0.9)' : 'rgba(255,255,255,0.9)', borderRadius: 6, border: `1px solid ${isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, overflow: 'hidden', backdropFilter: 'blur(8px)', zIndex: 10 }}>
+    <div className="glass-card" style={{ position: 'absolute', bottom: 48, right: 12, width: W, height: H, overflow: 'hidden', zIndex: 10 }}>
       <svg width={W} height={H}>
         {nonConn.map((item: any) => {
           const x = (item.pos.x - minX + pad) * scale
@@ -988,12 +983,12 @@ function LayersPanel({ items, onClose }: { items: BoardItem[]; onClose: () => vo
   }
 
   return (
-    <div style={{ position: 'absolute', top: 36, left: 12, width: 200, maxHeight: 300, background: isDark() ? 'rgba(22,22,31,0.95)' : 'rgba(255,255,255,0.95)', borderRadius: 8, border: `1px solid ${isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', overflow: 'hidden', zIndex: 10, backdropFilter: 'blur(8px)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderBottom: `1px solid ${isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: isDark() ? '#a1a1b5' : '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Layers</span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '0 2px' }}>×</button>
+    <div className="glass-card" style={{ position: 'absolute', top: 36, left: 12, width: 200, maxHeight: 300, overflow: 'hidden', zIndex: 10 }}>
+      <div className="flex justify-between items-center px-3 py-1.5 border-b border-surface-4">
+        <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Layers</span>
+        <button onClick={onClose} className="status-bar-btn text-xs">×</button>
       </div>
-      <div style={{ overflowY: 'auto', maxHeight: 260, padding: 4 }}>
+      <div className="overflow-y-auto p-1" style={{ maxHeight: 260 }}>
         {[...nonConn].reverse().map((item) => {
           const sel = selectedIds.has(item.id)
           const label = ('text' in item && item.text) ? item.text.slice(0, 20) :
@@ -1004,17 +999,13 @@ function LayersPanel({ items, onClose }: { items: BoardItem[]; onClose: () => vo
             <button
               key={item.id}
               onClick={(e) => e.shiftKey ? toggleSelect(item.id) : selectItem(item.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                padding: '4px 8px', border: 'none', borderRadius: 4,
-                background: sel ? (isDark() ? 'rgba(45,212,191,0.15)' : 'rgba(13,148,136,0.1)') : 'transparent',
-                cursor: 'pointer', fontSize: 11, textAlign: 'left',
-                color: sel ? accent() : (isDark() ? '#e8e8ec' : '#1f2937'),
-              }}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-left transition-fast ${
+                sel ? 'bg-accent/10 text-accent' : 'hover:bg-surface-2 text-text-primary'
+              }`}
             >
-              <span style={{ fontSize: 12, width: 18, textAlign: 'center' }}>{kindIcons[item.kind] || '•'}</span>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-              <span style={{ fontSize: 9, color: '#9ca3af' }}>{item.kind}</span>
+              <span className="w-5 text-center">{kindIcons[item.kind] || '•'}</span>
+              <span className="flex-1 truncate">{label}</span>
+              <span className="text-2xs text-text-muted">{item.kind}</span>
             </button>
           )
         })}

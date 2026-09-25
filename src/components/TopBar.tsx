@@ -86,10 +86,10 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, presenc
   }
 
   return (
-    <header className="h-12 glass-panel border-b border-surface-4 flex items-center px-3 gap-2 shrink-0">
+    <header className="h-12 glass-panel border-b border-surface-4 flex items-center px-4 gap-2 shrink-0" style={{ zIndex: 20 }}>
       <button
         onClick={toggleSidebar}
-        className={`btn p-1.5 rounded-lg ${sidebarOpen ? 'bg-surface-2 text-accent' : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'}`}
+        className={`toolbar-btn ${sidebarOpen ? 'active' : ''}`}
         title="Toggle sidebar"
       >
         <PanelLeft size={18} />
