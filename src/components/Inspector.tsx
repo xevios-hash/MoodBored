@@ -209,7 +209,7 @@ function renderKindFields(item: BoardItem, update: (u: Record<string, any>) => v
             </div>
           ))}
           <button
-            onClick={() => update({ colors: [...item.colors, { hex: '#000000', label: '' }] })}
+            onClick={() => update({ colors: [...item.colors, { hex: '#1a1028', label: '' }] })}
             className="btn btn-ghost w-full flex items-center justify-center gap-1 text-xs border border-dashed border-surface-4 mt-1"
           >
             <Plus size={12} /> Add Color

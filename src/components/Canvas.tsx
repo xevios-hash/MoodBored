@@ -29,10 +29,10 @@ function createDefaultItem(kind: string, pos: Position): BoardItem {
     text: { kind: 'text', id: crypto.randomUUID(), raw: '', pos: { x: cx, y: cy }, size: { w: 300, h: 200 } },
     image: { kind: 'image', id: crypto.randomUUID(), thumbnail: '', fullSource: '', description: '', source: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 300, h: 200 } },
     link: { kind: 'link', id: crypto.randomUUID(), url: '', title: '', summary: '', description: '', purpose: '', importance: '', source: '', tags: [], pos: { x: cx, y: cy } },
-    palette: { kind: 'palette', id: crypto.randomUUID(), label: 'New Palette', colors: [{ hex: '#ff7eb3', label: '' }, { hex: '#7c6cbf', label: '' }, { hex: '#fff07a', label: '' }], purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 120 } },
-    gradient: { kind: 'gradient', id: crypto.randomUUID(), label: 'New Gradient', stops: [{ position: 0, color: '#ff7eb3' }, { position: 1, color: '#7c6cbf' }], direction: 90, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 300, h: 80 } },
+    palette: { kind: 'palette', id: crypto.randomUUID(), label: 'New Palette', colors: [{ hex: '#e88098', label: '' }, { hex: '#8b7dc8', label: '' }, { hex: '#f0e080', label: '' }], purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 120 } },
+    gradient: { kind: 'gradient', id: crypto.randomUUID(), label: 'New Gradient', stops: [{ position: 0, color: '#e88098' }, { position: 1, color: '#8b7dc8' }], direction: 90, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 300, h: 80 } },
     font: { kind: 'font', id: crypto.randomUUID(), fontFamily: 'Inter', weights: [400, 700], sampleText: 'The quick brown fox', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 160 } },
-    swatch: { kind: 'swatch', id: crypto.randomUUID(), hex: '#7c6cbf', name: '', usage: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 160, h: 180 } },
+    swatch: { kind: 'swatch', id: crypto.randomUUID(), hex: '#8b7dc8', name: '', usage: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 160, h: 180 } },
     sizeguide: { kind: 'sizeguide', id: crypto.randomUUID(), width: 1920, height: 1080, unit: 'px', label: '', orientation: 'landscape', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 200, h: 160 } },
     container: { kind: 'container', id: crypto.randomUUID(), label: 'New Group', children: [], layout: 'free', gap: 8, collapsed: false, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 400, h: 300 } },
     video: { kind: 'video', id: crypto.randomUUID(), source: '', sourceUrl: '', startTs: 0, duration: 0, subjectDesc: '', motionDesc: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 240 } },
@@ -115,9 +115,9 @@ function asArray(v: any): string[] {
 
 const PORT_RADIUS = 5
 const PORT_COLORS: Record<string, string> = { data: '#6aa8d8', visual: '#a888d8', reference: '#78c8a0', any: '#8888aa' }
-const CONNECTOR_COLORS: Record<ConnectorOwner, string> = { user: '#6aa8d8', llm: '#ff7eb3', objective: '#c8b860' }
+const CONNECTOR_COLORS: Record<ConnectorOwner, string> = { user: '#6aa8d8', llm: '#e88098', objective: '#c8b860' }
 const KIND_COLORS: Record<string, string> = {
-  text: '#7c6cbf', note: '#e8b840', image: '#ff7eb3', link: '#6aa8d8',
+  text: '#8b7dc8', note: '#e8b840', image: '#e88098', link: '#6aa8d8',
   video: '#a888d8', palette: '#78c8a0', gradient: '#e89060', font: '#d87898',
   swatch: '#78b8d8', sizeguide: '#999999', container: '#78c8a0', connector: '#666688',
 }
@@ -1050,7 +1050,7 @@ export function Canvas() {
                 href={(item as any).url}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: '#7c6cbf', textDecoration: 'none', fontSize: 10, fontWeight: 600 }}
+                style={{ color: '#8b7dc8', textDecoration: 'none', fontSize: 10, fontWeight: 600 }}
                 onClick={(e) => e.stopPropagation()}
               >Open ↗</a>
               <button
@@ -1106,7 +1106,7 @@ export function Canvas() {
               fontSize, fontFamily: 'Inter, sans-serif', lineHeight: 1.6,
               background: isDark() ? 'rgba(21,15,36,0.95)' : 'rgba(255,255,255,0.95)',
               color: isDark() ? '#e8e0f5' : '#1a1028',
-              border: `2px solid ${isDark() ? '#7c6cbf' : '#6a5aae'}`,
+              border: `2px solid ${isDark() ? '#8b7dc8' : '#6a5aae'}`,
               borderRadius: 8, padding: 8, outline: 'none', resize: 'none',
               zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
               backdropFilter: 'blur(8px)',
@@ -1370,7 +1370,7 @@ function drawResizeHandles(ctx: CanvasRenderingContext2D, item: BoardItem, zoom:
   ]
   for (const handle of handles) {
     ctx.fillStyle = isDark() ? '#150f24' : '#ffffff'
-    ctx.strokeStyle = isDark() ? '#7c6cbf' : '#6a5aae'; ctx.lineWidth = 1.5 / zoom
+    ctx.strokeStyle = isDark() ? '#8b7dc8' : '#6a5aae'; ctx.lineWidth = 1.5 / zoom
     ctx.beginPath(); roundRect(ctx, handle.x, handle.y, s, s, 2 / zoom); ctx.fill(); ctx.stroke()
   }
 }

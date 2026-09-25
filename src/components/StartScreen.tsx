@@ -85,10 +85,10 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', zIndex: 1 }} />
 
         <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>
+        <h2 style={{ fontSize: 24, fontWeight: 700, color: '#1a1028', marginBottom: 8 }}>
           Choose a Template
         </h2>
-        <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 32 }}>
+        <p style={{ fontSize: 14, color: '#8a7aaa', marginBottom: 32 }}>
           Start with a pre-built board or go blank
         </p>
 
@@ -99,14 +99,14 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
               onClick={() => setSelectedTemplate(t.id)}
               style={{
                 background: selectedTemplate === t.id ? 'var(--accent-muted)' : '#ffffff',
-                border: selectedTemplate === t.id ? '2px solid #00fff0' : '2px solid #e5e7eb',
+                border: selectedTemplate === t.id ? '2px solid #8b7dc8' : '2px solid #e5e7eb',
                 borderRadius: 12, padding: 20, cursor: 'pointer', textAlign: 'left',
                 transition: 'all 150ms ease',
               }}
             >
               <div style={{ fontSize: 32, marginBottom: 8 }}>{t.icon}</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a2e', marginBottom: 4 }}>{t.name}</div>
-              <div style={{ fontSize: 12, color: '#6b7280' }}>{t.description}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1028', marginBottom: 4 }}>{t.name}</div>
+              <div style={{ fontSize: 12, color: '#8a7aaa' }}>{t.description}</div>
             </button>
           ))}
         </div>
@@ -119,9 +119,9 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
               onKeyDown={(e) => e.key === 'Enter' && handleNewProject()}
               placeholder="Name your project..."
               style={{
-                background: '#ffffff', border: '2px solid #00fff0', borderRadius: 10,
+                background: '#ffffff', border: '2px solid #8b7dc8', borderRadius: 10,
                 padding: '10px 16px', fontSize: 16, width: 300, outline: 'none',
-                color: '#1a1a2e', fontFamily: 'inherit',
+                color: '#1a1028', fontFamily: 'inherit',
               }}
               autoFocus
             />
@@ -129,7 +129,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
               onClick={handleNewProject}
               disabled={!projectName.trim()}
               style={{
-                background: projectName.trim() ? '#00fff0' : '#9ca3af',
+                background: projectName.trim() ? '#8b7dc8' : '#9ca3af',
                 color: '#ffffff', border: 'none', borderRadius: 10,
                 padding: '10px 24px', fontSize: 15, fontWeight: 600,
                 cursor: projectName.trim() ? 'pointer' : 'not-allowed',
@@ -142,7 +142,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
 
         <button
           onClick={() => setShowTemplates(false)}
-          style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, position: 'relative', zIndex: 2 }}
+          style={{ background: 'none', border: 'none', color: '#8a7aaa', cursor: 'pointer', fontSize: 14, position: 'relative', zIndex: 2 }}
         >
           ← Back
         </button>
@@ -166,13 +166,13 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
       <div style={{ position: 'relative', zIndex: 2, padding: '24px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img src="/logo.png" alt="MoodBored" style={{ width: 40, height: 40, objectFit: 'contain' }} />
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#00fff0' }}>MoodBored</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: '#8b7dc8' }}>MoodBored</span>
         </div>
         <button
           onClick={handleImport}
           style={{
             background: 'none', border: '1px solid #dee2e6', borderRadius: 8,
-            padding: '6px 16px', fontSize: 13, color: '#6b7280', cursor: 'pointer',
+            padding: '6px 16px', fontSize: 13, color: '#8a7aaa', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6,
           }}
         >
@@ -182,10 +182,10 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
 
       {/* Main content */}
       <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>
+        <h1 style={{ fontSize: 32, fontWeight: 700, color: '#1a1028', marginBottom: 8 }}>
           Welcome to MoodBored
         </h1>
-        <p style={{ fontSize: 16, color: '#6b7280', marginBottom: 48, textAlign: 'center' }}>
+        <p style={{ fontSize: 16, color: '#8a7aaa', marginBottom: 48, textAlign: 'center' }}>
           Collaborative mood-board workspace for humans and AI
         </p>
 
@@ -195,16 +195,16 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
           <button
             onClick={() => setShowTemplates(true)}
             style={{
-              background: '#ffffff', border: '2px solid #00fff0', borderRadius: 16,
+              background: '#ffffff', border: '2px solid #8b7dc8', borderRadius: 16,
               padding: '32px 40px', cursor: 'pointer', textAlign: 'center',
               transition: 'all 200ms ease', width: 200,
             }}
             onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(13,148,136,0.2)' }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
           >
-            <Plus size={32} style={{ color: '#00fff0', marginBottom: 12 }} />
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a2e', marginBottom: 4 }}>New Project</div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>Start from a template</div>
+            <Plus size={32} style={{ color: '#8b7dc8', marginBottom: 12 }} />
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1028', marginBottom: 4 }}>New Project</div>
+            <div style={{ fontSize: 12, color: '#8a7aaa' }}>Start from a template</div>
           </button>
 
           {/* Open File */}
@@ -218,16 +218,16 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
             onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)' }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
           >
-            <FolderOpen size={32} style={{ color: '#6b7280', marginBottom: 12 }} />
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a2e', marginBottom: 4 }}>Open File</div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>Import a .json project</div>
+            <FolderOpen size={32} style={{ color: '#8a7aaa', marginBottom: 12 }} />
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1028', marginBottom: 4 }}>Open File</div>
+            <div style={{ fontSize: 12, color: '#8a7aaa' }}>Import a .json project</div>
           </button>
         </div>
 
         {/* Recent Projects */}
         {recentProjects.length > 0 && (
           <div style={{ width: '100%', maxWidth: 600 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: '#8a7aaa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
               <Clock size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
               Recent Projects
             </h3>
@@ -242,11 +242,11 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     transition: 'all 150ms ease',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#00fff0'; e.currentTarget.style.background = '#1a0040' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8b7dc8'; e.currentTarget.style.background = '#1a0040' }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#ffffff' }}
                 >
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#1a1a2e' }}>{p.name}</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: '#1a1028' }}>{p.name}</div>
                     <div style={{ fontSize: 11, color: '#9ca3af' }}>
                       {new Date(p.updated).toLocaleDateString()} · {p.template}
                     </div>
