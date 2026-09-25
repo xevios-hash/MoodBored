@@ -14,6 +14,8 @@ import { randomUUID } from 'crypto'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = process.env.PORT || 3000
 const BOARDS_DIR = process.env.BOARDS_DIR || join(process.env.HOME || '/tmp', '.moodbored', 'boards')
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ''
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
 
 // ─── Board File I/O ─────────────────────────────────────────────────
 
@@ -35,8 +37,67 @@ function writeBoard(id, state) {
   ensureDir(BOARDS_DIR)
   state.lastModified = new Date().toISOString()
   writeFileSync(boardPath(id), JSON.stringify(state, null, 2))
-  // Notify all SSE subscribers for this board
   notifyBoardChange(id, state)
+  // Also persist to Supabase if configured (survives Railway redeploy)
+  syncToSupabase(id, state).catch(() => {})
+}
+
+// ─── Supabase Persistence ───────────────────────────────────────────
+// Boards are saved to Supabase as a backup. On startup, if the local
+// filesystem is empty, boards are restored from Supabase.
+
+const supabaseHeaders = SUPABASE_URL && SUPABASE_KEY
+  ? { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }
+  : null
+
+async function supabaseRequest(method, path, body) {
+  if (!supabaseHeaders) return null
+  const url = `${SUPABASE_URL}/rest/v1/${path}`
+  const opts = { method, headers: supabaseHeaders }
+  if (body) opts.body = JSON.stringify(body)
+  try {
+    const res = await fetch(url, opts)
+    if (!res.ok) return null
+    return await res.json().catch(() => null)
+  } catch { return null }
+}
+
+async function syncToSupabase(id, state) {
+  if (!supabaseHeaders) return
+  const project = state.project
+  if (!project) return
+  await supabaseRequest('POST', 'boards', {
+    id,
+    name: project.name || id,
+    data: state,
+    updated_at: new Date().toISOString(),
+  }).catch(() => {})
+  // Upsert — Supabase will insert or update based on id conflict
+  await fetch(`${SUPABASE_URL}/rest/v1/boards`, {
+    method: 'POST',
+    headers: { ...supabaseHeaders, Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify({
+      id,
+      name: project.name || id,
+      data: state,
+      updated_at: new Date().toISOString(),
+    }),
+  }).catch(() => {})
+}
+
+async function loadFromSupabase() {
+  if (!supabaseHeaders) return
+  const boards = listBoards()
+  if (boards.length > 0) return // local boards exist, don't overwrite
+  console.log('[MoodBored] No local boards found — loading from Supabase...')
+  const rows = await supabaseRequest('GET', 'boards?select=*', null)
+  if (!Array.isArray(rows) || rows.length === 0) return
+  for (const row of rows) {
+    if (row.id && row.data) {
+      writeFileSync(boardPath(row.id), JSON.stringify(row.data, null, 2))
+      console.log(`[MoodBored] Restored board: ${row.name || row.id}`)
+    }
+  }
 }
 
 function listBoards() {
@@ -669,6 +730,9 @@ app.get('/{*splat}', (_req, res) => {
 // ─── Start ──────────────────────────────────────────────────────────
 
 ensureDir(BOARDS_DIR)
+
+// Restore boards from Supabase if local filesystem is empty
+await loadFromSupabase().catch(() => {})
 
 app.listen(PORT, () => {
   console.log(`MoodBored server on port ${PORT}`)
