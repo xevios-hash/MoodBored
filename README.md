@@ -1,54 +1,78 @@
-# MoodBored
+<p align="center">
+  <img src="public/logo-transparent.png" width="120" alt="MoodBored Logo" />
+</p>
 
-A collaborative mood-board workspace where humans and LLMs brainstorm together visually.
+<h1 align="center">MoodBored</h1>
 
-MoodBored is a visual canvas for creative direction — mood boards, brand exploration, design systems, and reference gathering. It integrates with any LLM via MCP so your AI can read, write, and arrange items on the board as naturally as you can.
+<p align="center">
+  <strong>Visual mood-board workspace where humans and LLMs brainstorm together.</strong><br/>
+  <em>Any LLM. Any IDE. One canvas.</em>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#mcp-integration">MCP</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#architecture">Architecture</a>
+</p>
+
+---
+
+## What is MoodBored?
+
+MoodBored is a collaborative canvas for creative direction — mood boards, brand exploration, design systems, and reference gathering. It integrates with any LLM via [MCP](https://modelcontextprotocol.io) so your AI can read, write, and arrange items on the board as naturally as you can.
+
+**No sign-up required.** Works locally, works deployed. One `npm install` and you're running.
+
+## Screenshots
+
+<p align="center">
+  <img src="public/screenshot-board.png" width="800" alt="MoodBored Canvas" /><br/>
+  <em>Infinite canvas with images, palettes, gradients, fonts, and notes</em>
+</p>
+
+<p align="center">
+  <img src="public/screenshot-mcp.png" width="800" alt="MoodBored MCP Server" /><br/>
+  <em>MCP connection info page — copy-paste configs for any IDE</em>
+</p>
 
 ## Quick Start
 
 ```bash
-# Install and run
+git clone https://github.com/xevios-hash/MoodBored.git
+cd MoodBored
 npm install
 npm run dev          # opens at http://localhost:5173
+```
 
-# Production build
-npm run build        # outputs to dist/
-
-# macOS desktop (Tauri)
-npx tauri build      # produces .app and .dmg
-
-# Start the server (serves frontend + MCP endpoints)
+**Production server** (serves frontend + MCP endpoints):
+```bash
+npm run build
 npm start            # http://localhost:3000
 ```
 
-## What It Does
-
-**Canvas** — Infinite canvas with pan/zoom, drag-and-drop, multi-select, lasso selection, alignment snapping, layers panel, minimap. 11 item types: notes, text, images, links, palettes, gradients, fonts, swatches, size guides, videos, containers.
-
-**AI Chat** — Talk to an LLM that adds items to your board in real-time via OpenRouter. Supports tool-calling (structured function invocations) with a fallback to regex-parsed JSON blocks. Multi-agent mode available (toggle in Settings).
-
-**MCP Server** — Any LLM tool (Claude Desktop, Cursor, OpenCode, Grok Code) can drive the board via MCP. 7 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `arrange_items`, `clear_board`. Stdio transport for desktop clients, SSE transport for web-based clients.
-
-**Export for Creation** — Select items on the board, export a structured creative brief for another LLM to produce images, videos, games, websites, 3D scenes, audio, or documents.
-
-**Collaboration** — Share boards via links with view/edit roles. Real-time presence with cursor tracking. No sign-up required for viewers.
-
-## Architecture
-
-```
-src/                    React frontend (canvas, chat, inspector, etc.)
-src/lib/                Core logic (API, tools, sync, storage, export)
-mcp/mcp-server.ts       MCP server (stdio transport)
-server.mjs              Express server (static files + MCP SSE + board API)
-src-tauri/              Tauri desktop wrapper (macOS)
-bend/                   Formal verification (data model, laws, proofs)
+**macOS desktop:**
+```bash
+npx tauri build      # produces .app + .dmg
 ```
 
 ## MCP Integration
 
-MoodBored exposes an MCP server so any LLM can interact with your board.
+MoodBored exposes an MCP server so any LLM can interact with your board. **7 tools:**
 
-**Claude Desktop / Cursor** (stdio):
+| Tool | What it does |
+|------|-------------|
+| `get_board` | Read full board state — items, palette, typography |
+| `add_items` | Add notes, images, palettes, gradients, fonts, links, videos, containers |
+| `remove_items` | Delete items by ID |
+| `update_item` | Edit any item's properties |
+| `search_items` | Text + tag search across all items |
+| `arrange_items` | Grid, horizontal stack, vertical stack, spiral layouts |
+| `clear_board` | Wipe all items |
+
+### Claude Desktop / Cursor (stdio)
+
 ```json
 {
   "mcpServers": {
@@ -61,79 +85,138 @@ MoodBored exposes an MCP server so any LLM can interact with your board.
 }
 ```
 
-**OpenCode / Web IDEs** (SSE):
+### OpenCode / Web IDEs (SSE)
+
 ```
 http://localhost:3000/mcp/sse?board=your-board-id
 ```
 
-**Connection info page**: `http://localhost:3000/mcp`
+### Connection Info
 
-**Discovery**: `http://localhost:3000/.well-known/mcp.json`
+Open `http://localhost:3000/mcp` for copy-paste connection configs.
+
+### Discovery
+
+MCP clients can auto-discover the server via `/.well-known/mcp.json`.
+
+## Features
+
+### Canvas
+- Infinite pan/zoom with smooth touch gestures
+- Lasso selection, alignment snapping, multi-select
+- Layers panel, minimap, context menu (all 11 item types)
+- Inline text editing on notes (double-click)
+- Palette color editing (double-click swatch)
+- Eyedropper color picker
+- 11 item types: note, text, image, link, palette, gradient, font, swatch, size guide, video, container
+
+### AI
+- LLM chat with tool-calling (OpenRouter)
+- Automatic board population from natural language
+- Image generation via OpenRouter
+- Multi-agent mode (6 specialist roles, toggled off by default)
+- Jev quality gate for coherence scoring
+
+### Content
+- Unsplash image search (built-in browser)
+- Clipboard paste (images from clipboard → canvas)
+- YouTube video backgrounds
+- Custom video backgrounds with rename/delete
+- Color picker with harmony generators (complementary, analogous, triadic)
+- Palette extraction from canvas pixels
+
+### Integration
+- MCP server (stdio + SSE transports)
+- Export for Creation (8 creation types, 3 formats)
+- Supabase cloud sync (optional)
+- Real-time collaboration with cursor presence (optional)
+- Embed mode for IDE integration (`?embed=1`)
+- PostMessage API for parent-frame control
+
+### Platform
+- Web (any browser)
+- macOS desktop (Tauri)
+- PWA (installable, works offline)
+- Code splitting (vendor/store/UI chunks)
 
 ## Embed Mode
 
-Open any board URL to get a canvas-only view (no chat, no sidebar):
+Open any board URL to get a canvas-only view — no chat, no sidebar:
+
 ```
-http://localhost:3000/board/{board-id}
-http://localhost:3000/board/{board-id}?embed=1&theme=dark
-http://localhost:3000/board/{board-id}?readonly=1
+http://localhost:3000/board/{id}
+http://localhost:3000/board/{id}?embed=1&theme=dark
+http://localhost:3000/board/{id}?readonly=1
 ```
 
-PostMessage API for parent-frame control:
+PostMessage API:
 ```js
 window.postMessage({ type: 'addItems', items: [...] }, '*')
 window.postMessage({ type: 'setTheme', theme: 'dark' }, '*')
+window.postMessage({ type: 'focusItem', id: '...' }, '*')
 ```
-
-## Configuration
-
-Open Settings (gear icon) to configure:
-- **Canvas background** — solid color presets or video backgrounds (YouTube URLs supported)
-- **Theme** — light / dark
-- **Multi-agent mode** — toggle multiple specialized AI agents (off by default)
-- **Jev quality gate** — coherence threshold for agent proposals
-
-API key and model selection are only shown in the full app (not in embed mode).
 
 ## Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| `N` / `T` / `I` / `L` / `P` / `G` / `F` / `V` | Create note/text/image/link/palette/font/video |
-| `Ctrl+K` | Search |
-| `Ctrl+A` | Select all |
-| `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
-| `Ctrl+C` / `Ctrl+V` | Copy / paste |
-| `+` / `-` / `0` | Zoom in / out / reset |
-| `Delete` | Delete selected |
-| `Escape` | Cancel / deselect |
-| Double-click empty | Create note |
-| Right-click | Context menu (all item types) |
+| Key | Action | Key | Action |
+|-----|--------|-----|--------|
+| `N` | New note | `P` | New palette |
+| `T` | New text | `G` | New gradient |
+| `I` | New image | `F` | New font |
+| `L` | New link | `V` | New video |
+| `Ctrl+K` | Search | `Ctrl+Z` | Undo |
+| `Ctrl+A` | Select all | `Ctrl+Y` | Redo |
+| `Ctrl+C` | Copy | `+` / `-` | Zoom in/out |
+| `Ctrl+V` | Paste | `0` | Reset zoom |
+| `Delete` | Delete selected | `Escape` | Cancel/deselect |
+| Double-click | Create note | Right-click | Context menu |
 
 ## Item Types
 
-| Kind | Description |
-|------|-------------|
-| `note` | Text thoughts, quotes, keywords |
-| `text` | Raw content snippet |
-| `image` | Visual reference (supports Unsplash URLs) |
-| `link` | Reference URL with title and summary |
-| `palette` | Color palette with hex codes |
-| `gradient` | Gradient preview with stops and direction |
-| `font` | Typography preview with sample text |
-| `swatch` | Single color with usage notes |
-| `sizeguide` | Dimensions and orientation reference |
-| `video` | Video reference with subject and motion description |
-| `container` | Group of items with layout modes (free/grid/stack) |
-| `connector` | Line between items |
+| Kind | Description | Example |
+|------|-------------|---------|
+| `note` | Text thoughts, quotes | `"The ocean stirs the heart"` |
+| `text` | Raw content snippet | Copy/paste from articles |
+| `image` | Visual reference | Unsplash URLs, uploads |
+| `link` | Reference URL | YouTube videos, articles |
+| `palette` | Color palette | `[#00CED1, #20B2AA, #006994]` |
+| `gradient` | Gradient preview | Sand → teal → midnight |
+| `font` | Typography preview | Playfair Display, Inter |
+| `swatch` | Single color | `#00CED1 — Shallow Reef` |
+| `sizeguide` | Dimensions | 1920×1080 hero banner |
+| `video` | Video reference | Subject + motion description |
+| `container` | Group of items | Free/grid/stack layout modes |
 
-## Build Targets
+## Architecture
 
-| Target | Command | Output |
-|--------|---------|--------|
-| Web | `npm run build` | `dist/` |
-| macOS | `npx tauri build` | `.app` + `.dmg` |
-| Server | `npm start` | `http://localhost:3000` |
+```
+src/                      React frontend
+├── components/           Canvas, Chat, Inspector, Settings, etc.
+├── lib/                  Core logic
+│   ├── api.ts            OpenRouter streaming + tool-calling
+│   ├── tools.ts          MCP tool definitions
+│   ├── sync.ts           Supabase sync (optional)
+│   ├── storage.ts        IndexedDB persistence
+│   ├── exportForCreation.ts  Creative brief export
+│   └── collaboration.ts  Share links + presence
+├── stores/               Zustand state management
+└── types/                TypeScript type definitions
+
+mcp/mcp-server.ts         MCP server (stdio transport)
+server.mjs                Express server (static + SSE + board API)
+src-tauri/                Tauri desktop wrapper (macOS)
+bend/                     Formal verification (data model, laws, proofs)
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PORT` | No | Server port (default: 3000) |
+| `BOARDS_DIR` | No | Board storage directory |
+| `VITE_SUPABASE_URL` | No | Supabase project URL (for cloud sync) |
+| `VITE_SUPABASE_ANON_KEY` | No | Supabase anon key (for cloud sync) |
+| `MOODBORED_BOARD_ID` | No | MCP: target a specific board |
 
 ## License
 

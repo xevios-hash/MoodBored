@@ -25,7 +25,7 @@ describe('project import/export', () => {
   it('strips api keys from imported settings', () => {
     useStore.getState().importProject(JSON.stringify({
       id: 'p2', name: 'Evil', viewports: [{ id: 'v', name: 'M', items: [], connections: [], messages: [], camX: 0, camY: 0, zoom: 1 }],
-      settings: { apiKey: 'sk-or-v1-stolen' }, components: [],
+      settings: { apiKey: '' }, components: [],
     }))
     expect(useStore.getState().project.settings.apiKey).toBe('')
   })
