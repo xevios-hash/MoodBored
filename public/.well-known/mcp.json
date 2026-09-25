@@ -13,7 +13,7 @@
   "tools": [
     {
       "name": "get_board",
-      "description": "Read the full mood board state — items, palette, typography, notes, layout"
+      "description": "Read the full board state — items, palette, typography, spatial layout, relationships"
     },
     {
       "name": "add_items",
@@ -30,6 +30,14 @@
     {
       "name": "search_items",
       "description": "Search items by text query and/or tag filter"
+    },
+    {
+      "name": "semantic_search",
+      "description": "Search items by meaning — finds related concepts even with different wording"
+    },
+    {
+      "name": "related_items",
+      "description": "Find items semantically related to a given item"
     },
     {
       "name": "arrange_items",
