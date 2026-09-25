@@ -10,11 +10,11 @@
 </p>
 
 <p align="center">
+  <a href="https://moodbored-production.up.railway.app">Live Demo</a> ·
   <a href="#quick-start">Quick Start</a> ·
   <a href="#mcp-integration">MCP</a> ·
   <a href="#features">Features</a> ·
-  <a href="#screenshots">Screenshots</a> ·
-  <a href="#architecture">Architecture</a>
+  <a href="#screenshots">Screenshots</a>
 </p>
 
 ---
@@ -43,6 +43,8 @@ MoodBored is a collaborative canvas for creative direction — mood boards, bran
 </p>
 
 ## Quick Start
+
+**Try it live:** [moodbored-production.up.railway.app](https://moodbored-production.up.railway.app)
 
 ```bash
 git clone https://github.com/xevios-hash/MoodBored.git
@@ -93,12 +95,12 @@ MoodBored exposes an MCP server so any LLM can interact with your board. **7 too
 ### OpenCode / Web IDEs (SSE)
 
 ```
-http://localhost:3000/mcp/sse?board=your-board-id
+https://moodbored-production.up.railway.app/mcp/sse?board=your-board-id
 ```
 
 ### Connection Info
 
-Open `http://localhost:3000/mcp` for copy-paste connection configs.
+Open `https://moodbored-production.up.railway.app/mcp` for copy-paste connection configs.
 
 ### Discovery
 
