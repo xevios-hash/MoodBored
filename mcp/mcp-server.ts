@@ -1,74 +1,65 @@
 #!/usr/bin/env node
 
-// MoodBored MCP Server — exposes the mood board as tools that any LLM
-// can call. Uses stdio transport (Claude Desktop, Cursor, etc.).
-//
-// State is stored in a JSON file at:
-//   ~/Library/Application Support/MoodBored/board.json  (macOS)
-//   %APPDATA%/MoodBored/board.json                      (Windows)
-//
-// The Tauri app syncs to this file automatically via the sync bridge.
-// The MCP server reads/writes it directly.
-//
-// Usage:
-//   node mcp/mcp-server.js           (compiled)
-//   npx tsx mcp/mcp-server.ts        (dev)
-
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
-import { join } from 'path'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'fs'
+import { join, dirname } from 'path'
 import { v4 as uuid } from 'uuid'
 
 // ─── State File ─────────────────────────────────────────────────────
 
+const BOARDS_DIR = process.env.MOODBORED_BOARDS_DIR || join(
+  process.env.HOME || process.env.USERPROFILE || '/tmp',
+  '.moodbored', 'boards',
+)
+const BOARD_ID = process.env.MOODBORED_BOARD_ID || null
+
 function getStatePath(): string {
-  const home = process.env.HOME || process.env.USERPROFILE || '/tmp'
-  if (process.platform === 'darwin') {
-    return join(home, 'Library', 'Application Support', 'MoodBored', 'board.json')
-  }
-  if (process.platform === 'win32') {
-    return join(process.env.APPDATA || join(home, 'AppData', 'Roaming'), 'MoodBored', 'board.json')
-  }
-  return join(home, '.config', 'MoodBored', 'board.json')
+  if (BOARD_ID) return join(BOARDS_DIR, `${BOARD_ID}.json`)
+  // Fallback: use the most recently modified board, or create one
+  try {
+    const files = readdirSync(BOARDS_DIR).filter(f => f.endsWith('.json'))
+    if (files.length > 0) {
+      // Most recently modified
+      const sorted = files.sort((a, b) => {
+        const sa = readFileSync(join(BOARDS_DIR, a), 'utf-8')
+        const sb = readFileSync(join(BOARDS_DIR, b), 'utf-8')
+        return (JSON.parse(sb).lastModified || '').localeCompare(JSON.parse(sa).lastModified || '')
+      })
+      return join(BOARDS_DIR, sorted[0])
+    }
+  } catch (_e) {}
+  return join(BOARDS_DIR, 'default.json')
 }
 
 const STATE_PATH = getStatePath()
 
-interface BoardState {
-  project: any
-  lastModified: string
-}
-
 function ensureDir() {
-  const dir = STATE_PATH.replace(/[/\\][^/\\]+$/, '')
+  const dir = dirname(STATE_PATH)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
 }
 
-function readState(): BoardState {
+function readState(): any {
   try {
-    if (!existsSync(STATE_PATH)) {
-      return { project: null, lastModified: new Date().toISOString() }
-    }
+    if (!existsSync(STATE_PATH)) return { project: null, lastModified: new Date().toISOString() }
     return JSON.parse(readFileSync(STATE_PATH, 'utf-8'))
-  } catch {
+  } catch (_e) {
     return { project: null, lastModified: new Date().toISOString() }
   }
 }
 
-function writeState(state: BoardState) {
+function writeState(state: any) {
   ensureDir()
   state.lastModified = new Date().toISOString()
   writeFileSync(STATE_PATH, JSON.stringify(state, null, 2))
 }
 
-function getActiveViewport(state: BoardState): any {
-  if (!state.project?.viewports?.length) return null
-  return state.project.viewports[0]
+function getActiveViewport(state: any): any {
+  return state?.project?.viewports?.[0]
 }
 
-function getItems(state: BoardState): any[] {
+function getItems(state: any): any[] {
   return getActiveViewport(state)?.items ?? []
 }
 
@@ -96,7 +87,7 @@ server.resource('board', 'board://current', async (uri) => {
 server.resource('summary', 'board://summary', async (uri) => {
   const state = readState()
   const items = getItems(state)
-  const nonConn = items.filter(i => i.kind !== 'connector')
+  const nonConn = items.filter((i: any) => i.kind !== 'connector')
   const kinds: Record<string, number> = {}
   for (const item of nonConn) kinds[item.kind] = (kinds[item.kind] || 0) + 1
   const parts = Object.entries(kinds).map(([k, v]) => `${v} ${k}${v > 1 ? 's' : ''}`)
@@ -114,10 +105,10 @@ server.resource('summary', 'board://summary', async (uri) => {
 
 // ─── Tools ──────────────────────────────────────────────────────────
 
-server.tool('get_board', 'Read the current mood board state — all items, palette, typography, layout', {}, async () => {
+server.tool('get_board', 'Read the current mood board state — all items, palette, typography', {}, async () => {
   const state = readState()
   const items = getItems(state)
-  const nonConn = items.filter(i => i.kind !== 'connector')
+  const nonConn = items.filter((i: any) => i.kind !== 'connector')
   const palette: any[] = []
   const typography: any[] = []
   const notes: any[] = []
@@ -140,7 +131,7 @@ server.tool('get_board', 'Read the current mood board state — all items, palet
         palette,
         typography,
         notes: notes.slice(0, 10),
-        items: nonConn.map(i => ({
+        items: nonConn.map((i: any) => ({
           id: i.id, kind: i.kind,
           text: i.text || i.raw || i.description || i.label || i.url || '',
           pos: i.pos, size: i.size,
@@ -150,88 +141,92 @@ server.tool('get_board', 'Read the current mood board state — all items, palet
   }
 })
 
-server.tool('add_items', 'Add one or more items to the mood board. Items are placed on the canvas automatically.', {
-  items: z.array(z.object({
-    kind: z.enum(['note', 'text', 'image', 'link', 'palette', 'gradient', 'font', 'swatch', 'sizeguide', 'container', 'video']),
-    text: z.string().optional().describe('Content for notes/text items'),
-    description: z.string().optional().describe('Description for images/videos'),
-    url: z.string().optional().describe('URL for links/images'),
-    source: z.string().optional().describe('Image source URL (Unsplash, etc.)'),
-    label: z.string().optional().describe('Label for palettes/gradients/containers/sizeguides'),
-    colors: z.array(z.object({ hex: z.string(), label: z.string().optional() })).optional().describe('Colors for palette items'),
-    stops: z.array(z.object({ position: z.number(), color: z.string() })).optional().describe('Stops for gradient items'),
-    fontFamily: z.string().optional().describe('Font family name'),
-    hex: z.string().optional().describe('Hex color for swatch items'),
-    name: z.string().optional().describe('Name for swatch items'),
-    purpose: z.string().optional().describe('Why this item is on the board'),
-    importance: z.string().optional().describe('How important this item is'),
-    tags: z.array(z.string()).optional().describe('Tags for filtering/search'),
-  }).describe('An item to add to the board')),
-}, async ({ items: newItems }) => {
-  const state = readState()
-  const vp = getActiveViewport(state)
-  if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport. Open a project first.' }] }
+server.tool(
+  'add_items',
+  'Add one or more items to the mood board. Items are placed on the canvas automatically.',
+  {
+    items: z.array(z.object({
+      kind: z.enum(['note', 'text', 'image', 'link', 'palette', 'gradient', 'font', 'swatch', 'sizeguide', 'container', 'video']),
+      text: z.string().optional(),
+      description: z.string().optional(),
+      url: z.string().optional(),
+      source: z.string().optional(),
+      label: z.string().optional(),
+      colors: z.array(z.object({ hex: z.string(), label: z.string().optional() })).optional(),
+      stops: z.array(z.object({ position: z.number(), color: z.string() })).optional(),
+      fontFamily: z.string().optional(),
+      hex: z.string().optional(),
+      name: z.string().optional(),
+      purpose: z.string().optional(),
+      importance: z.string().optional(),
+      tags: z.array(z.string()).optional(),
+    })),
+  },
+  async ({ items: newItems }) => {
+    const state = readState()
+    const vp = getActiveViewport(state)
+    if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport. Open a project first.' }] }
 
-  const added: string[] = []
-  for (const raw of newItems) {
-    const id = uuid()
-    const kind = raw.kind
-    const pos = { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 }
-    let item: any
+    const added: string[] = []
+    for (const raw of newItems) {
+      const id = uuid()
+      const pos = { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 }
+      let item: any
 
-    switch (kind) {
-      case 'note':
-        item = { kind, id, text: raw.text || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos }
-        break
-      case 'text':
-        item = { kind, id, raw: raw.text || '', pos, size: { w: 300, h: 200 } }
-        break
-      case 'image':
-        item = { kind, id, description: raw.description || '', source: raw.source || raw.url || '', fullSource: raw.source || raw.url || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
-        break
-      case 'link':
-        item = { kind, id, url: raw.url || '', title: raw.label || '', description: raw.description || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos }
-        break
-      case 'palette':
-        item = { kind, id, label: raw.label || 'Palette', colors: (raw.colors || []).map(c => ({ hex: c.hex, label: c.label || '' })), purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 320, h: 120 } }
-        break
-      case 'gradient':
-        item = { kind, id, label: raw.label || 'Gradient', stops: (raw.stops || []).map(s => ({ position: s.position, color: s.color })), direction: 90, purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 80 } }
-        break
-      case 'font':
-        item = { kind, id, fontFamily: raw.fontFamily || 'Inter', weights: [400, 700], sampleText: 'The quick brown fox', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 320, h: 160 } }
-        break
-      case 'swatch':
-        item = { kind, id, hex: raw.hex || '#000000', name: raw.name || '', usage: raw.description || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 160, h: 180 } }
-        break
-      case 'sizeguide':
-        item = { kind, id, width: 1920, height: 1080, unit: 'px', label: raw.label || '', orientation: 'landscape', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 200, h: 160 } }
-        break
-      case 'container':
-        item = { kind, id, label: raw.label || 'Container', children: [], layout: 'free', gap: 8, collapsed: false, purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 400, h: 300 } }
-        break
-      case 'video':
-        item = { kind, id, source: raw.source || '', subjectDesc: raw.description || '', motionDesc: '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
-        break
-      default:
-        continue
+      switch (raw.kind) {
+        case 'note':
+          item = { kind: 'note', id, text: raw.text || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos }
+          break
+        case 'text':
+          item = { kind: 'text', id, raw: raw.text || '', pos, size: { w: 300, h: 200 } }
+          break
+        case 'image':
+          item = { kind: 'image', id, description: raw.description || '', source: raw.source || raw.url || '', fullSource: raw.source || raw.url || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
+          break
+        case 'link':
+          item = { kind: 'link', id, url: raw.url || '', title: raw.label || '', description: raw.description || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos }
+          break
+        case 'palette':
+          item = { kind: 'palette', id, label: raw.label || 'Palette', colors: (raw.colors || []).map((c: any) => ({ hex: c.hex, label: c.label || '' })), purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 320, h: 120 } }
+          break
+        case 'gradient':
+          item = { kind: 'gradient', id, label: raw.label || 'Gradient', stops: (raw.stops || []).map((s: any) => ({ position: s.position, color: s.color })), direction: 90, purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 80 } }
+          break
+        case 'font':
+          item = { kind: 'font', id, fontFamily: raw.fontFamily || 'Inter', weights: [400, 700], sampleText: 'The quick brown fox', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 320, h: 160 } }
+          break
+        case 'swatch':
+          item = { kind: 'swatch', id, hex: raw.hex || '#000000', name: raw.name || '', usage: raw.description || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 160, h: 180 } }
+          break
+        case 'sizeguide':
+          item = { kind: 'sizeguide', id, width: 1920, height: 1080, unit: 'px', label: raw.label || '', orientation: 'landscape', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 200, h: 160 } }
+          break
+        case 'container':
+          item = { kind: 'container', id, label: raw.label || 'Container', children: [], layout: 'free', gap: 8, collapsed: false, purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 400, h: 300 } }
+          break
+        case 'video':
+          item = { kind: 'video', id, source: raw.source || '', subjectDesc: raw.description || '', motionDesc: '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
+          break
+      }
+
+      if (item) {
+        vp.items.push(item)
+        added.push(`${raw.kind}: ${item.text || item.description || item.label || item.url || id}`)
+      }
     }
 
-    vp.items.push(item)
-    added.push(`${kind}: ${item.text || item.description || item.label || item.url || id}`)
-  }
-
-  writeState(state)
-  return {
-    content: [{
-      type: 'text',
-      text: `Added ${added.length} item(s) to the board:\n${added.map(a => `- ${a}`).join('\n')}`,
-    }],
-  }
-})
+    writeState(state)
+    return {
+      content: [{
+        type: 'text',
+        text: `Added ${added.length} item(s) to the board:\n${added.map(a => `- ${a}`).join('\n')}`,
+      }],
+    }
+  },
+)
 
 server.tool('remove_items', 'Remove items from the mood board by their IDs', {
-  ids: z.array(z.string()).describe('IDs of items to remove'),
+  ids: z.array(z.string()),
 }, async ({ ids }) => {
   const state = readState()
   const vp = getActiveViewport(state)
@@ -246,8 +241,8 @@ server.tool('remove_items', 'Remove items from the mood board by their IDs', {
 })
 
 server.tool('update_item', 'Update properties of an existing item on the board', {
-  id: z.string().describe('The item ID to update'),
-  updates: z.record(z.any()).describe('Properties to update (e.g. {"text": "new text", "purpose": "mood setter"})'),
+  id: z.string(),
+  updates: z.record(z.any()),
 }, async ({ id, updates }) => {
   const state = readState()
   const vp = getActiveViewport(state)
@@ -262,11 +257,11 @@ server.tool('update_item', 'Update properties of an existing item on the board',
 })
 
 server.tool('search_items', 'Search items on the board by text query and/or tag filter', {
-  query: z.string().optional().describe('Text to search for (matches descriptions, text, labels, URLs)'),
-  tag: z.string().optional().describe('Tag to filter by'),
+  query: z.string().optional(),
+  tag: z.string().optional(),
 }, async ({ query, tag }) => {
   const state = readState()
-  const items = getItems(state).filter(i => i.kind !== 'connector')
+  const items = getItems(state).filter((i: any) => i.kind !== 'connector')
   const q = (query || '').toLowerCase()
   const results = items.filter((item: any) => {
     const searchText = [item.text, item.raw, item.description, item.label, item.url, item.subjectDesc, item.fontFamily, item.hex, item.name, item.purpose, item.importance].filter(Boolean).join(' ').toLowerCase()
@@ -286,9 +281,9 @@ server.tool('search_items', 'Search items on the board by text query and/or tag 
 })
 
 server.tool('arrange_items', 'Organize items on the board — grid, horizontal stack, vertical stack, or spiral layout', {
-  layout: z.enum(['grid', 'stack-h', 'stack-v', 'spiral']).describe('Layout type'),
-  cols: z.number().optional().describe('Columns for grid layout (default: 4)'),
-  gap: z.number().optional().describe('Gap between items in pixels (default: 20)'),
+  layout: z.enum(['grid', 'stack-h', 'stack-v', 'spiral']),
+  cols: z.number().optional(),
+  gap: z.number().optional(),
 }, async ({ layout, cols, gap }) => {
   const state = readState()
   const vp = getActiveViewport(state)
@@ -331,48 +326,6 @@ server.tool('arrange_items', 'Organize items on the board — grid, horizontal s
   return { content: [{ type: 'text', text: `Arranged ${positioned.length} items in ${layout} layout.` }] }
 })
 
-server.tool('export_brief', 'Export the board as a structured creative brief for another LLM to consume', {
-  creation_type: z.enum(['image', 'video', 'game', 'web', '3d', 'audio', 'document', 'general']).optional().describe('What the receiving LLM should create'),
-  format: z.enum(['markdown', 'json']).optional().describe('Output format (default: markdown)'),
-}, async ({ creation_type, format }) => {
-  const state = readState()
-  const items = getItems(state)
-  const nonConn = items.filter(i => i.kind !== 'connector')
-
-  // Simple inline export (avoids import dependency on the frontend module)
-  const palette: string[] = []
-  const fonts: string[] = []
-  const images: string[] = []
-  const notesList: string[] = []
-
-  for (const item of nonConn) {
-    if (item.kind === 'palette') {
-      for (const c of item.colors || []) palette.push(c.hex)
-    }
-    if (item.kind === 'swatch') palette.push(item.hex)
-    if (item.kind === 'font') fonts.push(`${item.fontFamily} (${(item.weights || []).join(', ')})`)
-    if (item.kind === 'image') images.push(item.description || item.source)
-    if (item.kind === 'note' || item.kind === 'text') notesList.push(item.text || item.raw)
-  }
-
-  if (format === 'json') {
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({ creationType: creation_type || 'general', itemCount: nonConn.length, palette, fonts, images, notes: notesList, items: nonConn }, null, 2),
-      }],
-    }
-  }
-
-  const lines: string[] = [`# Creative Brief`, '', `**Board:** ${state.project?.name}`, `**Items:** ${nonConn.length}`, `**Creation target:** ${creation_type || 'general'}`, '']
-  if (palette.length) lines.push('## Color Palette', ...palette.map(h => `- \`${h}\``), '')
-  if (fonts.length) lines.push('## Typography', ...fonts.map(f => `- ${f}`), '')
-  if (images.length) lines.push('## Visual References', ...images.map(i => `- ${i}`), '')
-  if (notesList.length) lines.push('## Creative Notes', ...notesList.map(n => `- ${n}`), '')
-
-  return { content: [{ type: 'text', text: lines.join('\n') }] }
-})
-
 server.tool('clear_board', 'Remove all items from the current board', {}, async () => {
   const state = readState()
   const vp = getActiveViewport(state)
@@ -381,37 +334,6 @@ server.tool('clear_board', 'Remove all items from the current board', {}, async 
   vp.items = vp.items.filter((i: any) => i.kind === 'connector')
   writeState(state)
   return { content: [{ type: 'text', text: `Cleared ${count} items from the board.` }] }
-})
-
-server.tool('list_projects', 'List all available boards on disk', {}, async () => {
-  const dir = STATE_PATH.replace(/[/\\][^/\\]+$/, '')
-  try {
-    const { readdirSync } = await import('fs')
-    const files = readdirSync(dir).filter(f => f.endsWith('.json') && f !== 'settings.json')
-    const projects = files.map(f => {
-      try {
-        const data = JSON.parse(require('fs').readFileSync(`${dir}/${f}`, 'utf-8'))
-        return { id: data.project?.id || f.replace('.json',''), name: data.project?.name || f, items: data.project?.viewports?.[0]?.items?.length ?? 0 }
-      } catch { return null }
-    }).filter(Boolean)
-    return { content: [{ type: 'text', text: JSON.stringify(projects, null, 2) }] }
-  } catch { return { content: [{ type: 'text', text: 'No boards found.' }] }
-})
-
-server.tool('export_to_folder', 'Export the current board JSON to a file path (for saving to a project folder)', {
-  path: { type: 'string', description: 'Absolute file path to write the board JSON' },
-}, async ({ path }) => {
-  if (!path) return { content: [{ type: 'text', text: 'Error: path is required' }] }
-  const state = readState()
-  if (!state.project) return { content: [{ type: 'text', text: 'Error: no board loaded' }] }
-  try {
-    const { writeFileSync, mkdirSync } = await import('fs')
-    const { dirname } = await import('path')
-    const dir = dirname(path)
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(path, JSON.stringify(state.project, null, 2))
-    return { content: [{ type: 'text', text: `Exported board to ${path}` }] }
-  } catch (err: any) { return { content: [{ type: 'text', text: `Error: ${err.message}` }] } }
 })
 
 // ─── Start ──────────────────────────────────────────────────────────
