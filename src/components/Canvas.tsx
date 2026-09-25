@@ -103,6 +103,7 @@ function isImageFailed(url: string): boolean {
 
 // Global redraw flag so image loads can trigger a repaint
 let needsRedrawGlobal = false
+let drawLoggedOnce = false
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -258,6 +259,13 @@ export function Canvas() {
       const rect = cvs.getBoundingClientRect()
       const pw = Math.round(rect.width * dpr)
       const ph = Math.round(rect.height * dpr)
+
+      // Debug: log once on first real frame
+      if (!drawLoggedOnce) {
+        drawLoggedOnce = true
+        console.info('[Canvas] draw start', { rect: `${rect.width}x${rect.height}`, items: its.length, zoom: c.zoom, panX: c.panX, panY: c.panY })
+      }
+
       if (pw === 0 || ph === 0) { rafRef.current = requestAnimationFrame(draw); return }
 
       // Only resize canvas when dimensions actually change
@@ -375,6 +383,17 @@ export function Canvas() {
         ctx.fillText('Two-finger scroll to pan · Option+scroll to zoom', 0, 80 / c.zoom)
         ctx.textAlign = 'start'
       }
+
+      // Debug overlay (always visible during debug)
+      ctx.save()
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // screen-space
+      const dbg = `[${Math.round(rect.width)}x${Math.round(rect.height)}] ${its.length} items · zoom ${(c.zoom * 100).toFixed(0)}%`
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'
+      ctx.fillRect(8, 8, ctx.measureText(dbg).width + 16, 22)
+      ctx.fillStyle = '#fff'
+      ctx.font = '11px monospace'
+      ctx.fillText(dbg, 16, 23)
+      ctx.restore()
 
       ctx.restore()
       } catch (err) {
