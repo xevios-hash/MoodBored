@@ -184,6 +184,190 @@ app.get('/api/board/health', (_req, res) => {
   res.json({ status: 'ok', boardsDir: BOARDS_DIR, boardCount: listBoards().length })
 })
 
+// ─── REST API — Item Operations ─────────────────────────────────────
+// Mirrors the MCP tools so any HTTP client can drive the board.
+
+function getBoardOr404(id, res) {
+  const state = readBoard(id)
+  if (!state) { res.status(404).json({ error: 'Board not found' }); return null }
+  return state
+}
+
+function getVpOr404(state, res) {
+  const vp = state?.project?.viewports?.[0]
+  if (!vp) { res.status(404).json({ error: 'Board has no viewport' }); return null }
+  return vp
+}
+
+function itemSummary(item) {
+  return {
+    id: item.id, kind: item.kind,
+    text: item.text || item.raw || item.description || item.label || item.url || '',
+    pos: item.pos, size: item.size,
+  }
+}
+
+// Add items
+app.post('/api/board/:id/items', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const newItems = Array.isArray(req.body) ? req.body : [req.body]
+  const added = []
+  for (const raw of newItems) {
+    const id = raw.id || randomUUID()
+    const pos = raw.pos || { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 }
+    const item = { ...raw, id, pos }
+    if (!item.size && raw.kind !== 'note' && raw.kind !== 'link') item.size = { w: 300, h: 200 }
+    vp.items.push(item)
+    added.push(itemSummary(item))
+  }
+  writeBoard(req.params.id, state)
+  res.json({ ok: true, added })
+})
+
+// Remove items by IDs
+app.delete('/api/board/:id/items', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const ids = req.body?.ids || []
+  if (!Array.isArray(ids) || ids.length === 0) {
+    // No IDs → clear all
+    const count = vp.items.filter(i => i.kind !== 'connector').length
+    vp.items = vp.items.filter(i => i.kind === 'connector')
+    writeBoard(req.params.id, state)
+    res.json({ ok: true, removed: count })
+    return
+  }
+
+  const before = vp.items.length
+  vp.items = vp.items.filter(i => !ids.includes(i.id))
+  writeBoard(req.params.id, state)
+  res.json({ ok: true, removed: before - vp.items.length })
+})
+
+// Update a single item
+app.patch('/api/board/:id/items/:itemId', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const item = vp.items.find(i => i.id === req.params.itemId)
+  if (!item) { res.status(404).json({ error: 'Item not found' }); return }
+
+  Object.assign(item, req.body)
+  writeBoard(req.params.id, state)
+  res.json({ ok: true, item: itemSummary(item) })
+})
+
+// Search items
+app.get('/api/board/:id/search', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const q = (req.query.q || '').toLowerCase()
+  const tag = req.query.tag || ''
+  const kind = req.query.kind || ''
+
+  const results = vp.items.filter(item => {
+    if (item.kind === 'connector') return false
+    const text = [item.text, item.raw, item.description, item.label, item.url, item.subjectDesc, item.fontFamily, item.hex, item.name, item.purpose, item.importance, (item.tags || []).join(' ')].filter(Boolean).join(' ').toLowerCase()
+    const matchesQuery = !q || text.includes(q)
+    const matchesTag = !tag || (item.tags || []).includes(tag)
+    const matchesKind = !kind || item.kind === kind
+    return matchesQuery && matchesTag && matchesKind
+  })
+
+  res.json({ count: results.length, items: results.map(itemSummary) })
+})
+
+// Arrange items
+app.post('/api/board/:id/arrange', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const { layout, cols, gap } = req.body
+  const positioned = vp.items.filter(i => i.kind !== 'connector' && i.pos)
+  const g = gap ?? 20
+  let offset = 0
+
+  switch (layout) {
+    case 'grid': {
+      const c = cols || 4
+      positioned.forEach((item, idx) => {
+        item.pos = { x: 50 + (idx % c) * ((item.size?.w ?? 250) + g), y: 50 + Math.floor(idx / c) * ((item.size?.h ?? 150) + g) }
+      })
+      break
+    }
+    case 'stack-h':
+      positioned.forEach(item => {
+        item.pos = { x: 50 + offset, y: 50 }
+        offset += (item.size?.w ?? 250) + g
+      })
+      break
+    case 'stack-v':
+      positioned.forEach(item => {
+        item.pos = { x: 50, y: 50 + offset }
+        offset += (item.size?.h ?? 150) + g
+      })
+      break
+    case 'spiral':
+      positioned.forEach((item, idx) => {
+        const angle = idx * 0.8
+        const radius = 150 + idx * g * 0.3
+        item.pos = { x: 400 + Math.cos(angle) * radius, y: 300 + Math.sin(angle) * radius }
+      })
+      break
+    default:
+      res.status(400).json({ error: 'Invalid layout. Use: grid, stack-h, stack-v, spiral' })
+      return
+  }
+
+  writeBoard(req.params.id, state)
+  res.json({ ok: true, arranged: positioned.length, layout })
+})
+
+// Export as creative brief
+app.get('/api/board/:id/brief', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const nonConn = vp.items.filter(i => i.kind !== 'connector')
+  const palette = [], typography = [], notes = [], images = []
+  for (const item of nonConn) {
+    if (item.kind === 'palette') for (const c of item.colors || []) palette.push({ hex: c.hex, name: c.label })
+    if (item.kind === 'swatch') palette.push({ hex: item.hex, name: item.name, usage: item.usage })
+    if (item.kind === 'font') typography.push({ family: item.fontFamily, weights: item.weights })
+    if (item.kind === 'note' || item.kind === 'text') notes.push({ text: item.text || item.raw, purpose: item.purpose })
+    if (item.kind === 'image') images.push({ description: item.description, source: item.source })
+  }
+
+  const format = req.query.format || 'markdown'
+  if (format === 'json') {
+    res.json({ board: state.project?.name, items: nonConn.length, palette, typography, notes, images })
+    return
+  }
+
+  const lines = [`# Creative Brief — ${state.project?.name}`, '', `**Items:** ${nonConn.length}`, '']
+  if (palette.length) lines.push('## Palette', ...palette.map(c => `- \`${c.hex}\` ${c.name || ''}`), '')
+  if (typography.length) lines.push('## Typography', ...typography.map(t => `- ${t.family} (${(t.weights || []).join(', ')})`), '')
+  if (images.length) lines.push('## Visual References', ...images.map(i => `- ${i.description} ${i.source || ''}`), '')
+  if (notes.length) lines.push('## Notes', ...notes.map(n => `- ${n.text}`), '')
+  res.type('text').send(lines.join('\n'))
+})
+
 // ─── MCP SSE Transport ──────────────────────────────────────────────
 // Full parity with the stdio server + project management tools.
 
@@ -435,6 +619,26 @@ a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}
 <li><strong>arrange_items</strong> — grid, stack, spiral layouts</li>
 <li><strong>clear_board</strong> — wipe all items</li>
 </ul>
+
+<h2>REST API (same tools, plain HTTP)</h2>
+<p>For clients that don't support MCP — use <code>curl</code>, <code>fetch</code>, Postman, any language.</p>
+<table style="width:100%;border-collapse:collapse;font-size:13px">
+<tr style="border-bottom:1px solid #2d0055;text-align:left"><th style="padding:6px 0">Method</th><th>Endpoint</th><th>Description</th></tr>
+<tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/boards</code></td><td>List all boards</td></tr>
+<tr><td style="padding:4px 0"><code>POST</code></td><td><code>/api/boards</code></td><td>Create a board <code>{name}</code></td></tr>
+<tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id</code></td><td>Read full board state</td></tr>
+<tr><td style="padding:4px 0"><code>POST</code></td><td><code>/api/board/:id/items</code></td><td>Add items <code>[{kind, text, ...}]</code></td></tr>
+<tr><td style="padding:4px 0"><code>DELETE</code></td><td><code>/api/board/:id/items</code></td><td>Remove items <code>{ids: [...]}</code> or clear all</td></tr>
+<tr><td style="padding:4px 0"><code>PATCH</code></td><td><code>/api/board/:id/items/:itemId</code></td><td>Update item properties</td></tr>
+<tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id/search?q=&tag=&kind=</code></td><td>Search items</td></tr>
+<tr><td style="padding:4px 0"><code>POST</code></td><td><code>/api/board/:id/arrange</code></td><td>Arrange <code>{layout, cols?, gap?}</code></td></tr>
+<tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id/brief?format=markdown|json</code></td><td>Export creative brief</td></tr>
+<tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id/events</code></td><td>SSE stream of board changes</td></tr>
+</table>
+<p style="margin-top:8px"><strong>Example:</strong></p>
+<pre>curl -X POST ${origin}/api/board/BOARD_ID/items \\
+  -H "Content-Type: application/json" \\
+  -d '[{"kind":"note","text":"Hello from curl!"},{"kind":"palette","label":"My Colors","colors":[{"hex":"#FF6B35","label":"Orange"}]}]'</pre>
 
 <h2>Resources</h2>
 <ul>
