@@ -8,15 +8,15 @@ import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner
 // ─── Theme ──────────────────────────────────────────────────────────
 
 function isDark() { return document.body.classList.contains('dark') }
-function gridColor() { return isDark() ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)' }
-function crosshairColor() { return isDark() ? 'rgba(45,212,191,0.3)' : 'rgba(13,148,136,0.3)' }
-function cardBg(sel: boolean) { return isDark() ? (sel ? '#1a1a2e' : '#16161f') : (sel ? '#f0fdf9' : '#ffffff') }
-function cardBorder(sel: boolean) { return isDark() ? (sel ? 'rgba(45,212,191,0.5)' : 'rgba(255,255,255,0.08)') : (sel ? 'rgba(13,148,136,0.5)' : 'rgba(0,0,0,0.06)') }
-function txtPrimary() { return isDark() ? '#e8e8ec' : '#1f2937' }
-function txtSecondary() { return isDark() ? '#a1a1b5' : '#6b7280' }
-function txtMuted() { return isDark() ? '#6b6b80' : '#9ca3af' }
-function accent() { return isDark() ? '#2dd4bf' : '#0d9488' }
-function shadow(sel: boolean) { return isDark() ? (sel ? 'rgba(45,212,191,0.3)' : 'rgba(0,0,0,0.4)') : (sel ? 'rgba(13,148,136,0.3)' : 'rgba(0,0,0,0.12)') }
+function gridColor() { return isDark() ? 'rgba(0,255,240,0.04)' : 'rgba(0,0,0,0.06)' }
+function crosshairColor() { return isDark() ? 'rgba(0,255,240,0.25)' : 'rgba(0,148,136,0.3)' }
+function cardBg(sel: boolean) { return isDark() ? (sel ? '#1a0040' : '#1a0030') : (sel ? '#e8fcfa' : '#ffffff') }
+function cardBorder(sel: boolean) { return isDark() ? (sel ? 'rgba(0,255,240,0.5)' : 'rgba(0,255,240,0.08)') : (sel ? 'rgba(0,180,170,0.5)' : 'rgba(0,0,0,0.06)') }
+function txtPrimary() { return isDark() ? '#f0eaff' : '#1a0030' }
+function txtSecondary() { return isDark() ? '#b8a8d8' : '#6b5a8a' }
+function txtMuted() { return isDark() ? '#7a6a9a' : '#9a8aba' }
+function accent() { return isDark() ? '#00fff0' : '#00b4aa' }
+function shadow(sel: boolean) { return isDark() ? (sel ? 'rgba(0,255,240,0.25)' : 'rgba(0,0,0,0.5)') : (sel ? 'rgba(0,180,170,0.2)' : 'rgba(0,0,0,0.1)') }
 
 // ─── LRU Image Cache (max 200) ─────────────────────────────────────
 
@@ -53,11 +53,12 @@ function getImage(url: string): HTMLImageElement | null {
 // ─── Constants ──────────────────────────────────────────────────────
 
 const PORT_RADIUS = 5
-const PORT_COLORS: Record<string, string> = { data: '#3b82f6', visual: '#8b5cf6', reference: '#10b981', any: '#6b7280' }
-const CONNECTOR_COLORS: Record<ConnectorOwner, string> = { user: '#3b82f6', llm: '#8b5cf6', objective: '#6b7280' }
+const PORT_COLORS: Record<string, string> = { data: '#00bfff', visual: '#bf5fff', reference: '#00ff88', any: '#8888aa' }
+const CONNECTOR_COLORS: Record<ConnectorOwner, string> = { user: '#00bfff', llm: '#ff2d78', objective: '#ffe600' }
 const KIND_COLORS: Record<string, string> = {
-  note: '#10b981', text: '#3b82f6', image: '#8b5cf6', link: '#14b8a6', video: '#f97316',
-  palette: '#ec4899', gradient: '#8b5cf6', font: '#3b82f6', swatch: '#ec4899', sizeguide: '#6b7280', container: '#10b981',
+  text: '#00fff0', note: '#ffe600', image: '#ff2d78', link: '#00bfff',
+  video: '#bf5fff', palette: '#00ff88', gradient: '#ff8844', font: '#ff5599',
+  swatch: '#88ddff', sizeguide: '#aaaaaa', container: '#00ff88', connector: '#666688',
 }
 const RESIZE_HANDLE_SIZE = 8
 
@@ -156,6 +157,8 @@ export function Canvas() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; wx: number; wy: number; itemId?: string } | null>(null)
   const [showLayers, setShowLayers] = useState(false)
   const [eyedropperActive, setEyedropperActive] = useState(false)
+  const [addToolbarOpen, setAddToolbarOpen] = useState(false)
+  const [expandedLinks, setExpandedLinks] = useState<Set<string>>(new Set())
 
   const project = useStore((s) => s.project)
   const activeViewportId = useStore((s) => s.activeViewportId)
@@ -629,6 +632,17 @@ export function Canvas() {
       return
     }
 
+    // Double-click on link → toggle iframe preview
+    if (hit.kind === 'link') {
+      setExpandedLinks((prev) => {
+        const next = new Set(prev)
+        if (next.has(hit.id)) next.delete(hit.id)
+        else next.add(hit.id)
+        return next
+      })
+      return
+    }
+
     // Otherwise select and open inspector
     state.selectItem(hit.id)
     if (!state.inspectorOpen) state.toggleInspector()
@@ -789,11 +803,11 @@ export function Canvas() {
   function getYouTubeEmbedUrl(url: string): string | null {
     if (!url) return null
     const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+      /(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
     ]
     for (const p of patterns) {
       const m = url.match(p)
-      if (m) return `https://www.youtube.com/embed/${m[1]}?autoplay=1&mute=1&loop=1&playlist=${m[1]}&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&playsinline=1&disablekb=1&fs=0`
+      if (m) return `https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&mute=1&loop=1&playlist=${m[1]}&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&playsinline=1&disablekb=1&fs=0&color=white`
     }
     return null
   }
@@ -805,12 +819,15 @@ export function Canvas() {
     <div style={{ flex: 1, position: 'relative', overflow: 'hidden', cursor: 'crosshair' }} onDrop={onDrop} onDragOver={e => e.preventDefault()} onContextMenu={e => e.preventDefault()}>
       {/* Video background */}
       {isVideo && ytEmbed && (
-        <iframe
-          src={ytEmbed}
-          style={{ position: 'absolute', top: '50%', left: '50%', width: '100vw', height: '100vh', minWidth: '177.78vh', minHeight: '100vw', transform: 'translate(-50%, -50%)', border: 'none', pointerEvents: 'none', zIndex: 0 }}
-          allow="autoplay; encrypted-media"
-          key={bgVideo}
-        />
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0 }}>
+          <iframe
+            src={ytEmbed}
+            style={{ position: 'absolute', top: '50%', left: '50%', width: '120vw', height: '120vh', transform: 'translate(-50%, -50%)', border: 'none', pointerEvents: 'none' }}
+            allow="autoplay; encrypted-media; accelerometer; gyroscope; picture-in-picture"
+            allowFullScreen={false}
+            key={bgVideo}
+          />
+        </div>
       )}
       {isVideo && !ytEmbed && (
         <video
@@ -852,7 +869,7 @@ export function Canvas() {
           const z = Math.min((r.width - pad * 2) / (maxX - minX), (r.height - pad * 2) / (maxY - minY), 2)
           s.setZoom(z)
           s.setPan(r.width / 2 - ((minX + maxX) / 2) * z, r.height / 2 - ((minY + maxY) / 2) * z)
-        }} style={{ color: '#0d9488', fontWeight: 600 }}>Fit All</button>
+        }} style={{ color: '#00fff0', fontWeight: 600 }}>Fit All</button>
         <button onClick={() => {
           const cvs = canvasRef.current
           if (!cvs) return
@@ -860,7 +877,63 @@ export function Canvas() {
           a.download = 'moodboard.png'
           a.href = cvs.toDataURL('image/png')
           a.click()
-        }} className="status-bar-btn" style={{ color: '#0d9488', fontWeight: 600 }}>Export PNG</button>
+        }} className="status-bar-btn" style={{ color: '#00fff0', fontWeight: 600 }}>Export PNG</button>
+      </div>
+
+      {/* Floating Add Toolbar — bottom-right */}
+      <div className="add-toolbar">
+        {addToolbarOpen && (
+          <div className="add-toolbar-items">
+            {[
+              { kind: 'note', icon: '📝', label: 'Note' },
+              { kind: 'text', icon: '📄', label: 'Text' },
+              { kind: 'image', icon: '🖼️', label: 'Image' },
+              { kind: 'link', icon: '🔗', label: 'Link' },
+              { kind: 'palette', icon: '🎨', label: 'Palette' },
+              { kind: 'gradient', icon: '🌈', label: 'Gradient' },
+              { kind: 'font', icon: '🔤', label: 'Font' },
+              { kind: 'swatch', icon: '🟧', label: 'Color' },
+              { kind: 'sizeguide', icon: '📐', label: 'Size' },
+              { kind: 'container', icon: '📦', label: 'Group' },
+              { kind: 'video', icon: '🎬', label: 'Video' },
+            ].map(({ kind, icon, label }) => (
+              <button
+                key={kind}
+                className="add-toolbar-item"
+                title={label}
+                onClick={() => {
+                  const state = useStore.getState()
+                  const cx = -state.canvas.panX / state.canvas.zoom + 400
+                  const cy = -state.canvas.panY / state.canvas.zoom + 300
+                  const defaults: Record<string, any> = {
+                    note: { kind: 'note', id: crypto.randomUUID(), text: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy } },
+                    text: { kind: 'text', id: crypto.randomUUID(), raw: '', pos: { x: cx, y: cy }, size: { w: 300, h: 200 } },
+                    image: { kind: 'image', id: crypto.randomUUID(), thumbnail: '', fullSource: '', description: '', source: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 300, h: 200 } },
+                    link: { kind: 'link', id: crypto.randomUUID(), url: '', title: '', summary: '', description: '', purpose: '', importance: '', source: '', tags: [], pos: { x: cx, y: cy } },
+                    palette: { kind: 'palette', id: crypto.randomUUID(), label: 'New Palette', colors: [{ hex: '#ff2d78', label: '' }, { hex: '#00fff0', label: '' }, { hex: '#ffe600', label: '' }], purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 120 } },
+                    gradient: { kind: 'gradient', id: crypto.randomUUID(), label: 'New Gradient', stops: [{ position: 0, color: '#ff2d78' }, { position: 1, color: '#00fff0' }], direction: 90, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 300, h: 80 } },
+                    font: { kind: 'font', id: crypto.randomUUID(), fontFamily: 'Inter', weights: [400, 700], sampleText: 'The quick brown fox', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 160 } },
+                    swatch: { kind: 'swatch', id: crypto.randomUUID(), hex: '#00fff0', name: '', usage: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 160, h: 180 } },
+                    sizeguide: { kind: 'sizeguide', id: crypto.randomUUID(), width: 1920, height: 1080, unit: 'px', label: '', orientation: 'landscape', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 200, h: 160 } },
+                    container: { kind: 'container', id: crypto.randomUUID(), label: 'New Group', children: [], layout: 'free', gap: 8, collapsed: false, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 400, h: 300 } },
+                    video: { kind: 'video', id: crypto.randomUUID(), source: '', sourceUrl: '', startTs: 0, duration: 0, subjectDesc: '', motionDesc: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 240 } },
+                  }
+                  state.addItem(defaults[kind] || defaults.note)
+                  setAddToolbarOpen(false)
+                }}
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          className={`add-toolbar-trigger ${addToolbarOpen ? 'open' : ''}`}
+          onClick={() => setAddToolbarOpen(!addToolbarOpen)}
+          title="Add item"
+        >
+          +
+        </button>
       </div>
 
       {/* Video/GIF overlays */}
@@ -873,6 +946,31 @@ export function Canvas() {
         if (item.kind === 'video') return <video key={item.id} src={item.source || item.sourceUrl} autoPlay loop muted playsInline style={{ position: 'absolute', left: x, top: y, width: w, height: h, objectFit: 'cover', borderRadius: 10, pointerEvents: 'none' }} />
         if (item.kind === 'image') return <img key={item.id} src={item.thumbnail || item.fullSource} alt={item.description} style={{ position: 'absolute', left: x, top: y, width: w, height: h, objectFit: 'cover', borderRadius: 10, pointerEvents: 'none' }} />
         return null
+      })}
+
+      {/* Expanded link iframes */}
+      {items.filter(i => i.kind === 'link' && expandedLinks.has(i.id) && 'url' in i && i.url).map(item => {
+        if (!('pos' in item)) return null
+        const x = item.pos.x * canvas.zoom + canvas.panX
+        const y = item.pos.y * canvas.zoom + canvas.panY
+        const w = (item.size?.w ?? 250) * canvas.zoom
+        const h = (item.size?.h ?? 150) * canvas.zoom
+        return (
+          <div key={item.id} style={{ position: 'absolute', left: x, top: y, width: w, height: h, borderRadius: 10, overflow: 'hidden', border: `2px solid ${isDark() ? 'rgba(0,255,240,0.3)' : 'rgba(0,180,170,0.3)'}`, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', zIndex: 15 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: isDark() ? '#1a0030' : '#f5f0ff', borderBottom: `1px solid ${isDark() ? 'rgba(0,255,240,0.1)' : 'rgba(0,0,0,0.06)'}`, fontSize: 10, color: isDark() ? '#b8a8d8' : '#6b5a8a' }}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(item as any).url}</span>
+              <button
+                onClick={() => setExpandedLinks((prev) => { const n = new Set(prev); n.delete(item.id); return n })}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 14, padding: '0 2px' }}
+              >×</button>
+            </div>
+            <iframe
+              src={(item as any).url}
+              style={{ width: '100%', height: 'calc(100% - 28px)', border: 'none' }}
+              sandbox="allow-scripts allow-same-origin allow-forms"
+            />
+          </div>
+        )
       })}
 
       {itemCount > 0 && (
@@ -1115,7 +1213,7 @@ function drawResizeHandles(ctx: CanvasRenderingContext2D, item: BoardItem, zoom:
   ]
   for (const handle of handles) {
     ctx.fillStyle = isDark() ? '#16161f' : '#ffffff'
-    ctx.strokeStyle = '#0d9488'; ctx.lineWidth = 1.5 / zoom
+    ctx.strokeStyle = '#00fff0'; ctx.lineWidth = 1.5 / zoom
     ctx.beginPath(); roundRect(ctx, handle.x, handle.y, s, s, 2 / zoom); ctx.fill(); ctx.stroke()
   }
 }
@@ -1151,6 +1249,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
     case 'swatch': drawSwatchItem(ctx, item, x, y, w, h, zoom); break
     case 'sizeguide': drawSizeGuideItem(ctx, item, x, y, w, h, zoom); break
     case 'container': drawContainerItem(ctx, item, x, y, w, h, zoom); break
+    case 'link': drawLinkItem(ctx, item, x, y, w, h, zoom); break
     default: drawTextBasedItem(ctx, item, x, y, w, h, zoom); break
   }
   ctx.restore()
@@ -1232,7 +1331,7 @@ function drawSizeGuideItem(ctx: CanvasRenderingContext2D, item: any, x: number, 
   const mw = w - PAD * 2; const mh = h - PAD * 2 - 48; const aspect = (item.width || 1) / (item.height || 1)
   let bw = mw * 0.8; let bh = bw / aspect; if (bh > mh) { bh = mh; bw = bh * aspect }
   const cx = x + PAD + (mw - bw) / 2; const by = y + PAD + 34
-  ctx.strokeStyle = '#0d9488'; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4 / zoom, 3 / zoom]); ctx.strokeRect(cx, by, bw, bh); ctx.setLineDash([])
+  ctx.strokeStyle = '#00fff0'; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4 / zoom, 3 / zoom]); ctx.strokeRect(cx, by, bw, bh); ctx.setLineDash([])
   ctx.fillStyle = accent(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
   ctx.fillText(`${item.width}${item.unit}`, cx + bw / 2, by + bh + 14)
   ctx.save(); ctx.translate(cx - 8, by + bh / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(`${item.height}${item.unit}`, 0, 0); ctx.restore()
@@ -1290,6 +1389,34 @@ function drawContainerItem(ctx: CanvasRenderingContext2D, item: ContainerItem, x
     ctx.fillStyle = txtMuted(); ctx.font = `${9 / zoom}px Inter, sans-serif`
     if (childCount === 0) ctx.fillText('Empty — drag items here or add via chat', x + PAD, y + PAD + 56)
   }
+}
+
+function drawLinkItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  const url = item.url || ''
+  let domain = ''
+  try { domain = new URL(url).hostname.replace('www.', '') } catch {}
+  const title = item.title || domain || 'Link'
+  const summary = item.summary || item.description || url
+
+  ctx.fillStyle = accent(); ctx.font = HEADER_FONT; ctx.fillText('LINK', x + PAD, y + PAD + 9)
+  ctx.fillStyle = txtPrimary(); ctx.font = `600 13px Inter, sans-serif`
+  ctx.fillText(title.slice(0, 40), x + PAD, y + PAD + 26)
+
+  if (domain) {
+    ctx.fillStyle = txtMuted(); ctx.font = SMALL_FONT
+    ctx.fillText(domain, x + PAD, y + PAD + 40)
+  }
+
+  if (summary) {
+    ctx.fillStyle = txtSecondary(); ctx.font = BODY_FONT
+    wrapText(ctx, summary.slice(0, 120), x + PAD, y + PAD + 54, w - PAD * 2, 14, h - PAD - 58)
+  }
+
+  // URL bar at bottom
+  ctx.fillStyle = isDark() ? 'rgba(0,255,240,0.06)' : 'rgba(0,0,0,0.03)'
+  ctx.fillRect(x + PAD, y + h - PAD - 16, w - PAD * 2, 16)
+  ctx.fillStyle = txtMuted(); ctx.font = `${8}px Inter, sans-serif`
+  ctx.fillText(url.slice(0, 50) + (url.length > 50 ? '…' : ''), x + PAD + 4, y + h - PAD - 5)
 }
 
 function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {

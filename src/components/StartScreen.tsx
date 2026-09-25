@@ -99,7 +99,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
               onClick={() => setSelectedTemplate(t.id)}
               style={{
                 background: selectedTemplate === t.id ? 'var(--accent-muted)' : '#ffffff',
-                border: selectedTemplate === t.id ? '2px solid #0d9488' : '2px solid #e5e7eb',
+                border: selectedTemplate === t.id ? '2px solid #00fff0' : '2px solid #e5e7eb',
                 borderRadius: 12, padding: 20, cursor: 'pointer', textAlign: 'left',
                 transition: 'all 150ms ease',
               }}
@@ -119,7 +119,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
               onKeyDown={(e) => e.key === 'Enter' && handleNewProject()}
               placeholder="Name your project..."
               style={{
-                background: '#ffffff', border: '2px solid #0d9488', borderRadius: 10,
+                background: '#ffffff', border: '2px solid #00fff0', borderRadius: 10,
                 padding: '10px 16px', fontSize: 16, width: 300, outline: 'none',
                 color: '#1a1a2e', fontFamily: 'inherit',
               }}
@@ -129,7 +129,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
               onClick={handleNewProject}
               disabled={!projectName.trim()}
               style={{
-                background: projectName.trim() ? '#0d9488' : '#9ca3af',
+                background: projectName.trim() ? '#00fff0' : '#9ca3af',
                 color: '#ffffff', border: 'none', borderRadius: 10,
                 padding: '10px 24px', fontSize: 15, fontWeight: 600,
                 cursor: projectName.trim() ? 'pointer' : 'not-allowed',
@@ -166,7 +166,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
       <div style={{ position: 'relative', zIndex: 2, padding: '24px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img src="/logo.png" alt="MoodBored" style={{ width: 40, height: 40, objectFit: 'contain' }} />
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#0d9488' }}>MoodBored</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: '#00fff0' }}>MoodBored</span>
         </div>
         <button
           onClick={handleImport}
@@ -195,14 +195,14 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
           <button
             onClick={() => setShowTemplates(true)}
             style={{
-              background: '#ffffff', border: '2px solid #0d9488', borderRadius: 16,
+              background: '#ffffff', border: '2px solid #00fff0', borderRadius: 16,
               padding: '32px 40px', cursor: 'pointer', textAlign: 'center',
               transition: 'all 200ms ease', width: 200,
             }}
             onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(13,148,136,0.2)' }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
           >
-            <Plus size={32} style={{ color: '#0d9488', marginBottom: 12 }} />
+            <Plus size={32} style={{ color: '#00fff0', marginBottom: 12 }} />
             <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a2e', marginBottom: 4 }}>New Project</div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>Start from a template</div>
           </button>
@@ -242,7 +242,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     transition: 'all 150ms ease',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0d9488'; e.currentTarget.style.background = '#f0fdfa' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#00fff0'; e.currentTarget.style.background = '#1a0040' }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#ffffff' }}
                 >
                   <div>

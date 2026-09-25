@@ -14,6 +14,7 @@ import { Lightbox } from '@/components/Lightbox'
 import { ExportModal } from '@/components/ExportModal'
 import { UnsplashSearch } from '@/components/UnsplashSearch'
 import { ShareModal } from '@/components/ShareModal'
+import { ColorPicker } from '@/components/ColorPicker'
 import { PresenceBar, RemoteCursors } from '@/components/Presence'
 import { joinBoard, getShareByToken, broadcastCursor, broadcastSelection, type PresenceUser, type ShareRole, type CollaborationState } from '@/lib/collaboration'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -32,6 +33,7 @@ export default function App() {
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [unsplashOpen, setUnsplashOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [colorPickerOpen, setColorPickerOpen] = useState(false)
 
   // Collaboration state
   const [collab, setCollab] = useState<CollaborationState>({
@@ -83,6 +85,10 @@ export default function App() {
 
   const handleShareOpen = useCallback(() => {
     setShareOpen(true)
+  }, [])
+
+  const handleColorPickerOpen = useCallback(() => {
+    setColorPickerOpen(true)
   }, [])
 
   // Role enforcement
@@ -174,7 +180,7 @@ export default function App() {
           <Sidebar />
         </div>
         <main className="flex flex-col flex-1 min-w-0">
-          <TopBar onExportForCreation={handleExportForCreation} onUnsplashSearch={handleUnsplashSearch} onShare={handleShareOpen} presenceBar={<PresenceBar users={remoteUsers} isConnected={collab.isConnected} />} />
+          <TopBar onExportForCreation={handleExportForCreation} onUnsplashSearch={handleUnsplashSearch} onShare={handleShareOpen} onColorPicker={handleColorPickerOpen} presenceBar={<PresenceBar users={remoteUsers} isConnected={collab.isConnected} />} />
           <div className="flex flex-1 min-h-0 relative">
             <Canvas />
             <RemoteCursors users={remoteUsers} canvasPanX={canvas.panX} canvasPanY={canvas.panY} canvasZoom={canvas.zoom} />
@@ -196,6 +202,7 @@ export default function App() {
         {exportModalOpen && <ExportModalWrapper onClose={() => setExportModalOpen(false)} />}
         {unsplashOpen && <UnsplashSearch onClose={() => setUnsplashOpen(false)} />}
         {shareOpen && <ShareModal onClose={() => setShareOpen(false)} />}
+        {colorPickerOpen && <ColorPicker onClose={() => setColorPickerOpen(false)} />}
       </div>
     </>
   )

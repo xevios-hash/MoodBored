@@ -5,74 +5,90 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Dark mode surfaces (Raycast-inspired ladder)
+        // Dark mode surfaces — deep purple-black with character
         dark: {
-          canvas: '#07080a',
-          surface: '#0d0d12',
-          elevated: '#12121a',
-          card: '#16161f',
-          hover: '#1a1a25',
-          hairline: '#1f1f2e',
-          hairlineStrong: '#2a2a3a',
+          canvas: '#08000f',
+          surface: '#0e001a',
+          elevated: '#150025',
+          card: '#1a0030',
+          hover: '#220040',
+          hairline: '#2d0055',
+          hairlineStrong: '#3d0070',
         },
-        // Light mode surfaces
+        // Light mode surfaces — clean with cool tints
         light: {
-          canvas: '#f8f9fb',
+          canvas: '#f5f0ff',
           surface: '#ffffff',
-          elevated: '#f4f5f7',
+          elevated: '#f0eaff',
           card: '#ffffff',
-          hover: '#f0f1f3',
-          hairline: '#e2e4e8',
-          hairlineStrong: '#d0d3d8',
+          hover: '#ebe4ff',
+          hairline: '#ddd4f0',
+          hairlineStrong: '#c8bde0',
         },
         // Semantic surface aliases (default = dark)
         surface: {
-          0: '#07080a',
-          1: '#0d0d12',
-          2: '#12121a',
-          3: '#16161f',
-          4: '#1a1a25',
-          5: '#1f1f2e',
+          0: '#08000f',
+          1: '#0e001a',
+          2: '#150025',
+          3: '#1a0030',
+          4: '#220040',
+          5: '#2d0055',
         },
-        // Accent: blue-green glass teal
+        // Primary accent: neon cyan (Sega)
         accent: {
-          DEFAULT: '#2dd4bf',
-          hover: '#14b8a6',
-          muted: 'rgba(45,212,191,0.15)',
-          glow: 'rgba(45,212,191,0.25)',
-          light: '#ccfbf1',
+          DEFAULT: '#00fff0',
+          hover: '#00d4c8',
+          muted: 'rgba(0,255,240,0.12)',
+          glow: 'rgba(0,255,240,0.25)',
+          light: '#ccfffc',
+        },
+        // Secondary: hot magenta (PlayStation)
+        hot: {
+          DEFAULT: '#ff2d78',
+          hover: '#e0185f',
+          muted: 'rgba(255,45,120,0.12)',
+          glow: 'rgba(255,45,120,0.25)',
+          light: '#ffd6e8',
+        },
+        // Tertiary: electric yellow (Nintendo)
+        zap: {
+          DEFAULT: '#ffe600',
+          hover: '#d4c000',
+          muted: 'rgba(255,230,0,0.12)',
+          glow: 'rgba(255,230,0,0.25)',
+          light: '#fffccc',
         },
         // Text
         text: {
-          primary: '#e8e8ec',
-          secondary: '#a1a1b5',
-          muted: '#6b6b80',
-          disabled: '#45455a',
+          primary: '#f0eaff',
+          secondary: '#b8a8d8',
+          muted: '#7a6a9a',
+          disabled: '#4a3a6a',
         },
         // Danger
         danger: {
-          DEFAULT: '#f43f5e',
-          hover: '#e11d48',
-          light: 'rgba(244,63,94,0.1)',
+          DEFAULT: '#ff073a',
+          hover: '#d4052e',
+          light: 'rgba(255,7,58,0.12)',
         },
         // Warning
         warning: {
-          DEFAULT: '#f59e0b',
-          hover: '#d97706',
-          light: 'rgba(245,158,11,0.1)',
+          DEFAULT: '#ffe600',
+          hover: '#d4c000',
+          light: 'rgba(255,230,0,0.12)',
         },
         // Success
         success: {
-          DEFAULT: '#10b981',
-          hover: '#059669',
-          light: 'rgba(16,185,129,0.1)',
+          DEFAULT: '#39ff14',
+          hover: '#2dd40f',
+          light: 'rgba(57,255,20,0.12)',
         },
-        // Port colors
+        // Port colors — brighter for arcade feel
         port: {
-          data: '#60a5fa',
-          visual: '#a78bfa',
-          reference: '#34d399',
-          any: '#6b7280',
+          data: '#00bfff',
+          visual: '#bf5fff',
+          reference: '#00ff88',
+          any: '#8888aa',
         },
       },
       borderRadius: {
@@ -89,11 +105,13 @@ export default {
         base: ['14px', { lineHeight: '20px' }],
       },
       boxShadow: {
-        glow: '0 0 20px rgba(45,212,191,0.15)',
-        glowStrong: '0 0 30px rgba(45,212,191,0.25)',
-        card: '0 2px 8px rgba(0,0,0,0.3), 0 0 1px rgba(255,255,255,0.05)',
-        cardHover: '0 4px 16px rgba(0,0,0,0.4), 0 0 1px rgba(255,255,255,0.08)',
-        panel: '0 8px 32px rgba(0,0,0,0.5)',
+        glow: '0 0 20px rgba(0,255,240,0.15)',
+        glowStrong: '0 0 30px rgba(0,255,240,0.3)',
+        glowHot: '0 0 20px rgba(255,45,120,0.2)',
+        glowZap: '0 0 20px rgba(255,230,0,0.2)',
+        card: '0 2px 8px rgba(0,0,0,0.4), 0 0 1px rgba(0,255,240,0.08)',
+        cardHover: '0 4px 16px rgba(0,0,0,0.5), 0 0 1px rgba(0,255,240,0.15)',
+        panel: '0 8px 32px rgba(0,0,0,0.6)',
       },
       backdropBlur: {
         glass: '20px',

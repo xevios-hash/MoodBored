@@ -342,9 +342,9 @@ export function ChatPanel() {
 
       <div className="p-3 border-t border-surface-4">
         {!settings.apiKey && (
-          <div className="mb-2 p-2 bg-danger-light rounded-lg flex items-center gap-2 text-xs text-danger cursor-pointer" onClick={toggleSettings}>
-            <AlertCircle size={14} />
-            <span>API key required. Click to open Settings.</span>
+          <div className="mb-2 p-2 rounded-lg flex items-center gap-2 text-xs cursor-pointer animate-glow" onClick={toggleSettings} style={{ background: 'rgba(255,230,0,0.08)', border: '1px solid rgba(255,230,0,0.2)' }}>
+            <span className="insert-token">INSERT TOKEN</span>
+            <span className="text-2xs" style={{ color: '#7a6a9a' }}>— click to open Settings</span>
           </div>
         )}
         <div className="flex gap-2">
