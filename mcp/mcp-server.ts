@@ -383,6 +383,37 @@ server.tool('clear_board', 'Remove all items from the current board', {}, async 
   return { content: [{ type: 'text', text: `Cleared ${count} items from the board.` }] }
 })
 
+server.tool('list_projects', 'List all available boards on disk', {}, async () => {
+  const dir = STATE_PATH.replace(/[/\\][^/\\]+$/, '')
+  try {
+    const { readdirSync } = await import('fs')
+    const files = readdirSync(dir).filter(f => f.endsWith('.json') && f !== 'settings.json')
+    const projects = files.map(f => {
+      try {
+        const data = JSON.parse(require('fs').readFileSync(`${dir}/${f}`, 'utf-8'))
+        return { id: data.project?.id || f.replace('.json',''), name: data.project?.name || f, items: data.project?.viewports?.[0]?.items?.length ?? 0 }
+      } catch { return null }
+    }).filter(Boolean)
+    return { content: [{ type: 'text', text: JSON.stringify(projects, null, 2) }] }
+  } catch { return { content: [{ type: 'text', text: 'No boards found.' }] }
+})
+
+server.tool('export_to_folder', 'Export the current board JSON to a file path (for saving to a project folder)', {
+  path: { type: 'string', description: 'Absolute file path to write the board JSON' },
+}, async ({ path }) => {
+  if (!path) return { content: [{ type: 'text', text: 'Error: path is required' }] }
+  const state = readState()
+  if (!state.project) return { content: [{ type: 'text', text: 'Error: no board loaded' }] }
+  try {
+    const { writeFileSync, mkdirSync } = await import('fs')
+    const { dirname } = await import('path')
+    const dir = dirname(path)
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(path, JSON.stringify(state.project, null, 2))
+    return { content: [{ type: 'text', text: `Exported board to ${path}` }] }
+  } catch (err: any) { return { content: [{ type: 'text', text: `Error: ${err.message}` }] } }
+})
+
 // ─── Start ──────────────────────────────────────────────────────────
 
 async function main() {

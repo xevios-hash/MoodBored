@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useStore } from '@/stores/useStore'
 import { Sidebar } from '@/components/Sidebar'
 import { Canvas } from '@/components/Canvas'
@@ -19,8 +19,93 @@ import { PresenceBar, RemoteCursors } from '@/components/Presence'
 import { joinBoard, getShareByToken, broadcastCursor, broadcastSelection, type PresenceUser, type ShareRole, type CollaborationState } from '@/lib/collaboration'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
+// ─── URL Params (read once, before React renders) ───────────────────
+
+const URL_PARAMS = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+const IS_EMBED = URL_PARAMS.has('embed')
+const EMBED_READONLY = URL_PARAMS.has('readonly')
+const EMBED_THEME = URL_PARAMS.get('theme') as 'dark' | 'light' | null
+const EMBED_PROJECT_ID = URL_PARAMS.get('project')
+const EMBED_BOARD_ID = URL_PARAMS.get('board')
+
+// Detect if running inside an iframe (auto-enable embed if no explicit param)
+const IS_IFRAME = typeof window !== 'undefined' && window.self !== window.top
+
+// ─── Auto-load project for embed/board modes ────────────────────────
+
+async function loadEmbedProject(): Promise<boolean> {
+  const store = useStore.getState()
+  // ?board=<id> — load from server
+  if (EMBED_BOARD_ID) {
+    try {
+      const base = window.location.origin
+      const res = await fetch(`${base}/api/board/${EMBED_BOARD_ID}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.project) {
+          store.setProject(data.project)
+          return true
+        }
+      }
+    } catch {}
+  }
+  // ?project=<id> — load from IndexedDB
+  if (EMBED_PROJECT_ID) {
+    try {
+      const { getProject } = await import('@/lib/storage')
+      const project = await getProject(EMBED_PROJECT_ID)
+      if (project) {
+        store.setProject(project)
+        return true
+      }
+    } catch {}
+  }
+  // No project specified — create a blank one
+  return false
+}
+
+// ─── Bidirectional sync bridge ──────────────────────────────────────
+// When running in embed mode with a board ID, subscribe to server-side
+// changes via SSE so the canvas updates when MCP tools write to the board.
+
+function initBoardSync(boardId: string | null) {
+  if (!boardId) return () => {}
+  const base = window.location.origin
+  let es: EventSource | null = null
+  let disposed = false
+
+  const connect = () => {
+    if (disposed) return
+    es = new EventSource(`${base}/api/board/${boardId}/events`)
+    es.onmessage = (event) => {
+      if (disposed) return
+      try {
+        const data = JSON.parse(event.data)
+        if (data.project) {
+          useStore.getState().setProject(data.project)
+        }
+      } catch {}
+    }
+    es.onerror = () => {
+      // Reconnect after 2s
+      es?.close()
+      if (!disposed) setTimeout(connect, 2000)
+    }
+  }
+  connect()
+
+  return () => {
+    disposed = true
+    es?.close()
+  }
+}
+
+// ─── Main App ───────────────────────────────────────────────────────
+
 export default function App() {
-  const [phase, setPhase] = useState<'splash' | 'start' | 'workspace'>('splash')
+  const isEmbed = IS_EMBED || (IS_IFRAME && !URL_PARAMS.has('token'))
+  const [phase, setPhase] = useState<'splash' | 'start' | 'workspace'>(isEmbed ? 'workspace' : 'splash')
+  const [embedReady, setEmbedReady] = useState(!isEmbed)
   const chatOpen = useStore((s) => s.chatOpen)
   const sidebarOpen = useStore((s) => s.sidebarOpen)
   const settingsOpen = useStore((s) => s.settingsOpen)
@@ -42,12 +127,74 @@ export default function App() {
   const channelRef = useRef<RealtimeChannel | null>(null)
   const [remoteUsers, setRemoteUsers] = useState<PresenceUser[]>([])
 
+  // ─── Theme ───
   useEffect(() => {
+    const t = EMBED_THEME || theme
     document.body.classList.remove('light', 'dark')
-    document.body.classList.add(theme)
-  }, [theme])
+    document.body.classList.add(t)
+  }, [theme, EMBED_THEME])
 
-  // Detect mobile
+  // ─── Embed: auto-load project + init sync ───
+  useEffect(() => {
+    if (!isEmbed) return
+    ;(async () => {
+      await loadEmbedProject()
+      // Override chrome settings for embed mode
+      useStore.setState({
+        sidebarOpen: false,
+        chatOpen: false,
+        inspectorOpen: false,
+      })
+      setEmbedReady(true)
+    })()
+  }, [isEmbed])
+
+  // ─── Embed: bidirectional sync with server ───
+  useEffect(() => {
+    if (!isEmbed || !embedReady) return
+    return initBoardSync(EMBED_BOARD_ID)
+  }, [isEmbed, embedReady])
+
+  // ─── Embed: listen for PostMessage from parent frame ───
+  useEffect(() => {
+    if (!isEmbed) return
+    const handler = (e: MessageEvent) => {
+      const data = e.data
+      if (!data || typeof data !== 'object') return
+      const store = useStore.getState()
+      switch (data.type) {
+        case 'loadProject':
+          if (data.project) store.setProject(data.project)
+          break
+        case 'setTheme':
+          if (data.theme) store.updateSettings({ theme: data.theme })
+          break
+        case 'export':
+          const json = store.exportProject()
+          window.parent?.postMessage({ type: 'exportResult', json }, '*')
+          break
+        case 'focusItem': {
+          const vp = store.project.viewports.find(v => v.id === store.activeViewportId)
+          const item = vp?.items.find(i => i.id === data.id)
+          if (item && 'pos' in item) {
+            store.setZoom(1.5)
+            const r = document.querySelector('canvas')?.getBoundingClientRect()
+            if (r) store.setPan(r.width / 2 - item.pos.x * 1.5, r.height / 2 - item.pos.y * 1.5)
+          }
+          break
+        }
+        case 'addItems':
+          if (Array.isArray(data.items)) {
+            for (const item of data.items) store.addItem(item)
+          }
+          break
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [isEmbed])
+
+  // ─── Mobile detection ───
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
     const check = () => {
@@ -60,97 +207,80 @@ export default function App() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // Listen for lightbox events from Canvas
+  // ─── Lightbox events ───
   useEffect(() => {
     const handler = (e: CustomEvent) => setLightboxItem(e.detail)
     window.addEventListener('moodbored:lightbox' as any, handler)
     return () => window.removeEventListener('moodbored:lightbox' as any, handler)
   }, [])
 
-  const handleSplashComplete = useCallback(() => {
-    setPhase('start')
-  }, [])
+  const handleSplashComplete = useCallback(() => setPhase('start'), [])
+  const handleProjectLoaded = useCallback(() => setPhase('workspace'), [])
+  const handleExportForCreation = useCallback(() => setExportModalOpen(true), [])
+  const handleUnsplashSearch = useCallback(() => setUnsplashOpen(true), [])
+  const handleShareOpen = useCallback(() => setShareOpen(true), [])
+  const handleColorPickerOpen = useCallback(() => setColorPickerOpen(true), [])
 
-  const handleProjectLoaded = useCallback(() => {
-    setPhase('workspace')
-  }, [])
+  const canEdit = isEmbed ? !EMBED_READONLY : (collab.role === 'editor' || !collab.shareToken)
 
-  const handleExportForCreation = useCallback(() => {
-    setExportModalOpen(true)
-  }, [])
-
-  const handleUnsplashSearch = useCallback(() => {
-    setUnsplashOpen(true)
-  }, [])
-
-  const handleShareOpen = useCallback(() => {
-    setShareOpen(true)
-  }, [])
-
-  const handleColorPickerOpen = useCallback(() => {
-    setColorPickerOpen(true)
-  }, [])
-
-  // Role enforcement
-  const canEdit = collab.role === 'editor' || !collab.shareToken
-
-  // Check URL for share token on load (board joining)
+  // ─── Share token (non-embed only) ───
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const token = params.get('token')
+    if (isEmbed) return
+    const token = URL_PARAMS.get('token')
     if (token && phase === 'workspace') {
       getShareByToken(token).then((share) => {
-        if (share) {
-          setCollab((prev) => ({ ...prev, shareToken: token, role: share.role }))
-        }
+        if (share) setCollab((prev) => ({ ...prev, shareToken: token, role: share.role }))
       })
     }
-  }, [phase])
+  }, [phase, isEmbed])
 
-  // Join Realtime channel when in workspace
+  // ─── Realtime channel (non-embed only) ───
   useEffect(() => {
-    if (phase !== 'workspace') return
+    if (isEmbed || phase !== 'workspace') return
     const project = useStore.getState().project
     const { channel, leave } = joinBoard(project.id, collab.shareToken, {
-      onUserJoin: (user) => {
-        setRemoteUsers((prev) => prev.some(u => u.id === user.id) ? prev : [...prev, user])
-      },
-      onUserLeave: (userId) => {
-        setRemoteUsers((prev) => prev.filter(u => u.id !== userId))
-      },
-      onCursorMove: (userId, cursor) => {
-        setRemoteUsers((prev) => prev.map(u => u.id === userId ? { ...u, cursor } : u))
-      },
-      onSelectionChange: (userId, itemId) => {
-        setRemoteUsers((prev) => prev.map(u => u.id === userId ? { ...u, selectedItemId: itemId } : u))
-      },
-      onBoardChange: () => {
-        // Board changed by remote user — the store will sync via Supabase
-      },
+      onUserJoin: (user) => setRemoteUsers((prev) => prev.some(u => u.id === user.id) ? prev : [...prev, user]),
+      onUserLeave: (userId) => setRemoteUsers((prev) => prev.filter(u => u.id !== userId)),
+      onCursorMove: (userId, cursor) => setRemoteUsers((prev) => prev.map(u => u.id === userId ? { ...u, cursor } : u)),
+      onSelectionChange: (userId, itemId) => setRemoteUsers((prev) => prev.map(u => u.id === userId ? { ...u, selectedItemId: itemId } : u)),
+      onBoardChange: () => {},
     })
     channelRef.current = channel
     setCollab((prev) => ({ ...prev, channel, isConnected: true }))
     return leave
-  }, [phase, collab.shareToken])
+  }, [phase, collab.shareToken, isEmbed])
 
-  // Broadcast cursor position on mouse move
+  // ─── Cursor/selection broadcast (non-embed only) ───
   useEffect(() => {
+    if (isEmbed) return
     const handler = (e: MouseEvent) => {
       const state = useStore.getState()
-      const worldX = (e.clientX - state.canvas.panX) / state.canvas.zoom
-      const worldY = (e.clientY - state.canvas.panY) / state.canvas.zoom
-      broadcastCursor(channelRef.current, { x: worldX, y: worldY })
+      broadcastCursor(channelRef.current, {
+        x: (e.clientX - state.canvas.panX) / state.canvas.zoom,
+        y: (e.clientY - state.canvas.panY) / state.canvas.zoom,
+      })
     }
     window.addEventListener('mousemove', handler, { passive: true })
     return () => window.removeEventListener('mousemove', handler)
-  }, [])
+  }, [isEmbed])
 
-  // Broadcast selection changes
   useEffect(() => {
-    broadcastSelection(channelRef.current, [...selectedIds][0] ?? null)
-  }, [selectedIds])
+    if (!isEmbed) broadcastSelection(channelRef.current, [...selectedIds][0] ?? null)
+  }, [selectedIds, isEmbed])
 
-  // Mobile layout
+  // ─── Embed mode: canvas only ───
+  if (isEmbed) {
+    if (!embedReady) return null // loading
+    return (
+      <div className="flex flex-col h-full w-full overflow-hidden" style={{ background: 'var(--bg-surface-0)' }}>
+        <div className="flex flex-1 min-h-0 relative">
+          <Canvas />
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Mobile layout ───
   if (isMobile && phase === 'workspace') {
     return (
       <>
@@ -160,22 +290,22 @@ export default function App() {
     )
   }
 
-  // Splash
+  // ─── Splash ───
   if (phase === 'splash') {
     return <SplashScreen onComplete={handleSplashComplete} />
   }
 
-  // Start screen
+  // ─── Start screen ───
   if (phase === 'start') {
     return <StartScreen onProjectLoaded={handleProjectLoaded} />
   }
 
-  // Workspace
+  // ─── Full workspace ───
   return (
     <>
       {lightboxItem && <Lightbox item={lightboxItem} onClose={() => setLightboxItem(null)} />}
 
-      <div className="flex h-screen w-screen overflow-hidden" style={{ background: 'var(--bg-surface-0)' }}>
+      <div className="flex h-full w-full overflow-hidden" style={{ background: 'var(--bg-surface-0)' }}>
         <div className={`transition-all duration-200 ease-in-out ${sidebarOpen ? 'w-56 opacity-100' : 'w-0 opacity-0 overflow-hidden'}`}>
           <Sidebar />
         </div>
@@ -216,9 +346,5 @@ function ExportModalWrapper({ onClose }: { onClose: () => void }) {
   const allItems = viewport?.items ?? []
   const selectedItems = allItems.filter(i => selectedIds.has(i.id))
   const items = selectedItems.length > 0 ? selectedItems : allItems
-  const label = selectedItems.length > 0
-    ? `${selectedItems.length} selected items`
-    : `All ${allItems.length} items on "${viewport?.name}"`
-
   return <ExportModal items={items} boardName={project.name} onClose={onClose} />
 }

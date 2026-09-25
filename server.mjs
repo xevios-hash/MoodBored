@@ -1,85 +1,205 @@
-// Production server — serves the built frontend, hosts the MCP server
-// over SSE transport, and provides a board state API for web deployments
-// where Tauri's invoke() is not available.
-//
-// Railway: set start command to "node server.mjs"
-// Cloudflare Pages: deploy dist/ as static site, run this server separately for MCP
+// MoodBored Production Server
+// - Multi-board routes: /board/:id, /api/board/:id, /api/boards
+// - SSE push: notifies frontend when MCP writes to a board
+// - MCP over SSE: full tool parity with stdio server
+// - Export to project folder tool
 
 import express from 'express'
 import cors from 'cors'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = process.env.PORT || 3000
-const BOARD_STATE_PATH = process.env.BOARD_STATE_PATH || getDefaultStatePath()
+const BOARDS_DIR = process.env.BOARDS_DIR || join(process.env.HOME || '/tmp', '.moodbored', 'boards')
 
-function getDefaultStatePath() {
-  const home = process.env.HOME || '/tmp'
-  if (process.platform === 'darwin') return join(home, 'Library', 'Application Support', 'MoodBored', 'board.json')
-  if (process.platform === 'win32') return join(process.env.APPDATA || join(home, 'AppData', 'Roaming'), 'MoodBored', 'board.json')
-  return join(home, '.config', 'MoodBored', 'board.json')
-}
+// ─── Board File I/O ─────────────────────────────────────────────────
 
-function ensureDir(path) {
-  const dir = dirname(path)
+function ensureDir(dir) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
 }
 
-function readBoard() {
-  try {
-    if (!existsSync(BOARD_STATE_PATH)) return { project: null, lastModified: new Date().toISOString() }
-    return JSON.parse(readFileSync(BOARD_STATE_PATH, 'utf-8'))
-  } catch {
-    return { project: null, lastModified: new Date().toISOString() }
+function boardPath(id) {
+  return join(BOARDS_DIR, `${id}.json`)
+}
+
+function readBoard(id) {
+  const p = boardPath(id)
+  if (!existsSync(p)) return null
+  try { return JSON.parse(readFileSync(p, 'utf-8')) } catch { return null }
+}
+
+function writeBoard(id, state) {
+  ensureDir(BOARDS_DIR)
+  state.lastModified = new Date().toISOString()
+  writeFileSync(boardPath(id), JSON.stringify(state, null, 2))
+  // Notify all SSE subscribers for this board
+  notifyBoardChange(id, state)
+}
+
+function listBoards() {
+  ensureDir(BOARDS_DIR)
+  return readdirSync(BOARDS_DIR)
+    .filter(f => f.endsWith('.json'))
+    .map(f => {
+      const id = f.replace('.json', '')
+      const state = readBoard(id)
+      return {
+        id,
+        name: state?.project?.name || id,
+        itemCount: state?.project?.viewports?.[0]?.items?.length ?? 0,
+        lastModified: state?.lastModified || null,
+      }
+    })
+    .sort((a, b) => (b.lastModified || '').localeCompare(a.lastModified || ''))
+}
+
+function createBoard(name, template) {
+  const id = randomUUID()
+  const state = {
+    project: {
+      id, name: name || 'Untitled Board',
+      viewports: [{
+        id: randomUUID(), name: 'Main', items: [], connections: [], messages: [],
+        camX: 0, camY: 0, zoom: 1,
+      }],
+      components: [],
+      settings: {
+        apiKey: '', defaultModel: 'anthropic/claude-sonnet-4',
+        jevThreshold: 0.2, multiAgent: false, theme: 'dark',
+        canvasBg: '#0c0814', canvasBgType: 'color', canvasBgVideo: '',
+        customBgUrls: [], customBgLabels: {},
+      },
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    },
+    lastModified: new Date().toISOString(),
+  }
+  if (template?.items) {
+    state.project.viewports[0].items = template.items
+  }
+  writeBoard(id, state)
+  return { id, name: state.project.name }
+}
+
+// ─── SSE Board Events ───────────────────────────────────────────────
+// When MCP writes to a board, push the new state to all connected
+// frontend clients for that board.
+
+const boardSubscribers = new Map() // boardId -> Set<res>
+
+function notifyBoardChange(boardId, state) {
+  const subs = boardSubscribers.get(boardId)
+  if (!subs || subs.size === 0) return
+  const data = JSON.stringify({ project: state.project, lastModified: state.lastModified })
+  for (const res of subs) {
+    try { res.write(`data: ${data}\n\n`) } catch { subs.delete(res) }
   }
 }
 
-function writeBoard(state) {
-  ensureDir(BOARD_STATE_PATH)
-  state.lastModified = new Date().toISOString()
-  writeFileSync(BOARD_STATE_PATH, JSON.stringify(state, null, 2))
-}
+// ─── Express App ────────────────────────────────────────────────────
 
 const app = express()
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 
-// ─── Board State API (for web frontend sync) ───────────────────────
+// ─── Board API ──────────────────────────────────────────────────────
 
-app.get('/api/board', (_req, res) => {
-  res.json(readBoard())
+app.get('/api/boards', (_req, res) => {
+  res.json(listBoards())
 })
 
-app.put('/api/board', (req, res) => {
-  writeBoard(req.body)
+app.post('/api/boards', (req, res) => {
+  const { name, template } = req.body || {}
+  const board = createBoard(name, template)
+  res.json(board)
+})
+
+app.get('/api/board/:id', (req, res) => {
+  const state = readBoard(req.params.id)
+  if (!state) { res.status(404).json({ error: 'Board not found' }); return }
+  res.json(state)
+})
+
+app.put('/api/board/:id', (req, res) => {
+  writeBoard(req.params.id, req.body)
   res.json({ ok: true })
 })
 
-app.get('/api/board/health', (_req, res) => {
-  res.json({ status: 'ok', boardPath: BOARD_STATE_PATH, exists: existsSync(BOARD_STATE_PATH) })
+app.delete('/api/board/:id', (req, res) => {
+  const p = boardPath(req.params.id)
+  if (existsSync(p)) unlinkSync(p)
+  res.json({ ok: true })
 })
 
-// ─── MCP SSE Transport (for remote MCP clients) ────────────────────
+app.get('/api/board/:id/health', (req, res) => {
+  const p = boardPath(req.params.id)
+  res.json({ status: 'ok', boardId: req.params.id, exists: existsSync(p) })
+})
+
+// SSE endpoint — frontend subscribes here for live updates
+app.get('/api/board/:id/events', (req, res) => {
+  const boardId = req.params.id
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  })
+  res.write(':ok\n\n')
+
+  if (!boardSubscribers.has(boardId)) boardSubscribers.set(boardId, new Set())
+  boardSubscribers.get(boardId).add(res)
+
+  req.on('close', () => {
+    const subs = boardSubscribers.get(boardId)
+    if (subs) { subs.delete(res); if (subs.size === 0) boardSubscribers.delete(boardId) }
+  })
+})
+
+// Legacy single-board endpoints (backward compat)
+app.get('/api/board', (_req, res) => {
+  const boards = listBoards()
+  if (boards.length > 0) {
+    res.json(readBoard(boards[0].id))
+  } else {
+    res.json({ project: null })
+  }
+})
+
+app.put('/api/board', (req, res) => {
+  let boards = listBoards()
+  let id
+  if (boards.length > 0) {
+    id = boards[0].id
+  } else {
+    id = createBoard('Default Board').id
+  }
+  writeBoard(id, req.body)
+  res.json({ ok: true, id })
+})
+
+app.get('/api/board/health', (_req, res) => {
+  res.json({ status: 'ok', boardsDir: BOARDS_DIR, boardCount: listBoards().length })
+})
+
+// ─── MCP SSE Transport ──────────────────────────────────────────────
+// Full parity with the stdio server + project management tools.
 
 const mcpSessions = new Map()
 
 app.get('/mcp/sse', (req, res) => {
   const sessionId = randomUUID()
+  const boardId = req.query.board || null
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
   })
   res.write(`data: ${JSON.stringify({ type: 'endpoint', endpoint: `/mcp/message?sessionId=${sessionId}` })}\n\n`)
-
-  mcpSessions.set(sessionId, { res })
-
-  req.on('close', () => {
-    mcpSessions.delete(sessionId)
-  })
+  mcpSessions.set(sessionId, { res, boardId })
+  req.on('close', () => mcpSessions.delete(sessionId))
 })
 
 app.post('/mcp/message', async (req, res) => {
@@ -88,8 +208,7 @@ app.post('/mcp/message', async (req, res) => {
   if (!session) { res.status(404).json({ error: 'Session not found' }); return }
 
   try {
-    const message = req.body
-    const response = await handleMcpMessage(message)
+    const response = await handleMcpMessage(req.body, session.boardId)
     session.res.write(`data: ${JSON.stringify(response)}\n\n`)
     res.json({ ok: true })
   } catch (err) {
@@ -97,19 +216,28 @@ app.post('/mcp/message', async (req, res) => {
   }
 })
 
-async function handleMcpMessage(message) {
+function getActiveViewport(state) {
+  return state?.project?.viewports?.[0]
+}
+
+async function handleMcpMessage(message, sessionBoardId) {
   if (message.method === 'tools/list') {
     return {
-      jsonrpc: '2.0',
-      id: message.id,
+      jsonrpc: '2.0', id: message.id,
       result: {
         tools: [
-          { name: 'get_board', description: 'Read the current mood board state' },
-          { name: 'add_items', description: 'Add items to the board', inputSchema: { type: 'object', properties: { items: { type: 'array' } } } },
-          { name: 'remove_items', description: 'Remove items by ID', inputSchema: { type: 'object', properties: { ids: { type: 'array' } } } },
-          { name: 'search_items', description: 'Search items', inputSchema: { type: 'object', properties: { query: { type: 'string' }, tag: { type: 'string' } } } },
-          { name: 'export_brief', description: 'Export as creation brief', inputSchema: { type: 'object', properties: { creation_type: { type: 'string' }, format: { type: 'string' } } } },
-          { name: 'clear_board', description: 'Clear all items' },
+          { name: 'list_projects', description: 'List all available boards', inputSchema: { type: 'object', properties: {} } },
+          { name: 'create_project', description: 'Create a new board', inputSchema: { type: 'object', properties: { name: { type: 'string' } } } },
+          { name: 'get_project', description: 'Get board metadata', inputSchema: { type: 'object', properties: { id: { type: 'string' } } } },
+          { name: 'get_board', description: 'Read the full board state — all items, palette, typography', inputSchema: { type: 'object', properties: {} } },
+          { name: 'add_items', description: 'Add items to the board', inputSchema: { type: 'object', properties: { items: { type: 'array' } }, required: ['items'] } },
+          { name: 'remove_items', description: 'Remove items by ID', inputSchema: { type: 'object', properties: { ids: { type: 'array' } }, required: ['ids'] } },
+          { name: 'update_item', description: 'Update an item\'s properties', inputSchema: { type: 'object', properties: { id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] } },
+          { name: 'search_items', description: 'Search items by text or tag', inputSchema: { type: 'object', properties: { query: { type: 'string' }, tag: { type: 'string' } } } },
+          { name: 'arrange_items', description: 'Arrange items into a layout', inputSchema: { type: 'object', properties: { layout: { type: 'string', enum: ['grid', 'stack-h', 'stack-v', 'spiral'] }, cols: { type: 'number' }, gap: { type: 'number' } }, required: ['layout'] } },
+          { name: 'clear_board', description: 'Remove all items', inputSchema: { type: 'object', properties: {} } },
+          { name: 'export_brief', description: 'Export board as a creative brief', inputSchema: { type: 'object', properties: { creation_type: { type: 'string' }, format: { type: 'string' } } } },
+          { name: 'export_to_folder', description: 'Export the board JSON to a file path (for saving to a project folder)', inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'Absolute file path to write the board JSON' } }, required: ['path'] } },
         ],
       },
     }
@@ -117,34 +245,142 @@ async function handleMcpMessage(message) {
 
   if (message.method === 'tools/call') {
     const { name, arguments: args } = message.params
-    const state = readBoard()
-    const vp = state.project?.viewports?.[0]
-    if (!vp) return { jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: 'No board open' }] } }
-
-    switch (name) {
-      case 'get_board':
-        return { jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: JSON.stringify({ projectName: state.project?.name, items: vp.items }, null, 2) }] } }
-      case 'add_items':
-        for (const raw of (args?.items || [])) {
-          vp.items.push({ ...raw, id: randomUUID(), pos: raw.pos || { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 } })
-        }
-        writeBoard(state)
-        return { jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: `Added ${(args?.items || []).length} items` }] } }
-      case 'clear_board': {
-        const count = vp.items.length
-        vp.items = []
-        writeBoard(state)
-        return { jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: `Cleared ${count} items` }] } }
-      }
-      default:
-        return { jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: `Unknown tool: ${name}` }] } }
-    }
+    const result = await executeTool(name, args || {}, sessionBoardId)
+    return { jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: result }] } }
   }
 
   return { jsonrpc: '2.0', id: message.id, result: {} }
 }
 
-// ─── Static Files (SPA fallback) ───────────────────────────────────
+async function executeTool(name, args, sessionBoardId) {
+  // Project management tools
+  if (name === 'list_projects') {
+    const boards = listBoards()
+    return JSON.stringify(boards, null, 2)
+  }
+  if (name === 'create_project') {
+    const board = createBoard(args.name)
+    return `Created board "${board.name}" (${board.id})`
+  }
+  if (name === 'get_project') {
+    const id = args.id || sessionBoardId
+    if (!id) return 'No board ID specified and no session board bound'
+    const state = readBoard(id)
+    if (!state) return `Board ${id} not found`
+    return JSON.stringify({ id, name: state.project?.name, viewportCount: state.project?.viewports?.length, itemCount: state.project?.viewports?.[0]?.items?.length, created: state.project?.created, updated: state.project?.updated }, null, 2)
+  }
+  if (name === 'export_to_folder') {
+    if (!args.path) return 'Error: path is required'
+    if (!sessionBoardId) return 'Error: no session board bound'
+    const state = readBoard(sessionBoardId)
+    if (!state) return 'Error: session board not found'
+    try {
+      ensureDir(dirname(args.path))
+      writeFileSync(args.path, JSON.stringify(state.project, null, 2))
+      return `Exported board to ${args.path}`
+    } catch (err) { return `Error: ${err.message}` }
+  }
+
+  // Board content tools — require a board
+  if (!sessionBoardId) return 'Error: no board bound to this MCP session. Use create_project first.'
+  const state = readBoard(sessionBoardId)
+  if (!state) return 'Error: session board not found on disk'
+  const vp = getActiveViewport(state)
+  if (!vp) return 'Error: board has no viewports'
+
+  switch (name) {
+    case 'get_board': {
+      const nonConn = vp.items.filter(i => i.kind !== 'connector')
+      const palette = [], typography = [], notes = []
+      for (const item of nonConn) {
+        if (item.kind === 'palette') for (const c of item.colors || []) palette.push({ hex: c.hex, name: c.label })
+        if (item.kind === 'swatch') palette.push({ hex: item.hex, name: item.name, usage: item.usage })
+        if (item.kind === 'font') typography.push({ family: item.fontFamily, weights: item.weights })
+        if (item.kind === 'note' || item.kind === 'text') notes.push({ text: item.text || item.raw, purpose: item.purpose })
+      }
+      return JSON.stringify({
+        projectName: state.project?.name, itemCount: nonConn.length,
+        palette, typography, notes: notes.slice(0, 10),
+        items: nonConn.map(i => ({ id: i.id, kind: i.kind, text: i.text || i.raw || i.description || i.label || i.url || '', pos: i.pos, size: i.size })),
+      }, null, 2)
+    }
+    case 'add_items': {
+      let added = 0
+      for (const raw of (args.items || [])) {
+        const id = randomUUID()
+        const pos = raw.pos || { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 }
+        const item = { ...raw, id, pos }
+        if (!item.size && raw.kind !== 'note' && raw.kind !== 'link') item.size = { w: 300, h: 200 }
+        vp.items.push(item)
+        added++
+      }
+      writeBoard(sessionBoardId, state)
+      return `Added ${added} item(s)`
+    }
+    case 'remove_items': {
+      const ids = new Set(args.ids || [])
+      const before = vp.items.length
+      vp.items = vp.items.filter(i => !ids.has(i.id))
+      writeBoard(sessionBoardId, state)
+      return `Removed ${before - vp.items.length} item(s)`
+    }
+    case 'update_item': {
+      const item = vp.items.find(i => i.id === args.id)
+      if (!item) return `Item ${args.id} not found`
+      Object.assign(item, args.updates)
+      writeBoard(sessionBoardId, state)
+      return `Updated item ${args.id}`
+    }
+    case 'search_items': {
+      const q = (args.query || '').toLowerCase()
+      const tag = args.tag
+      const results = vp.items.filter(i => {
+        if (i.kind === 'connector') return false
+        const text = [i.text, i.raw, i.description, i.label, i.url, i.subjectDesc, i.fontFamily, i.hex, i.name, i.purpose].filter(Boolean).join(' ').toLowerCase()
+        return (!q || text.includes(q)) && (!tag || (i.tags || []).includes(tag))
+      })
+      return results.length === 0 ? 'No matches.' : `Found ${results.length}:\n${results.map(i => `- [${i.kind}] ${i.text || i.description || i.label || i.url || i.id}`).join('\n')}`
+    }
+    case 'arrange_items': {
+      const positioned = vp.items.filter(i => i.kind !== 'connector' && i.pos)
+      const g = args.gap ?? 20
+      let offset = 0
+      if (args.layout === 'grid') {
+        const c = args.cols || 4
+        positioned.forEach((item, idx) => { item.pos = { x: 50 + (idx % c) * ((item.size?.w ?? 250) + g), y: 50 + Math.floor(idx / c) * ((item.size?.h ?? 150) + g) } })
+      } else if (args.layout === 'stack-h') {
+        positioned.forEach(item => { item.pos = { x: 50 + offset, y: 50 }; offset += (item.size?.w ?? 250) + g })
+      } else if (args.layout === 'stack-v') {
+        positioned.forEach(item => { item.pos = { x: 50, y: 50 + offset }; offset += (item.size?.h ?? 150) + g })
+      } else if (args.layout === 'spiral') {
+        positioned.forEach((item, idx) => { const a = idx * 0.8; const r = 150 + idx * g * 0.3; item.pos = { x: 400 + Math.cos(a) * r, y: 300 + Math.sin(a) * r } })
+      }
+      writeBoard(sessionBoardId, state)
+      return `Arranged ${positioned.length} items in ${args.layout} layout`
+    }
+    case 'clear_board': {
+      const count = vp.items.filter(i => i.kind !== 'connector').length
+      vp.items = vp.items.filter(i => i.kind === 'connector')
+      writeBoard(sessionBoardId, state)
+      return `Cleared ${count} items`
+    }
+    case 'export_brief': {
+      const nonConn = vp.items.filter(i => i.kind !== 'connector')
+      const lines = [`# Creative Brief`, '', `**Board:** ${state.project?.name}`, `**Items:** ${nonConn.length}`, '']
+      for (const item of nonConn) {
+        if (item.kind === 'note') lines.push(`- Note: ${item.text}`)
+        if (item.kind === 'image') lines.push(`- Image: ${item.description} ${item.source || ''}`)
+        if (item.kind === 'palette') lines.push(`- Palette: ${(item.colors || []).map(c => c.hex).join(', ')}`)
+        if (item.kind === 'font') lines.push(`- Font: ${item.fontFamily}`)
+      }
+      return lines.join('\n')
+    }
+    default:
+      return `Unknown tool: ${name}`
+  }
+}
+
+// ─── SPA Fallback ───────────────────────────────────────────────────
 
 app.use(express.static(join(__dirname, 'dist'), { maxAge: '1y', immutable: true }))
 app.get('/{*splat}', (_req, res) => {
@@ -153,10 +389,12 @@ app.get('/{*splat}', (_req, res) => {
 
 // ─── Start ──────────────────────────────────────────────────────────
 
+ensureDir(BOARDS_DIR)
+
 app.listen(PORT, () => {
-  console.log(`MoodBored server running on port ${PORT}`)
-  console.log(`  Frontend: http://localhost:${PORT}`)
-  console.log(`  Board API: http://localhost:${PORT}/api/board`)
-  console.log(`  MCP SSE: http://localhost:${PORT}/mcp/sse`)
-  console.log(`  Board state: ${BOARD_STATE_PATH}`)
+  console.log(`MoodBored server on port ${PORT}`)
+  console.log(`  Frontend:  http://localhost:${PORT}`)
+  console.log(`  Boards:    http://localhost:${PORT}/api/boards`)
+  console.log(`  MCP SSE:   http://localhost:${PORT}/mcp/sse`)
+  console.log(`  Board dir: ${BOARDS_DIR}`)
 })

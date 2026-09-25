@@ -8,7 +8,11 @@ import App from './App'
 import './index.css'
 
 preloadFonts()
-initMcpSync()
+
+// Parse board ID from URL for embed mode sync
+const boardParam = new URLSearchParams(window.location.search).get('board')
+const pathBoardId = window.location.pathname.match(/\/board\/([^/?]+)/)?.[1] || null
+initMcpSync({ boardId: boardParam || pathBoardId || undefined })
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
