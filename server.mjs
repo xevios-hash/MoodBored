@@ -382,9 +382,9 @@ async function executeTool(name, args, sessionBoardId) {
 
 // ─── MCP Discovery (before SPA fallback) ────────────────────────────
 
-app.get('/.well-known/mcp.json', (_req, res) => {
-  res.sendFile(join(__dirname, 'public', '.well-known', 'mcp.json'))
-})
+// MCP Discovery — serve .well-known from dist (built) or public (dev)
+app.use('/.well-known', express.static(join(__dirname, 'dist', '.well-known')))
+app.use('/.well-known', express.static(join(__dirname, 'public', '.well-known')))
 
 // MCP connection info page — human-readable, copy-pasteable
 app.get('/mcp', (_req, res) => {
