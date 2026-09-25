@@ -60,6 +60,22 @@ export function MobileLayout({ showSplash }: { showSplash: boolean }) {
     setShowAddMenu(false)
   }
 
+  const tabBtnStyle = (active: boolean) => ({
+    background: active ? 'rgba(139,125,200,0.15)' : 'none',
+    border: 'none',
+    color: active ? '#8b7dc8' : '#7a6a9a',
+    padding: '6px 8px',
+    borderRadius: 8,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center' as const,
+    gap: 4,
+    fontSize: 11,
+    fontWeight: active ? 600 : 400,
+    transition: 'all 120ms ease',
+    whiteSpace: 'nowrap' as const,
+  })
+
   return (
     <div style={{
       display: 'flex',
@@ -70,46 +86,81 @@ export function MobileLayout({ showSplash }: { showSplash: boolean }) {
       opacity: showSplash ? 0 : 1,
       transition: 'opacity 300ms ease',
     }}>
-      {/* Top Bar */}
+      {/* Top Bar — tabs + search + settings all in one row */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        padding: '8px 12px',
-        paddingTop: 'max(8px, env(safe-area-inset-top))',
+        padding: '6px 8px',
+        paddingTop: 'max(6px, env(safe-area-inset-top))',
         background: 'rgba(12,8,20,0.85)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(139,125,200,0.1)',
         zIndex: 20,
-        gap: 8,
+        gap: 4,
       }}>
         <button
-          onClick={toggleSearch}
-          style={{ background: 'none', border: 'none', color: '#8b7dc8', padding: 8, borderRadius: 8, cursor: 'pointer', display: 'flex' }}
+          onClick={() => setActiveTab('canvas')}
+          style={tabBtnStyle(activeTab === 'canvas')}
         >
-          <Search size={20} />
+          <Grid3X3 size={16} />
+          <span>Board</span>
         </button>
-        <input
-          value={useStore.getState().project.name}
-          onChange={(e) => useStore.getState().updateProjectName(e.target.value)}
-          style={{
-            flex: 1, minWidth: 0, background: 'rgba(139,125,200,0.08)', border: '1px solid rgba(139,125,200,0.15)',
-            borderRadius: 8, padding: '6px 12px', fontSize: 15, fontWeight: 600,
-            color: '#ede5f8', textAlign: 'center', outline: 'none', fontFamily: 'inherit',
-          }}
-          spellCheck={false}
-        />
+        <button
+          onClick={() => setActiveTab('chat')}
+          style={tabBtnStyle(activeTab === 'chat')}
+        >
+          <MessageSquare size={16} />
+          <span>Chat</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('inspector')}
+          style={tabBtnStyle(activeTab === 'inspector')}
+        >
+          <Layers size={16} />
+          <span>Inspect</span>
+        </button>
+
+        <div style={{ flex: 1 }} />
+
+        <button
+          onClick={toggleSearch}
+          style={{ background: 'none', border: 'none', color: '#8b7dc8', padding: 6, borderRadius: 8, cursor: 'pointer', display: 'flex' }}
+        >
+          <Search size={18} />
+        </button>
         <button
           onClick={toggleSettings}
-          style={{ background: 'none', border: 'none', color: '#8b7dc8', padding: 8, borderRadius: 8, cursor: 'pointer', display: 'flex' }}
+          style={{ background: 'none', border: 'none', color: '#8b7dc8', padding: 6, borderRadius: 8, cursor: 'pointer', display: 'flex' }}
         >
-          <Settings size={20} />
+          <Settings size={18} />
         </button>
       </div>
 
-      {/* Content — all tabs mounted, only active one visible */}
+      {/* Project name bar — only on canvas tab */}
+      {activeTab === 'canvas' && (
+        <div style={{
+          padding: '4px 12px',
+          background: 'rgba(12,8,20,0.6)',
+          borderBottom: '1px solid rgba(139,125,200,0.06)',
+          zIndex: 15,
+        }}>
+          <input
+            value={useStore.getState().project.name}
+            onChange={(e) => useStore.getState().updateProjectName(e.target.value)}
+            style={{
+              width: '100%', background: 'none', border: 'none',
+              fontSize: 13, fontWeight: 600, color: '#b8a8d8',
+              textAlign: 'center', outline: 'none', fontFamily: 'inherit',
+            }}
+            spellCheck={false}
+          />
+        </div>
+      )}
+
+      {/* Content */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {/* Canvas — always mounted so draw loop keeps running */}
+        {/* Canvas */}
         <div style={{
           position: 'absolute', inset: 0,
           visibility: activeTab === 'canvas' ? 'visible' : 'hidden',
@@ -119,7 +170,7 @@ export function MobileLayout({ showSplash }: { showSplash: boolean }) {
           <Canvas />
         </div>
 
-        {/* Chat — mounted when visible */}
+        {/* Chat */}
         {activeTab === 'chat' && (
           <div style={{
             position: 'absolute', inset: 0,
@@ -131,119 +182,65 @@ export function MobileLayout({ showSplash }: { showSplash: boolean }) {
           </div>
         )}
 
-        {/* Inspector — mounted when visible */}
+        {/* Inspector */}
         {activeTab === 'inspector' && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
             <Inspector />
           </div>
         )}
-      </div>
 
-      {/* Add item floating button + menu */}
-      {activeTab === 'canvas' && (
-        <div style={{ position: 'absolute', bottom: 72, right: 16, zIndex: 30 }}>
-          {showAddMenu && (
-            <div style={{
-              display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center',
-              maxWidth: 200, padding: 8, marginBottom: 8, borderRadius: 12,
-              background: 'rgba(12,8,20,0.92)', backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(139,125,200,0.1)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-            }}>
-              {ITEM_TYPES.map(({ kind, icon, label }) => (
-                <button
-                  key={kind}
-                  onClick={() => handleAddItem(kind)}
-                  title={label}
-                  style={{
-                    width: 40, height: 40, borderRadius: 8,
-                    border: '1px solid rgba(139,125,200,0.1)',
-                    background: 'rgba(139,125,200,0.05)',
-                    color: '#b8a8d8', cursor: 'pointer', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center', fontSize: 18,
-                  }}
-                >
-                  {icon}
-                </button>
-              ))}
-            </div>
-          )}
-          <button
-            onClick={() => setShowAddMenu(!showAddMenu)}
-            style={{
-              width: 52, height: 52, borderRadius: '50%', border: 'none',
-              background: showAddMenu
-                ? 'linear-gradient(135deg, #ff7eb3, #e86a9e)'
-                : 'linear-gradient(135deg, #8b7dc8, #9b8ce0)',
-              color: '#fff', fontSize: 24, fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 2px 12px rgba(139,125,200,0.4)',
-              transform: showAddMenu ? 'rotate(45deg)' : 'none',
-              transition: 'all 200ms ease',
-            }}
-          >
-            <Plus size={24} />
-          </button>
-        </div>
-      )}
-
-      {/* Bottom Tab Bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-        padding: '6px 0',
-        paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
-        background: 'rgba(12,8,20,0.85)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(139,125,200,0.1)',
-        zIndex: 20,
-      }}>
-        <TabButton
-          icon={<Grid3X3 size={20} />}
-          label="Board"
-          active={activeTab === 'canvas'}
-          onClick={() => setActiveTab('canvas')}
-        />
-        <TabButton
-          icon={<MessageSquare size={20} />}
-          label="Chat"
-          active={activeTab === 'chat'}
-          onClick={() => setActiveTab('chat')}
-        />
-        <TabButton
-          icon={<Layers size={20} />}
-          label="Inspect"
-          active={activeTab === 'inspector'}
-          onClick={() => setActiveTab('inspector')}
-        />
+        {/* Add item floating button + menu — canvas only */}
+        {activeTab === 'canvas' && (
+          <div style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 30 }}>
+            {showAddMenu && (
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center',
+                maxWidth: 200, padding: 8, marginBottom: 8, borderRadius: 12,
+                background: 'rgba(12,8,20,0.92)', backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(139,125,200,0.1)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              }}>
+                {ITEM_TYPES.map(({ kind, icon, label }) => (
+                  <button
+                    key={kind}
+                    onClick={() => handleAddItem(kind)}
+                    title={label}
+                    style={{
+                      width: 40, height: 40, borderRadius: 8,
+                      border: '1px solid rgba(139,125,200,0.1)',
+                      background: 'rgba(139,125,200,0.05)',
+                      color: '#b8a8d8', cursor: 'pointer', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                    }}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setShowAddMenu(!showAddMenu)}
+              style={{
+                width: 52, height: 52, borderRadius: '50%', border: 'none',
+                background: showAddMenu
+                  ? 'linear-gradient(135deg, #ff7eb3, #e86a9e)'
+                  : 'linear-gradient(135deg, #8b7dc8, #9b8ce0)',
+                color: '#fff', fontSize: 24, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 12px rgba(139,125,200,0.4)',
+                transform: showAddMenu ? 'rotate(45deg)' : 'none',
+                transition: 'all 200ms ease',
+              }}
+            >
+              <Plus size={24} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
       {settingsOpen && <SettingsModal />}
       {searchOpen && <SearchOverlay />}
     </div>
-  )
-}
-
-function TabButton({ icon, label, active, onClick }: {
-  icon: React.ReactNode
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: 'none', border: 'none',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-        padding: '4px 20px', cursor: 'pointer',
-        color: active ? '#8b7dc8' : '#7a6a9a',
-        transition: 'color 150ms ease',
-      }}
-    >
-      {icon}
-      <span style={{ fontSize: 10, fontWeight: active ? 600 : 400 }}>{label}</span>
-    </button>
   )
 }
