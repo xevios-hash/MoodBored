@@ -265,7 +265,7 @@ export function SettingsModal() {
                   <div className="flex gap-2">
                     <input
                       type="url"
-                      placeholder="https://example.com/video.mp4"
+                      placeholder="YouTube or .mp4 URL"
                       className="input flex-1 text-xs"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && e.currentTarget.value) {

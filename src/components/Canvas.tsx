@@ -785,16 +785,40 @@ export function Canvas() {
   const bgType = project.settings.canvasBgType || 'color'
   const bgVideo = project.settings.canvasBgVideo || ''
 
+  // YouTube detection — returns embed URL or null
+  function getYouTubeEmbedUrl(url: string): string | null {
+    if (!url) return null
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    ]
+    for (const p of patterns) {
+      const m = url.match(p)
+      if (m) return `https://www.youtube.com/embed/${m[1]}?autoplay=1&mute=1&loop=1&playlist=${m[1]}&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&playsinline=1&disablekb=1&fs=0`
+    }
+    return null
+  }
+
+  const ytEmbed = getYouTubeEmbedUrl(bgVideo)
+  const isVideo = bgType === 'video' && bgVideo
+
   return (
     <div style={{ flex: 1, position: 'relative', overflow: 'hidden', cursor: 'crosshair' }} onDrop={onDrop} onDragOver={e => e.preventDefault()} onContextMenu={e => e.preventDefault()}>
       {/* Video background */}
-      {bgType === 'video' && bgVideo && (
+      {isVideo && ytEmbed && (
+        <iframe
+          src={ytEmbed}
+          style={{ position: 'absolute', top: '50%', left: '50%', width: '100vw', height: '100vh', minWidth: '177.78vh', minHeight: '100vw', transform: 'translate(-50%, -50%)', border: 'none', pointerEvents: 'none', zIndex: 0 }}
+          allow="autoplay; encrypted-media"
+          key={bgVideo}
+        />
+      )}
+      {isVideo && !ytEmbed && (
         <video
           autoPlay loop muted playsInline
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}
           key={bgVideo}
         >
-          <source src={bgVideo} type="video/mp4" />
+          <source src={bgVideo} />
         </video>
       )}
 
