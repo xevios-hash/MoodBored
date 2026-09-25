@@ -43,15 +43,15 @@ function createDefaultItem(kind: string, pos: Position): BoardItem {
 // ─── Theme ──────────────────────────────────────────────────────────
 
 function isDark() { return document.body.classList.contains('dark') }
-function gridColor() { return isDark() ? 'rgba(124,108,191,0.06)' : 'rgba(0,0,0,0.06)' }
-function crosshairColor() { return isDark() ? 'rgba(124,108,191,0.2)' : 'rgba(100,80,160,0.25)' }
+function gridColor() { return isDark() ? 'rgba(139,125,200,0.06)' : 'rgba(0,0,0,0.06)' }
+function crosshairColor() { return isDark() ? 'rgba(139,125,200,0.2)' : 'rgba(100,80,160,0.25)' }
 function cardBg(sel: boolean) { return isDark() ? (sel ? '#1a1030' : '#150f24') : (sel ? '#f0ecfa' : '#ffffff') }
-function cardBorder(sel: boolean) { return isDark() ? (sel ? 'rgba(124,108,191,0.4)' : 'rgba(160,140,220,0.08)') : (sel ? 'rgba(100,80,160,0.4)' : 'rgba(0,0,0,0.06)') }
-function txtPrimary() { return isDark() ? '#e8e0f5' : '#1a1028' }
-function txtSecondary() { return isDark() ? '#a898c8' : '#6b5a8a' }
-function txtMuted() { return isDark() ? '#7a6a9a' : '#9a8aba' }
-function accent() { return isDark() ? '#7c6cbf' : '#6a5aae' }
-function shadow(sel: boolean) { return isDark() ? (sel ? 'rgba(124,108,191,0.2)' : 'rgba(0,0,0,0.4)') : (sel ? 'rgba(100,80,160,0.15)' : 'rgba(0,0,0,0.08)') }
+function cardBorder(sel: boolean) { return isDark() ? (sel ? 'rgba(139,125,200,0.4)' : 'rgba(160,140,220,0.08)') : (sel ? 'rgba(100,80,160,0.4)' : 'rgba(0,0,0,0.06)') }
+function txtPrimary() { return isDark() ? '#ede5f8' : '#1a1028' }
+function txtSecondary() { return isDark() ? '#b8a8d8' : '#6b5a8a' }
+function txtMuted() { return isDark() ? '#8a7aaa' : '#9a8aba' }
+function accent() { return isDark() ? '#8b7dc8' : '#6a5aae' }
+function shadow(sel: boolean) { return isDark() ? (sel ? 'rgba(139,125,200,0.2)' : 'rgba(0,0,0,0.4)') : (sel ? 'rgba(100,80,160,0.15)' : 'rgba(0,0,0,0.08)') }
 
 // ─── LRU Image Cache (max 200) ─────────────────────────────────────
 
@@ -103,7 +103,6 @@ function isImageFailed(url: string): boolean {
 
 // Global redraw flag so image loads can trigger a repaint
 let needsRedrawGlobal = false
-let drawLoggedOnce = false
 
 // Safe accessor — tags might be a string (from JSON import) or an array
 function asArray(v: any): string[] {
@@ -240,11 +239,9 @@ export function Canvas() {
     const cvs = canvasRef.current
     if (!cvs) { console.warn('[Canvas] no canvas ref'); return }
     const ctx = cvs.getContext('2d')
-    if (!ctx) { console.warn('[Canvas] no 2d context'); return }
-    console.info('[Canvas] draw loop starting, canvas size:', cvs.getBoundingClientRect())
+    if (!ctx) return
 
     const draw = () => {
-      // Check if images finished loading (global flag from getImage callbacks)
       if (needsRedrawGlobal) {
         needsRedrawGlobal = false
         needsRedraw.current = true
@@ -268,16 +265,7 @@ export function Canvas() {
       const pw = Math.round(rect.width * dpr)
       const ph = Math.round(rect.height * dpr)
 
-      // Debug: log once on first real frame
-      if (!drawLoggedOnce) {
-        drawLoggedOnce = true
-        console.info('[Canvas] draw start', { rect: `${rect.width}x${rect.height}`, items: its.length, zoom: c.zoom, panX: c.panX, panY: c.panY })
-      }
-
-      if (pw === 0 || ph === 0) {
-        if (!drawLoggedOnce) { drawLoggedOnce = true; console.warn('[Canvas] zero dimensions, waiting for layout', rect) }
-        rafRef.current = requestAnimationFrame(draw); return
-      }
+      if (pw === 0 || ph === 0) { rafRef.current = requestAnimationFrame(draw); return }
 
       // Only resize canvas when dimensions actually change
       if (lastSize.current.w !== pw || lastSize.current.h !== ph) {
@@ -394,17 +382,6 @@ export function Canvas() {
         ctx.fillText('Two-finger scroll to pan · Option+scroll to zoom', 0, 80 / c.zoom)
         ctx.textAlign = 'start'
       }
-
-      // Debug overlay (always visible during debug)
-      ctx.save()
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // screen-space
-      const dbg = `[${Math.round(rect.width)}x${Math.round(rect.height)}] ${its.length} items · zoom ${(c.zoom * 100).toFixed(0)}%`
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'
-      ctx.fillRect(8, 8, ctx.measureText(dbg).width + 16, 22)
-      ctx.fillStyle = '#fff'
-      ctx.font = '11px monospace'
-      ctx.fillText(dbg, 16, 23)
-      ctx.restore()
 
       ctx.restore()
       } catch (err) {
@@ -1606,37 +1583,50 @@ function drawLinkItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: nu
 
 function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
   const label = item.kind.charAt(0).toUpperCase() + item.kind.slice(1).toLowerCase()
-  ctx.fillStyle = accent(); ctx.font = `600 ${10}px Inter, sans-serif`; ctx.fillText(label, x + PAD, y + PAD + 10)
   const text = item.text || item.raw || item.content || ''
-  ctx.fillStyle = txtPrimary(); ctx.font = `${12}px Inter, sans-serif`
-
-  if (text.length > 60 || text.includes('\n')) {
-    wrapText(ctx, text, x + PAD, y + PAD + 24, w - PAD * 2, 16, h - PAD * 2 - 10)
-  } else if (text.length > 30) {
-    ctx.font = `500 ${9}px Inter, sans-serif`
-    ctx.fillText(text.slice(0, 30), x + PAD, y + PAD + 24)
-  } else if (text.length > 0) {
-    ctx.font = `500 ${10}px Inter, sans-serif`
-    ctx.fillText(text.slice(0, 60), x + PAD, y + PAD + 24)
-  }
-
-  if (item.purpose && h > 100) {
-    ctx.fillStyle = txtMuted(); ctx.font = `500 ${9}px Inter, sans-serif`
-    ctx.fillText(item.purpose.slice(0, 40), x + PAD, y + PAD + 40)
-  }
-
+  const purpose = item.purpose || ''
   const summary = [item.purpose, item.importance].filter(Boolean).join(' · ')
-  if (summary) {
-    wrapText(ctx, summary, x + PAD, y + PAD + 28, w - PAD * 2, 16, h - PAD * 2 - 24)
-  } else {
-    ctx.font = `500 ${9}px Inter, sans-serif`
-    ctx.fillText(item.text?.slice(0, 30) || item.kind, x + PAD, y + PAD + 28)
+
+  // Layout: label → text → purpose → summary → tags (top to bottom, no overlap)
+  let cy = y + PAD
+
+  // Kind label
+  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`
+  ctx.fillText(label, x + PAD, cy + 9)
+  cy += 22
+
+  // Main content
+  if (text.length > 0) {
+    ctx.fillStyle = txtPrimary()
+    if (text.length > 80 || text.includes('\n')) {
+      ctx.font = `400 ${10}px Inter, sans-serif`
+      wrapText(ctx, text, x + PAD, cy, w - PAD * 2, 14, h - (cy - y) - PAD - (summary ? 20 : 0) - (purpose ? 16 : 0))
+      cy += Math.min(Math.ceil(text.length / 30) * 14, h - (cy - y) - PAD - 36)
+    } else {
+      ctx.font = text.length > 30 ? `500 ${9}px Inter, sans-serif` : `500 ${10}px Inter, sans-serif`
+      ctx.fillText(text.slice(0, 80), x + PAD, cy)
+      cy += text.length > 30 ? 14 : 14
+    }
   }
 
+  // Purpose
+  if (purpose && cy < y + h - PAD - 20) {
+    ctx.fillStyle = txtMuted(); ctx.font = `500 ${8}px Inter, sans-serif`
+    ctx.fillText(purpose.slice(0, 50), x + PAD, cy + 2)
+    cy += 14
+  }
+
+  // Summary (purpose + importance)
+  if (summary && cy < y + h - PAD - 12 && !purpose) {
+    ctx.fillStyle = txtMuted(); ctx.font = `400 ${8}px Inter, sans-serif`
+    wrapText(ctx, summary.slice(0, 80), x + PAD, cy, w - PAD * 2, 12, h - (cy - y) - PAD)
+  }
+
+  // Tags at bottom
   if ('tags' in item && item.tags?.length) {
     const tags = asArray(item.tags)
-    ctx.fillStyle = txtMuted(); ctx.font = `${8}px Inter, sans-serif`
-    ctx.fillText(tags.slice(0, 3).join(', '), x + PAD, y + h - PAD + 14)
+    ctx.fillStyle = txtMuted(); ctx.font = `400 ${8}px Inter, sans-serif`
+    ctx.fillText(tags.slice(0, 3).join(', '), x + PAD, y + h - PAD + 2)
   }
 }
 

@@ -34,13 +34,13 @@ export default {
           4: '#220040',
           5: '#2d0055',
         },
-        // Primary accent: neon cyan (Sega)
+        // Primary accent: pastel purple
         accent: {
-          DEFAULT: '#00fff0',
-          hover: '#00d4c8',
-          muted: 'rgba(0,255,240,0.12)',
-          glow: 'rgba(0,255,240,0.25)',
-          light: '#ccfffc',
+          DEFAULT: '#8b7dc8',
+          hover: '#7a6cb8',
+          muted: 'rgba(139,125,200,0.12)',
+          glow: 'rgba(139,125,200,0.25)',
+          light: '#e8e0ff',
         },
         // Secondary: hot magenta (PlayStation)
         hot: {
@@ -60,10 +60,10 @@ export default {
         },
         // Text
         text: {
-          primary: '#f0eaff',
+          primary: '#ede5f8',
           secondary: '#b8a8d8',
-          muted: '#7a6a9a',
-          disabled: '#4a3a6a',
+          muted: '#8a7aaa',
+          disabled: '#5a4a7a',
         },
         // Danger
         danger: {

@@ -194,7 +194,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                   onClick={() => updateSettings({ canvasBgType: 'color' })}
                   className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-fast border ${
                     (settings.canvasBgType || 'color') === 'color'
-                      ? 'bg-[#7c6cbf] text-white border-accent'
+                      ? 'bg-[#8b7dc8] text-white border-accent'
                       : 'bg-surface-2 border-surface-4 text-text-secondary'
                   }`}
                 >
@@ -204,7 +204,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                   onClick={() => updateSettings({ canvasBgType: 'video', canvasBgVideo: settings.canvasBgVideo || '/sky-day.mp4' })}
                   className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-fast border ${
                     settings.canvasBgType === 'video'
-                      ? 'bg-[#7c6cbf] text-white border-accent'
+                      ? 'bg-[#8b7dc8] text-white border-accent'
                       : 'bg-surface-2 border-surface-4 text-text-secondary'
                   }`}
                 >
@@ -253,7 +253,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                         onClick={() => updateSettings({ canvasBgVideo: bg.url })}
                         className={`px-3 py-2 rounded-lg text-xs font-medium transition-fast border ${
                           settings.canvasBgVideo === bg.url
-                            ? 'bg-[#7c6cbf] text-white border-accent'
+                            ? 'bg-[#8b7dc8] text-white border-accent'
                             : 'bg-surface-2 border-surface-4 text-text-secondary'
                         }`}
                       >
@@ -275,7 +275,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                               onClick={() => updateSettings({ canvasBgVideo: url })}
                               className={`flex-1 px-3 py-1.5 rounded text-xs text-left truncate transition-fast border ${
                                 settings.canvasBgVideo === url
-                                  ? 'bg-[#7c6cbf] text-white border-accent'
+                                  ? 'bg-[#8b7dc8] text-white border-accent'
                                   : 'bg-surface-2 border-surface-4 text-text-secondary hover:border-accent'
                               }`}
                             >
