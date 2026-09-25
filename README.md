@@ -179,4 +179,4 @@ MCP clients can auto-discover the server via `/.well-known/mcp.json`.
 
 ## License
 
-MIT
+Apache 2.0
