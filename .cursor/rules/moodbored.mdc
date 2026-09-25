@@ -1,0 +1,43 @@
+# MoodBored — Visual Mood Board
+
+When the user mentions moodboard, mood board, visual board, brand board, or design exploration, use MoodBored.
+
+## Setup
+
+```bash
+cd /Users/x.hyperdex/OpenCodeApps/MoodBored
+npm run dev   # http://localhost:5173
+```
+
+## MCP Tools (stdio)
+
+Connect to `mcp/mcp-server.ts` via stdio. Key tools:
+
+- `get_board` — read the board
+- `add_items` — add notes, images, palettes, fonts, gradients, links, videos, containers
+- `search_items` / `semantic_search` — find items by text or meaning
+- `arrange_items` — grid/stack/spiral layout
+- `clear_board` — wipe everything
+
+## REST API
+
+```
+POST /api/boards                          — create board
+POST /api/board/:id/items                 — add items
+GET  /api/board/:id/search?q=             — text search
+GET  /api/board/:id/semantic?q=           — semantic search
+```
+
+## Item format
+
+```json
+{"kind":"note","text":"...","purpose":"...","tags":["..."],"pos":{"x":100,"y":200}}
+{"kind":"image","description":"...","source":"https://images.unsplash.com/photo-XXX?w=800","tags":["..."]}
+{"kind":"palette","label":"My Colors","colors":[{"hex":"#FF6B35","label":"Orange"}]}
+```
+
+All items accept `purpose`, `importance`, `tags`, `pos`, `size`.
+
+## Rule: always populate the board
+
+When the user describes anything visual, immediately add items via MCP or REST. Don't just discuss — create the board content. Use real Unsplash image URLs. Every response should add 2–8 items.

@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "mcp": "node --loader tsx mcp/mcp-server.ts",
+    "mcp:install": "node -e \"const fs=require('fs'),p=require('path'),h=require('os').homedir();const d=process.platform==='darwin'?p.join(h,'Library','Application Support','Claude'):p.join(h,'.config','claude');if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});const f=p.join(d,'claude_desktop_config.json');const c=fs.existsSync(f)?JSON.parse(fs.readFileSync(f,'utf-8')):{};c.mcpServers=c.mcpServers||{};c.mcpServers.moodbored={command:'npx',args:['tsx',process.cwd()+'/mcp/mcp-server.ts']};fs.writeFileSync(f,JSON.stringify(c,null,2));console.log('MCP server added to Claude Desktop config:',f)\"",
     "tauri": "tauri",
     "cap:sync": "npx cap sync",
     "cap:ios": "npx cap open ios"

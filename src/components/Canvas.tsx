@@ -1709,32 +1709,30 @@ function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, 
   const text = item.text || item.raw || item.content || ''
   const purpose = item.purpose || ''
   const tags = ('tags' in item && item.tags?.length) ? asArray(item.tags) : []
-  const maxBot = y + h - PAD
-  let cy = y + PAD
+  const cx = x + PAD
+  const contentW = w - PAD * 2
+
+  // Fixed zones from bottom: tags (14px) → purpose (14px) → text fills the rest
+  const tagsZone = tags.length > 0 ? y + h - PAD + 2 : y + h
+  const purposeZone = purpose ? tagsZone - 18 : tagsZone
+  const textMaxH = Math.max(14, purposeZone - (y + PAD + 20) - 4)
+
   ctx.fillStyle = accent(); ctx.font = '600 9px Inter, sans-serif'
-  ctx.fillText(label, x + PAD, cy + 9); cy += 22
-  const purposeReserve = purpose ? 16 : 0
-  const tagsReserve = tags.length > 0 ? 14 : 0
-  const contentMaxBot = maxBot - purposeReserve - tagsReserve
-  if (text.length > 0 && cy < contentMaxBot) {
-    ctx.fillStyle = txtPrimary()
-    if (text.length > 60 || text.includes('\n')) {
-      ctx.font = '400 10px Inter, sans-serif'
-      wrapText(ctx, text, x + PAD, cy, w - PAD * 2, 14, contentMaxBot - cy)
-      const lineCount = Math.min(Math.ceil(text.length / 35), Math.floor((contentMaxBot - cy) / 14))
-      cy += Math.max(14, lineCount * 14)
-    } else {
-      ctx.font = '500 10px Inter, sans-serif'
-      ctx.fillText(text.slice(0, 80), x + PAD, cy); cy += 14
-    }
+  ctx.fillText(label, cx, y + PAD + 9)
+
+  if (text.length > 0 && textMaxH > 10) {
+    ctx.fillStyle = txtPrimary(); ctx.font = '400 10px Inter, sans-serif'
+    wrapText(ctx, text, cx, y + PAD + 20, contentW, 14, textMaxH)
   }
-  if (purpose && cy < maxBot - tagsReserve) {
+
+  if (purpose && purposeZone < tagsZone) {
     ctx.fillStyle = txtMuted(); ctx.font = '500 8px Inter, sans-serif'
-    ctx.fillText(purpose.slice(0, 50), x + PAD, cy); cy += 14
+    ctx.fillText(purpose.slice(0, 60), cx, purposeZone)
   }
+
   if (tags.length > 0) {
     ctx.fillStyle = txtMuted(); ctx.font = '400 8px Inter, sans-serif'
-    ctx.fillText(tags.slice(0, 3).join(', '), x + PAD, maxBot + 2)
+    ctx.fillText(tags.slice(0, 3).join(', '), cx, tagsZone)
   }
 }
 
