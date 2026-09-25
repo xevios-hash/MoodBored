@@ -234,6 +234,15 @@ export function Canvas() {
     return unsub
   }, [])
 
+  // Trigger redraw when canvas becomes visible (e.g., mobile tab switch)
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) needsRedraw.current = true
+    }, { threshold: 0 })
+    if (canvasRef.current) observer.observe(canvasRef.current)
+    return () => observer.disconnect()
+  }, [])
+
   // Draw loop — only redraws when needed
   useEffect(() => {
     const cvs = canvasRef.current

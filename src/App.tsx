@@ -213,11 +213,16 @@ export default function App() {
     const check = () => {
       const ua = navigator.userAgent || ''
       const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-      setIsMobile(isIOS || window.innerWidth < 768)
+      const w = window.visualViewport?.width ?? window.innerWidth
+      setIsMobile(isIOS || w < 768)
     }
     check()
+    window.visualViewport?.addEventListener('resize', check)
     window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', check)
+      window.removeEventListener('resize', check)
+    }
   }, [])
 
   // ─── Lightbox events ───
