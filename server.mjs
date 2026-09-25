@@ -756,14 +756,6 @@ async function executeTool(name, args, sessionBoardId) {
   }
 }
 
-// Sanity check: verify /mcp page origin is correct (dev-only)
-app.get('/mcp/selftest', (req, res) => {
-  const expected = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`
-  const rendered = buildMcpPage(req)
-  const ok = rendered.includes(expected) && !rendered.includes('localhost')
-  res.json({ expected, contains_localhost: rendered.includes('localhost'), ok })
-})
-
 // ─── MCP Discovery (before SPA fallback) ────────────────────────────
 
 // MCP Discovery — serve .well-known from dist (built) or public (dev)
@@ -861,7 +853,9 @@ app.get('/mcp', (req, res) => {
 
 // Sanity check: verify rendered page uses correct origin
 app.get('/mcp/selftest', (req, res) => {
-  const expected = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`
+  const proto = req.get('x-forwarded-proto') || req.protocol
+  const host = req.get('x-forwarded-host') || req.get('host')
+  const expected = process.env.PUBLIC_URL || `${proto}://${host}`
   const rendered = buildMcpPage(req)
   const ok = rendered.includes(expected)
   res.json({ expected, rendered_contains_localhost: rendered.includes('localhost'), ok })
