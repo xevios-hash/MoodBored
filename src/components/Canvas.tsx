@@ -58,6 +58,18 @@ function shadow(sel: boolean) { return isDark() ? (sel ? 'rgba(139,125,200,0.2)'
 const MAX_IMAGES = 200
 const imageCache = new Map<string, HTMLImageElement>()
 const imageFailed = new Set<string>()
+const blobUrls = new Set<string>() // track blob URLs for revocation
+
+function isBlobUrl(url: string): boolean {
+  return url.startsWith('blob:')
+}
+
+function revokeBlobUrl(url: string) {
+  if (isBlobUrl(url) && blobUrls.has(url)) {
+    try { URL.revokeObjectURL(url) } catch {}
+    blobUrls.delete(url)
+  }
+}
 
 function getImage(url: string): HTMLImageElement | null {
   if (!url || imageFailed.has(url)) return null
@@ -78,12 +90,16 @@ function getImage(url: string): HTMLImageElement | null {
         // Evict oldest if over limit
         while (imageCache.size > MAX_IMAGES) {
           const first = imageCache.keys().next().value
-          if (first) imageCache.delete(first)
+          if (first) {
+            imageCache.delete(first)
+            revokeBlobUrl(first)
+          }
         }
       }
       img.onerror = () => {
         imageFailed.add(url)
         imageCache.delete(url)
+        revokeBlobUrl(url)
         needsRedrawGlobal = true
       }
       img.src = url
@@ -92,13 +108,27 @@ function getImage(url: string): HTMLImageElement | null {
       imageFailed.add(url)
     }
   }
-  // If currently loading (in cache but not complete), return null
-  if (imageCache.has(url) && !imageFailed.has(url)) return null
   return null
 }
 
 function isImageFailed(url: string): boolean {
   return !!url && imageFailed.has(url)
+}
+
+// Revoke all blob URLs on page unload (safety net)
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    for (const url of blobUrls) revokeBlobUrl(url)
+  })
+}
+
+// Reset imageFailed when project changes (clear stale failures)
+let lastProjectId: string | null = null
+function maybeClearImageFailed(projectId: string) {
+  if (projectId !== lastProjectId) {
+    lastProjectId = projectId
+    imageFailed.clear()
+  }
 }
 
 // Global redraw flag so image loads can trigger a repaint
@@ -234,7 +264,34 @@ export function Canvas() {
     return unsub
   }, [])
 
-  // Trigger redraw when canvas becomes visible (e.g., mobile tab switch)
+  // Revoke blob URLs when items are removed from the board
+  const prevItemIds = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const currentIds = new Set(items.map(i => i.id))
+    for (const id of prevItemIds.current) {
+      if (!currentIds.has(id)) {
+        // Item was removed — find its blob URLs from the cache and revoke them
+        for (const [url] of imageCache) {
+          if (isBlobUrl(url)) {
+            // Check if any remaining item still uses this URL
+            const stillUsed = items.some((i: any) =>
+              i.thumbnail === url || i.fullSource === url || i.source === url
+            )
+            if (!stillUsed) {
+              imageCache.delete(url)
+              revokeBlobUrl(url)
+            }
+          }
+        }
+      }
+    }
+    prevItemIds.current = currentIds
+  }, [items])
+
+  // Clear stale image failures when project changes
+  useEffect(() => {
+    maybeClearImageFailed(project.id)
+  }, [project.id])
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) needsRedraw.current = true
@@ -635,10 +692,10 @@ export function Canvas() {
     const wy = (e.clientY - rect.top - state.canvas.panY) / state.canvas.zoom
     for (const file of Array.from(e.dataTransfer.files)) {
       if (file.type.startsWith('image/')) {
-        const url = URL.createObjectURL(file)
+        const url = URL.createObjectURL(file); blobUrls.add(url)
         state.addItem({ kind: 'image', id: crypto.randomUUID(), thumbnail: url, fullSource: url, description: file.name, purpose: 'Dropped by user', importance: 'User reference', source: `file:${file.name}`, tags: [], pos: { x: wx, y: wy }, size: { w: 300, h: 200 } })
       } else if (file.type.startsWith('video/')) {
-        const url = URL.createObjectURL(file)
+        const url = URL.createObjectURL(file); blobUrls.add(url)
         state.addItem({ kind: 'video', id: crypto.randomUUID(), source: url, sourceUrl: url, startTs: 0, duration: 0, subjectDesc: file.name, motionDesc: '', purpose: 'Dropped by user', importance: 'User video', tags: [], pos: { x: wx, y: wy }, size: { w: 320, h: 240 } })
       } else {
         state.addItem({ kind: 'note', id: crypto.randomUUID(), text: `File: ${file.name}`, purpose: 'Dropped file', importance: 'User file', tags: [`file:${file.name}`], pos: { x: wx, y: wy } })
@@ -669,7 +726,7 @@ export function Canvas() {
             for (const type of item.types) {
               if (type.startsWith('image/')) {
                 const blob = await item.getType(type)
-                const url = URL.createObjectURL(blob)
+                const url = URL.createObjectURL(blob); blobUrls.add(url)
                 s.addItem({
                   kind: 'image', id: crypto.randomUUID(),
                   thumbnail: url, fullSource: url,
