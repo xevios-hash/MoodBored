@@ -2,157 +2,138 @@
 
 A collaborative mood-board workspace where humans and LLMs brainstorm together visually.
 
+MoodBored is a visual canvas for creative direction — mood boards, brand exploration, design systems, and reference gathering. It integrates with any LLM via MCP so your AI can read, write, and arrange items on the board as naturally as you can.
+
 ## Quick Start
 
 ```bash
-# Install dependencies
+# Install and run
 npm install
+npm run dev          # opens at http://localhost:5173
 
-# Run web dev server
-npm run dev
+# Production build
+npm run build        # outputs to dist/
+
+# macOS desktop (Tauri)
+npx tauri build      # produces .app and .dmg
+
+# Start the server (serves frontend + MCP endpoints)
+npm start            # http://localhost:3000
 ```
+
+## What It Does
+
+**Canvas** — Infinite canvas with pan/zoom, drag-and-drop, multi-select, lasso selection, alignment snapping, layers panel, minimap. 11 item types: notes, text, images, links, palettes, gradients, fonts, swatches, size guides, videos, containers.
+
+**AI Chat** — Talk to an LLM that adds items to your board in real-time via OpenRouter. Supports tool-calling (structured function invocations) with a fallback to regex-parsed JSON blocks. Multi-agent mode available (toggle in Settings).
+
+**MCP Server** — Any LLM tool (Claude Desktop, Cursor, OpenCode, Grok Code) can drive the board via MCP. 7 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `arrange_items`, `clear_board`. Stdio transport for desktop clients, SSE transport for web-based clients.
+
+**Export for Creation** — Select items on the board, export a structured creative brief for another LLM to produce images, videos, games, websites, 3D scenes, audio, or documents.
+
+**Collaboration** — Share boards via links with view/edit roles. Real-time presence with cursor tracking. No sign-up required for viewers.
 
 ## Architecture
 
-- **Bend 2 core** (`bend/`): Data model, laws, proofs, search logic
-- **TypeScript frontend** (`src/`): React app with infinite canvas, chat, search
-- **Tauri** (`src-tauri/`): macOS desktop wrapper
-- **iOS** (`ios/`): Native iOS app with WKWebView
-
-## Build Targets
-
-### Web (any browser, including Windows)
-
-```bash
-npm run build          # outputs to dist/
-npm run preview        # preview production build
+```
+src/                    React frontend (canvas, chat, inspector, etc.)
+src/lib/                Core logic (API, tools, sync, storage, export)
+mcp/mcp-server.ts       MCP server (stdio transport)
+server.mjs              Express server (static files + MCP SSE + board API)
+src-tauri/              Tauri desktop wrapper (macOS)
+bend/                   Formal verification (data model, laws, proofs)
 ```
 
-### macOS Desktop (Tauri)
+## MCP Integration
 
-```bash
-npx tauri build        # produces .app and .dmg
-# Output: src-tauri/target/release/bundle/macos/MoodBored.app
-# Output: src-tauri/target/release/bundle/dmg/MoodBored_1.0.0_aarch64.dmg
+MoodBored exposes an MCP server so any LLM can interact with your board.
+
+**Claude Desktop / Cursor** (stdio):
+```json
+{
+  "mcpServers": {
+    "moodbored": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/MoodBored/mcp/mcp-server.ts"],
+      "env": { "MOODBORED_BOARD_ID": "your-board-id" }
+    }
+  }
+}
 ```
 
-### iOS
-
-```bash
-# Build for simulator
-xcodebuild -project ios/MoodBored.xcodeproj -scheme MoodBored \
-  -destination 'platform=iOS Simulator,name=iPhone 17' build
-
-# Build for device
-xcodebuild -project ios/MoodBored.xcodeproj -scheme MoodBored \
-  -destination 'generic/platform=iOS' build
+**OpenCode / Web IDEs** (SSE):
+```
+http://localhost:3000/mcp/sse?board=your-board-id
 ```
 
-## Bend 2 Core
+**Connection info page**: `http://localhost:3000/mcp`
 
-The pure data model, laws, and proofs live in `bend/`.
+**Discovery**: `http://localhost:3000/.well-known/mcp.json`
 
-```bash
-# Check model
-bend bend/model.bend
+## Embed Mode
 
-# Run proofs (must print "All terms check.")
-bend bend/PROOF.bend
-
-# Check search module
-bend bend/search.bend
+Open any board URL to get a canvas-only view (no chat, no sidebar):
+```
+http://localhost:3000/board/{board-id}
+http://localhost:3000/board/{board-id}?embed=1&theme=dark
+http://localhost:3000/board/{board-id}?readonly=1
 ```
 
-### Laws (invariants)
-
-Every law in `LAWS.bend` must be proven in `PROOF.bend`. Run `bend PROOF.bend` after every change.
-
-| Law | Description |
-|-----|-------------|
-| `media_has_metadata` | Image/Link/Video items carry description, purpose, source |
-| `id_is_deterministic` | `Item.id` returns the same value for the same item |
-| `pos_is_stable` | `Item.pos` returns the same position for the same item |
-| `search_text_total` | `Item.search_text` always terminates |
-| `tags_total` | `Item.tags` always terminates |
-
-## Features
-
-- Infinite canvas with pan/zoom, drag-and-drop, multi-select
-- Chat panel with LLM streaming (OpenRouter)
-- AI can add items to canvas via structured JSON actions
-- Full-text search across all item fields + tag filters
-- Item inspector with editable metadata
-- Export/import as JSON (round-trippable)
-- Multiple projects with viewports
-- Settings for API keys, models, themes
-- Dark-mode-first UI
+PostMessage API for parent-frame control:
+```js
+window.postMessage({ type: 'addItems', items: [...] }, '*')
+window.postMessage({ type: 'setTheme', theme: 'dark' }, '*')
+```
 
 ## Configuration
 
 Open Settings (gear icon) to configure:
-- **OpenRouter API Key**: Required for chat/agent features
-- **Default Model**: LLM model for chat (default: `anthropic/claude-sonnet-4`)
-- **Jev Threshold**: Coherence threshold for agent loop (0-1)
-- **Canvas Background**: Dark theme presets
+- **Canvas background** — solid color presets or video backgrounds (YouTube URLs supported)
+- **Theme** — light / dark
+- **Multi-agent mode** — toggle multiple specialized AI agents (off by default)
+- **Jev quality gate** — coherence threshold for agent proposals
 
-## Project JSON Format
-
-```json
-{
-  "id": "uuid",
-  "name": "My Board",
-  "viewports": [
-    {
-      "id": "uuid",
-      "name": "Main",
-      "items": [
-        {
-          "kind": "note",
-          "id": "uuid",
-          "text": "Hello world",
-          "purpose": "Greeting",
-          "importance": "First item",
-          "tags": ["intro"],
-          "pos": { "x": 100, "y": 200 }
-        }
-      ],
-      "camX": 0,
-      "camY": 0,
-      "zoom": 1
-    }
-  ],
-  "settings": {
-    "apiKey": "",
-    "defaultModel": "anthropic/claude-sonnet-4",
-    "jevThreshold": 0.7,
-    "theme": "dark",
-    "canvasBg": "#0a0a0f"
-  },
-  "created": "2026-01-01T00:00:00.000Z",
-  "updated": "2026-01-01T00:00:00.000Z"
-}
-```
-
-## Item Types
-
-| Kind | Required Fields |
-|------|----------------|
-| `text` | `raw`, `pos`, `size` |
-| `image` | `description`, `purpose`, `importance`, `source`, `tags`, `pos`, `size` |
-| `link` | `url`, `description`, `purpose`, `importance`, `source`, `tags`, `pos` |
-| `note` | `text`, `purpose`, `importance`, `tags`, `pos` |
-| `video` | `subjectDesc`, `motionDesc`, `purpose`, `importance`, `sourceUrl`, `tags`, `pos`, `size` |
+API key and model selection are only shown in the full app (not in embed mode).
 
 ## Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
-| `Ctrl/Cmd+K` | Open search |
-| `Ctrl/Cmd+A` | Select all items |
-| `Delete/Backspace` | Delete selected items |
-| `Shift+Click` | Toggle item selection |
-| `Alt+Drag` | Pan canvas |
-| `Scroll` | Zoom in/out |
+| `N` / `T` / `I` / `L` / `P` / `G` / `F` / `V` | Create note/text/image/link/palette/font/video |
+| `Ctrl+K` | Search |
+| `Ctrl+A` | Select all |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
+| `Ctrl+C` / `Ctrl+V` | Copy / paste |
+| `+` / `-` / `0` | Zoom in / out / reset |
+| `Delete` | Delete selected |
+| `Escape` | Cancel / deselect |
+| Double-click empty | Create note |
+| Right-click | Context menu (all item types) |
+
+## Item Types
+
+| Kind | Description |
+|------|-------------|
+| `note` | Text thoughts, quotes, keywords |
+| `text` | Raw content snippet |
+| `image` | Visual reference (supports Unsplash URLs) |
+| `link` | Reference URL with title and summary |
+| `palette` | Color palette with hex codes |
+| `gradient` | Gradient preview with stops and direction |
+| `font` | Typography preview with sample text |
+| `swatch` | Single color with usage notes |
+| `sizeguide` | Dimensions and orientation reference |
+| `video` | Video reference with subject and motion description |
+| `container` | Group of items with layout modes (free/grid/stack) |
+| `connector` | Line between items |
+
+## Build Targets
+
+| Target | Command | Output |
+|--------|---------|--------|
+| Web | `npm run build` | `dist/` |
+| macOS | `npx tauri build` | `.app` + `.dmg` |
+| Server | `npm start` | `http://localhost:3000` |
 
 ## License
 

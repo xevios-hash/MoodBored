@@ -1,0 +1,55 @@
+{
+  "name": "MoodBored",
+  "version": "1.0.0",
+  "description": "Collaborative mood-board workspace — visual brainstorming canvas that any LLM can drive via MCP tools",
+  "capabilities": {
+    "tools": {},
+    "resources": {}
+  },
+  "transport": {
+    "type": "sse",
+    "url": "/mcp/sse"
+  },
+  "tools": [
+    {
+      "name": "get_board",
+      "description": "Read the full mood board state — items, palette, typography, notes, layout"
+    },
+    {
+      "name": "add_items",
+      "description": "Add one or more items to the board (notes, images, palettes, gradients, fonts, links, videos, containers, etc.)"
+    },
+    {
+      "name": "remove_items",
+      "description": "Remove items from the board by their IDs"
+    },
+    {
+      "name": "update_item",
+      "description": "Update properties of an existing item (text, colors, tags, position, etc.)"
+    },
+    {
+      "name": "search_items",
+      "description": "Search items by text query and/or tag filter"
+    },
+    {
+      "name": "arrange_items",
+      "description": "Organize items into a layout (grid, horizontal stack, vertical stack, spiral)"
+    },
+    {
+      "name": "clear_board",
+      "description": "Remove all items from the board"
+    }
+  ],
+  "resources": [
+    {
+      "name": "board",
+      "uri": "board://current",
+      "description": "Full board state as JSON"
+    },
+    {
+      "name": "summary",
+      "uri": "board://summary",
+      "description": "Text summary of the board (item counts by type)"
+    }
+  ]
+}
