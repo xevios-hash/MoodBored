@@ -690,6 +690,13 @@ export function repositionItem(item: BoardItem, existingItems: BoardItem[]): Boa
   return { ...item, pos: freePos } as BoardItem
 }
 
+// Safe accessor — tags might be a string (from JSON import) or an array
+function asTags(v: any): string[] {
+  if (Array.isArray(v)) return v
+  if (typeof v === 'string' && v.length > 0) return v.split(',').map((s) => s.trim())
+  return []
+}
+
 // ─── Board Description for LLM Context ──────────────────────────────
 
 export function summarizeProject(items: BoardItem[]): string {
@@ -713,11 +720,11 @@ export function describeBoard(items: BoardItem[]): string {
     }
     const pos = `(${Math.round(item.pos.x)},${Math.round(item.pos.y)})`
     switch (item.kind) {
-      case 'note': lines.push(`- Note ${pos}: "${item.text.slice(0, 60)}" [${item.tags.join(', ')}]`); break
+      case 'note': lines.push(`- Note ${pos}: "${item.text.slice(0, 60)}" [${asTags(item.tags).join(', ')}]`); break
       case 'text': lines.push(`- Text ${pos}: "${item.raw.slice(0, 60)}"`); break
-      case 'image': lines.push(`- Image ${pos}: ${item.description} src=${item.source} [${item.tags.join(', ')}]`); break
-      case 'link': lines.push(`- Link ${pos}: ${item.title || item.url} [${item.tags.join(', ')}]`); break
-      case 'video': lines.push(`- Video ${pos}: ${item.subjectDesc} [${item.tags.join(', ')}]`); break
+      case 'image': lines.push(`- Image ${pos}: ${item.description} src=${item.source} [${asTags(item.tags).join(', ')}]`); break
+      case 'link': lines.push(`- Link ${pos}: ${item.title || item.url} [${asTags(item.tags).join(', ')}]`); break
+      case 'video': lines.push(`- Video ${pos}: ${item.subjectDesc} [${asTags(item.tags).join(', ')}]`); break
       case 'palette': lines.push(`- Palette ${pos}: "${item.label}" colors=${item.colors.map(c => c.hex).join(',')}`); break
       case 'gradient': lines.push(`- Gradient ${pos}: "${item.label}" ${item.stops.map(s => s.color).join('→')}`); break
       case 'font': lines.push(`- Font ${pos}: ${item.fontFamily} "${item.sampleText.slice(0, 30)}"`); break
@@ -833,7 +840,7 @@ export function boardToMarkdown(items: BoardItem[]): string {
         lines.push(`## Note`)
         lines.push(item.text)
         if (item.purpose) lines.push(`*Purpose: ${item.purpose}*`)
-        if (item.tags?.length) lines.push(`Tags: ${item.tags.join(', ')}`)
+        if (item.tags?.length) lines.push(`Tags: ${asTags(item.tags).join(', ')}`)
         lines.push('')
         break
       case 'text':
@@ -916,7 +923,7 @@ export function boardToTable(items: BoardItem[]): string {
       case 'sizeguide': content = `${item.width}x${item.height}${item.unit}`; break
       case 'container': content = `${item.label} (${item.children?.length || 0} items)`; break
     }
-    const tags = ('tags' in item && item.tags) ? item.tags.join(', ') : ''
+    const tags = ('tags' in item && item.tags) ? asTags(item.tags).join(', ') : ''
     const purpose = ('purpose' in item && item.purpose) ? item.purpose.slice(0, 40) : ''
     rows.push(`| ${item.kind} | ${content} | ${tags} | ${purpose} |`)
   }
@@ -931,7 +938,7 @@ export function searchItems(items: BoardItem[], query: string, tag?: string): Bo
   return items.filter((item) => {
     const text = getSearchText(item).toLowerCase()
     const matchesQuery = !q || text.includes(q)
-    const matchesTag = !tag || (item.kind !== 'connector' && 'tags' in item && item.tags?.includes(tag))
+    const matchesTag = !tag || (item.kind !== 'connector' && 'tags' in item && asTags(item.tags).includes(tag))
     return matchesQuery && matchesTag
   })
 }

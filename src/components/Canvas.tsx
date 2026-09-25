@@ -105,6 +105,13 @@ function isImageFailed(url: string): boolean {
 let needsRedrawGlobal = false
 let drawLoggedOnce = false
 
+// Safe accessor — tags might be a string (from JSON import) or an array
+function asArray(v: any): string[] {
+  if (Array.isArray(v)) return v
+  if (typeof v === 'string' && v.length > 0) return v.split(',').map((s: string) => s.trim())
+  return []
+}
+
 // ─── Constants ──────────────────────────────────────────────────────
 
 const PORT_RADIUS = 5
@@ -1627,7 +1634,7 @@ function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, 
   }
 
   if ('tags' in item && item.tags?.length) {
-    const tags = item.tags.join(', ')
+    const tags = asArray(item.tags)
     ctx.fillStyle = txtMuted(); ctx.font = `${8}px Inter, sans-serif`
     ctx.fillText(tags.slice(0, 3).join(', '), x + PAD, y + h - PAD + 14)
   }
