@@ -443,6 +443,17 @@ a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}
 </body></html>`)
 })
 
+// MCP manifest fallback (for clients that can't access .well-known)
+app.get('/mcp.json', (_req, res) => {
+  try {
+    const p = join(__dirname, 'dist', '.well-known', 'mcp.json')
+    if (existsSync(p)) { res.type('json').send(readFileSync(p, 'utf-8')); return }
+    const pub = join(__dirname, 'public', '.well-known', 'mcp.json')
+    if (existsSync(pub)) { res.type('json').send(readFileSync(pub, 'utf-8')); return }
+  } catch (_e) {}
+  res.status(404).json({ error: 'MCP manifest not found' })
+})
+
 // ─── SPA Fallback (catch-all, last) ─────────────────────────────────
 
 app.use(express.static(join(__dirname, 'dist'), { maxAge: '1y', immutable: true }))
