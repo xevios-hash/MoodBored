@@ -231,9 +231,10 @@ export function Canvas() {
   // Draw loop — only redraws when needed
   useEffect(() => {
     const cvs = canvasRef.current
-    if (!cvs) return
+    if (!cvs) { console.warn('[Canvas] no canvas ref'); return }
     const ctx = cvs.getContext('2d')
-    if (!ctx) return
+    if (!ctx) { console.warn('[Canvas] no 2d context'); return }
+    console.info('[Canvas] draw loop starting, canvas size:', cvs.getBoundingClientRect())
 
     const draw = () => {
       // Check if images finished loading (global flag from getImage callbacks)
@@ -266,7 +267,10 @@ export function Canvas() {
         console.info('[Canvas] draw start', { rect: `${rect.width}x${rect.height}`, items: its.length, zoom: c.zoom, panX: c.panX, panY: c.panY })
       }
 
-      if (pw === 0 || ph === 0) { rafRef.current = requestAnimationFrame(draw); return }
+      if (pw === 0 || ph === 0) {
+        if (!drawLoggedOnce) { drawLoggedOnce = true; console.warn('[Canvas] zero dimensions, waiting for layout', rect) }
+        rafRef.current = requestAnimationFrame(draw); return
+      }
 
       // Only resize canvas when dimensions actually change
       if (lastSize.current.w !== pw || lastSize.current.h !== ph) {
