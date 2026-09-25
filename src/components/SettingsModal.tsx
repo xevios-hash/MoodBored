@@ -247,9 +247,6 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { url: '/sky-day.mp4', label: 'Daytime Sky' },
-                      { url: '/sky-night.mp4', label: 'Starry Night' },
-                      { url: '/bg-ocean.mp4', label: 'Deep Blue' },
-                      { url: '/bg-sunset.mp4', label: 'Golden Hour' },
                     ].map((bg) => (
                       <button
                         key={bg.url}
