@@ -1413,8 +1413,9 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
 }
 
 function drawImageItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('IMAGE', x + PAD, y + PAD + 9)
-  const imgTop = y + PAD + 20; const imgH = h - PAD * 2 - 40; const imgW = w - PAD * 2
+  let cy = y + PAD
+  ctx.fillStyle = accent(); ctx.font = `600 9px Inter, sans-serif`; ctx.fillText('IMAGE', x + PAD, cy + 9); cy += 20
+  const imgTop = cy; const imgBot = y + h - PAD - 18; const imgH = Math.max(40, imgBot - imgTop); const imgW = w - PAD * 2
   const src = item.thumbnail || item.fullSource
   const img = getImage(src)
   if (img) {
@@ -1426,89 +1427,119 @@ function drawImageItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: n
     ctx.drawImage(img, sx, sy, sw, sh, x + PAD, imgTop, imgW, imgH); ctx.restore()
   } else if (isImageFailed(src)) {
     ctx.fillStyle = isDark() ? '#1a0018' : '#fff0f0'; ctx.fillRect(x + PAD, imgTop, imgW, imgH)
-    ctx.fillStyle = isDark() ? '#ff6b6b' : '#d44'; ctx.font = `${10}px Inter, sans-serif`; ctx.textAlign = 'center'
+    ctx.fillStyle = isDark() ? '#ff6b6b' : '#d44'; ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center'
     ctx.fillText('Image failed to load', x + w / 2, imgTop + imgH / 2 + 4); ctx.textAlign = 'start'
   } else if (src?.startsWith('http')) {
     ctx.fillStyle = isDark() ? '#1a1a25' : '#f1f5f9'; ctx.fillRect(x + PAD, imgTop, imgW, imgH)
-    ctx.fillStyle = txtMuted(); ctx.font = `${10}px Inter, sans-serif`; ctx.textAlign = 'center'
+    ctx.fillStyle = txtMuted(); ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center'
     ctx.fillText('Loading image...', x + w / 2, imgTop + imgH / 2 + 4); ctx.textAlign = 'start'
   } else {
     ctx.fillStyle = isDark() ? '#1a1a25' : '#f1f5f9'; ctx.fillRect(x + PAD, imgTop, imgW, imgH)
-    ctx.fillStyle = txtMuted(); ctx.font = `${10}px Inter, sans-serif`; ctx.textAlign = 'center'
+    ctx.fillStyle = txtMuted(); ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center'
     ctx.fillText('No image', x + w / 2, imgTop + imgH / 2 + 4); ctx.textAlign = 'start'
   }
-  ctx.fillStyle = txtPrimary(); ctx.font = `${10}px Inter, sans-serif`; ctx.fillText(item.description || '', x + PAD, y + h - PAD)
+  if (item.description) {
+    ctx.fillStyle = txtPrimary(); ctx.font = '10px Inter, sans-serif'
+    ctx.fillText(item.description.slice(0, 60), x + PAD, y + h - PAD + 2)
+  }
 }
 
 function drawPaletteItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('PALETTE', x + PAD, y + PAD + 9)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24)
+  let cy = y + PAD
+  ctx.fillStyle = accent(); ctx.font = '600 9px Inter, sans-serif'; ctx.fillText('PALETTE', x + PAD, cy + 9); cy += 20
+  ctx.fillStyle = txtPrimary(); ctx.font = '500 12px Inter, sans-serif'; ctx.fillText(item.label || '', x + PAD, cy + 2); cy += 18
   const colors = item.colors || []
   const sw = Math.min(60, (w - PAD * 2 - (colors.length - 1) * 4) / Math.max(colors.length, 1))
-  const sh = h - PAD * 2 - 44
+  const maxBot = y + h - PAD - 14
+  const sh = Math.max(20, maxBot - cy - 14)
   for (let i = 0; i < colors.length; i++) {
     const sx = x + PAD + i * (sw + 4)
-    ctx.fillStyle = colors[i].hex || '#000'; ctx.beginPath(); roundRect(ctx, sx, y + PAD + 32, sw, sh, 4); ctx.fill()
-    ctx.fillStyle = txtSecondary(); ctx.font = `${8}px Inter, sans-serif`; ctx.textAlign = 'center'
-    ctx.fillText(colors[i].hex || '', sx + sw / 2, y + PAD + 32 + sh + 12); ctx.textAlign = 'start'
+    ctx.fillStyle = colors[i].hex || '#000'; ctx.beginPath(); roundRect(ctx, sx, cy, sw, sh, 4); ctx.fill()
+    if (cy + sh + 12 < maxBot) {
+      ctx.fillStyle = txtSecondary(); ctx.font = '8px Inter, sans-serif'; ctx.textAlign = 'center'
+      ctx.fillText(colors[i].hex || '', sx + sw / 2, cy + sh + 12); ctx.textAlign = 'start'
+    }
   }
 }
 
 function drawGradientItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('GRADIENT', x + PAD, y + PAD + 9)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24)
+  let cy = y + PAD
+  ctx.fillStyle = accent(); ctx.font = '600 9px Inter, sans-serif'; ctx.fillText('GRADIENT', x + PAD, cy + 9); cy += 20
+  ctx.fillStyle = txtPrimary(); ctx.font = '500 12px Inter, sans-serif'; ctx.fillText(item.label || '', x + PAD, cy + 2); cy += 18
   const stops = item.stops || []
   if (stops.length >= 2) {
     const dir = (item.direction || 90) * Math.PI / 180
-    const bx = x + PAD; const by = y + PAD + 32; const bw = w - PAD * 2; const bh = h - PAD * 2 - 36
-    const grad = ctx.createLinearGradient(bx + bw / 2 - Math.cos(dir) * bw / 2, by + bh / 2 - Math.sin(dir) * bh / 2, bx + bw / 2 + Math.cos(dir) * bw / 2, by + bh / 2 + Math.sin(dir) * bh / 2)
-    for (const s of stops) grad.addColorStop(Math.max(0, Math.min(1, s.position)), s.color)
-    ctx.fillStyle = grad; ctx.beginPath(); roundRect(ctx, bx, by, bw, bh, 6); ctx.fill()
+    const bx = x + PAD; const by = cy; const bw = w - PAD * 2; const bh = y + h - PAD - cy
+    if (bh > 10) {
+      const grad = ctx.createLinearGradient(bx + bw / 2 - Math.cos(dir) * bw / 2, by + bh / 2 - Math.sin(dir) * bh / 2, bx + bw / 2 + Math.cos(dir) * bw / 2, by + bh / 2 + Math.sin(dir) * bh / 2)
+      for (const s of stops) grad.addColorStop(Math.max(0, Math.min(1, s.position)), s.color)
+      ctx.fillStyle = grad; ctx.beginPath(); roundRect(ctx, bx, by, bw, bh, 6); ctx.fill()
+    }
   }
 }
 
 function drawFontItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
   const ff = item.fontFamily || 'Inter'; loadFont(ff)
-  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('FONT', x + PAD, y + PAD + 9)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${11}px Inter, sans-serif`; ctx.fillText(ff, x + PAD, y + PAD + 24)
+  let cy = y + PAD
+  ctx.fillStyle = accent(); ctx.font = '600 9px Inter, sans-serif'; ctx.fillText('FONT', x + PAD, cy + 9); cy += 20
+  ctx.fillStyle = txtPrimary(); ctx.font = '500 11px Inter, sans-serif'; ctx.fillText(ff, x + PAD, cy + 2); cy += 20
   const sample = item.sampleText || 'The quick brown fox'
-  const sizes = [24, 16, 12]; let ty = y + PAD + 44
+  const sizes = [24, 16, 12]
+  const maxBot = y + h - PAD
   for (const size of sizes) {
+    if (cy + size > maxBot) break
     ctx.fillStyle = txtPrimary(); ctx.font = `400 ${size}px "${ff}", sans-serif`
-    ctx.fillText(sample.slice(0, 40), x + PAD, ty); ty += size + 8; if (ty > y + h - PAD) break
+    ctx.fillText(sample.slice(0, 40), x + PAD, cy + size)
+    cy += size + 8
   }
 }
 
 function drawSwatchItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
-  const bh = h * 0.55
-  ctx.fillStyle = item.hex || '#000'; ctx.beginPath(); roundRect(ctx, x + PAD, y + PAD, w - PAD * 2, bh, 6); ctx.fill()
-  ctx.fillStyle = txtPrimary(); ctx.font = `600 ${13}px Inter, sans-serif`; ctx.fillText(item.name || item.hex, x + PAD, y + PAD + bh + 18)
-  ctx.fillStyle = txtSecondary(); ctx.font = `${11}px Inter, sans-serif`; ctx.fillText(item.hex, x + PAD, y + PAD + bh + 34)
-  if (item.usage) { ctx.fillStyle = txtMuted(); ctx.font = `${10}px Inter, sans-serif`; wrapText(ctx, item.usage, x + PAD, y + PAD + bh + 50, w - PAD * 2, 14, h - PAD - bh - 54) }
+  const maxBot = y + h - PAD
+  const colorH = Math.max(40, (maxBot - y - PAD) * 0.5)
+  let cy = y + PAD
+  ctx.fillStyle = item.hex || '#000'; ctx.beginPath(); roundRect(ctx, x + PAD, cy, w - PAD * 2, colorH, 6); ctx.fill()
+  cy += colorH + 12
+  if (cy + 14 < maxBot) {
+    ctx.fillStyle = txtPrimary(); ctx.font = '600 13px Inter, sans-serif'
+    ctx.fillText(item.name || item.hex, x + PAD, cy); cy += 16
+  }
+  if (cy + 14 < maxBot) {
+    ctx.fillStyle = txtSecondary(); ctx.font = '11px Inter, sans-serif'
+    ctx.fillText(item.hex, x + PAD, cy); cy += 16
+  }
+  if (item.usage && cy < maxBot) {
+    ctx.fillStyle = txtMuted(); ctx.font = '10px Inter, sans-serif'
+    wrapText(ctx, item.usage, x + PAD, cy, w - PAD * 2, 14, maxBot - cy)
+  }
 }
 
 function drawSizeGuideItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('SIZE', x + PAD, y + PAD + 9)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24)
-  const mw = w - PAD * 2; const mh = h - PAD * 2 - 48; const aspect = (item.width || 1) / (item.height || 1)
+  let cy = y + PAD
+  ctx.fillStyle = accent(); ctx.font = '600 9px Inter, sans-serif'; ctx.fillText('SIZE', x + PAD, cy + 9); cy += 20
+  ctx.fillStyle = txtPrimary(); ctx.font = '500 12px Inter, sans-serif'; ctx.fillText(item.label || '', x + PAD, cy + 2); cy += 20
+  const maxBot = y + h - PAD
+  const mw = w - PAD * 2; const mh = Math.max(20, maxBot - cy - 26); const aspect = (item.width || 1) / (item.height || 1)
   let bw = mw * 0.8; let bh = bw / aspect; if (bh > mh) { bh = mh; bw = bh * aspect }
-  const cx = x + PAD + (mw - bw) / 2; const by = y + PAD + 34
-  ctx.strokeStyle = '#00fff0'; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4 / zoom, 3 / zoom]); ctx.strokeRect(cx, by, bw, bh); ctx.setLineDash([])
-  ctx.fillStyle = accent(); ctx.font = `${10}px Inter, sans-serif`; ctx.textAlign = 'center'
-  ctx.fillText(`${item.width}${item.unit}`, cx + bw / 2, by + bh + 14)
-  ctx.save(); ctx.translate(cx - 8, by + bh / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(`${item.height}${item.unit}`, 0, 0); ctx.restore()
-  ctx.fillStyle = txtMuted(); ctx.font = `${9}px Inter, sans-serif`; ctx.fillText(item.orientation, cx + bw / 2, by + bh + 26); ctx.textAlign = 'start'
+  const cx = x + PAD + (mw - bw) / 2
+  ctx.strokeStyle = '#8b7dc8'; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4 / zoom, 3 / zoom]); ctx.strokeRect(cx, cy, bw, bh); ctx.setLineDash([])
+  ctx.fillStyle = accent(); ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center'
+  ctx.fillText(`${item.width}${item.unit}`, cx + bw / 2, cy + bh + 14)
+  ctx.save(); ctx.translate(cx - 8, cy + bh / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(`${item.height}${item.unit}`, 0, 0); ctx.restore()
+  if (cy + bh + 26 < maxBot) {
+    ctx.fillStyle = txtMuted(); ctx.font = '9px Inter, sans-serif'
+    ctx.fillText(item.orientation, cx + bw / 2, cy + bh + 26); ctx.textAlign = 'start'
+  }
 }
 
 function drawContainerItem(ctx: CanvasRenderingContext2D, item: ContainerItem, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = '#059669'; ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('CONTAINER', x + PAD, y + PAD + 9)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24)
-  ctx.fillStyle = txtMuted(); ctx.font = `${10}px Inter, sans-serif`
+  let cy = y + PAD
+  ctx.fillStyle = '#4a9e6e'; ctx.font = '600 9px Inter, sans-serif'; ctx.fillText('CONTAINER', x + PAD, cy + 9); cy += 20
+  ctx.fillStyle = txtPrimary(); ctx.font = '500 12px Inter, sans-serif'; ctx.fillText(item.label || '', x + PAD, cy + 2); cy += 18
   const childCount = item.children?.length || 0
-  ctx.fillText(`${childCount} items · ${item.layout}${item.collapsed ? ' · collapsed' : ''}`, x + PAD, y + PAD + 40)
-
-  const iconX = x + w - PAD - 16
-  const iconY = y + PAD + 4
+  ctx.fillStyle = txtMuted(); ctx.font = '10px Inter, sans-serif'
+  ctx.fillText(`${childCount} items · ${item.layout}${item.collapsed ? ' · collapsed' : ''}`, x + PAD, cy); cy += 16
+  const iconX = x + w - PAD - 16; const iconY = y + PAD + 4
   ctx.strokeStyle = txtMuted(); ctx.lineWidth = 1.5 / zoom
   ctx.beginPath()
   if (item.collapsed) {
@@ -1518,38 +1549,32 @@ function drawContainerItem(ctx: CanvasRenderingContext2D, item: ContainerItem, x
     ctx.moveTo(iconX + 6, iconY); ctx.lineTo(iconX + 6, iconY + 12)
   }
   ctx.stroke()
-
-  if (!item.collapsed && item.children?.length) {
-    const previewY = y + PAD + 52
-    const previewH = h - PAD * 2 - 56
+  const maxBot = y + h - PAD
+  if (!item.collapsed && item.children?.length && cy < maxBot) {
+    const previewH = maxBot - cy
     const cols = Math.max(1, Math.min(4, Math.floor((w - PAD * 2) / 64)))
     const cellW = (w - PAD * 2 - (cols - 1) * 4) / cols
     const cellH = Math.min(40, previewH / Math.ceil(item.children.length / cols))
     for (let i = 0; i < item.children.length; i++) {
       const child = item.children[i]
-      const col = i % cols
-      const row = Math.floor(i / cols)
-      const cx = x + PAD + col * (cellW + 4)
-      const cy = previewY + row * (cellH + 4)
+      const col = i % cols; const row = Math.floor(i / cols)
+      const ccx = x + PAD + col * (cellW + 4); const ccy = cy + row * (cellH + 4)
+      if (ccy + cellH > maxBot) break
       const ccolor = KIND_COLORS[child.kind] || accent()
-      ctx.fillStyle = ccolor + '22'; ctx.strokeStyle = ccolor
-      ctx.lineWidth = 0.5 / zoom
-      ctx.beginPath(); roundRect(ctx, cx, cy, cellW, cellH, 3); ctx.fill(); ctx.stroke()
-      ctx.fillStyle = ccolor
-      ctx.font = `600 ${6}px Inter, sans-serif`
-      ctx.fillText(child.kind.toUpperCase(), cx + 4, cy + 10)
+      ctx.fillStyle = ccolor + '22'; ctx.strokeStyle = ccolor; ctx.lineWidth = 0.5 / zoom
+      ctx.beginPath(); roundRect(ctx, ccx, ccy, cellW, cellH, 3); ctx.fill(); ctx.stroke()
+      ctx.fillStyle = ccolor; ctx.font = '600 6px Inter, sans-serif'
+      ctx.fillText(child.kind.toUpperCase(), ccx + 4, ccy + 10)
       let preview = ''
       if ('text' in (child as any)) preview = (child as any).text?.slice(0, 20) || ''
       else if ('description' in (child as any)) preview = (child as any).description?.slice(0, 20) || ''
       else if ('url' in (child as any)) preview = (child as any).url?.slice(0, 20) || ''
-      else if ('raw' in (child as any)) preview = (child as any).raw?.slice(0, 20) || ''
-      ctx.fillStyle = txtSecondary()
-      ctx.font = `${8}px Inter, sans-serif`
-      ctx.fillText(preview, cx + 4, cy + 22)
+      ctx.fillStyle = txtSecondary(); ctx.font = '8px Inter, sans-serif'
+      ctx.fillText(preview, ccx + 4, ccy + 22)
     }
-  } else if (item.collapsed || !item.children?.length) {
-    ctx.fillStyle = txtMuted(); ctx.font = `${9}px Inter, sans-serif`
-    if (childCount === 0) ctx.fillText('Empty — drag items here or add via chat', x + PAD, y + PAD + 56)
+  } else if (childCount === 0 && cy < maxBot) {
+    ctx.fillStyle = txtMuted(); ctx.font = '9px Inter, sans-serif'
+    ctx.fillText('Empty — drag items here or add via chat', x + PAD, cy)
   }
 }
 
@@ -1558,75 +1583,59 @@ function drawLinkItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: nu
   let domain = ''
   try { domain = new URL(url).hostname.replace('www.', '') } catch {}
   const title = item.title || domain || 'Link'
-  const summary = item.summary || item.description || url
-
-  ctx.fillStyle = accent(); ctx.font = HEADER_FONT; ctx.fillText('LINK', x + PAD, y + PAD + 9)
-  ctx.fillStyle = txtPrimary(); ctx.font = `600 13px Inter, sans-serif`
-  ctx.fillText(title.slice(0, 40), x + PAD, y + PAD + 26)
-
-  if (domain) {
-    ctx.fillStyle = txtMuted(); ctx.font = SMALL_FONT
-    ctx.fillText(domain, x + PAD, y + PAD + 40)
+  const summary = item.summary || item.description || ''
+  const maxBot = y + h - PAD
+  let cy = y + PAD
+  ctx.fillStyle = accent(); ctx.font = '600 9px Inter, sans-serif'; ctx.fillText('LINK', x + PAD, cy + 9); cy += 20
+  ctx.fillStyle = txtPrimary(); ctx.font = '600 13px Inter, sans-serif'
+  ctx.fillText(title.slice(0, 40), x + PAD, cy + 2); cy += 18
+  if (domain && cy < maxBot) {
+    ctx.fillStyle = txtMuted(); ctx.font = '8px Inter, sans-serif'
+    ctx.fillText(domain, x + PAD, cy); cy += 14
   }
-
-  if (summary) {
-    ctx.fillStyle = txtSecondary(); ctx.font = BODY_FONT
-    wrapText(ctx, summary.slice(0, 120), x + PAD, y + PAD + 54, w - PAD * 2, 14, h - PAD - 58)
+  if (summary && cy < maxBot) {
+    ctx.fillStyle = txtSecondary(); ctx.font = '10px Inter, sans-serif'
+    wrapText(ctx, summary.slice(0, 120), x + PAD, cy, w - PAD * 2, 14, maxBot - cy)
   }
-
-  // URL bar at bottom
-  ctx.fillStyle = isDark() ? 'rgba(0,255,240,0.06)' : 'rgba(0,0,0,0.03)'
-  ctx.fillRect(x + PAD, y + h - PAD - 16, w - PAD * 2, 16)
-  ctx.fillStyle = txtMuted(); ctx.font = `${8}px Inter, sans-serif`
-  ctx.fillText(url.slice(0, 50) + (url.length > 50 ? '…' : ''), x + PAD + 4, y + h - PAD - 5)
+  if (url) {
+    ctx.fillStyle = isDark() ? 'rgba(139,125,200,0.06)' : 'rgba(0,0,0,0.03)'
+    ctx.fillRect(x + PAD, maxBot - 14, w - PAD * 2, 14)
+    ctx.fillStyle = txtMuted(); ctx.font = '8px Inter, sans-serif'
+    ctx.fillText(url.slice(0, 50) + (url.length > 50 ? '…' : ''), x + PAD + 4, maxBot - 3)
+  }
 }
 
 function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
   const label = item.kind.charAt(0).toUpperCase() + item.kind.slice(1).toLowerCase()
   const text = item.text || item.raw || item.content || ''
   const purpose = item.purpose || ''
-  const summary = [item.purpose, item.importance].filter(Boolean).join(' · ')
-
-  // Layout: label → text → purpose → summary → tags (top to bottom, no overlap)
+  const tags = ('tags' in item && item.tags?.length) ? asArray(item.tags) : []
+  const maxBot = y + h - PAD
   let cy = y + PAD
-
-  // Kind label
-  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`
-  ctx.fillText(label, x + PAD, cy + 9)
-  cy += 22
-
-  // Main content
-  if (text.length > 0) {
+  ctx.fillStyle = accent(); ctx.font = '600 9px Inter, sans-serif'
+  ctx.fillText(label, x + PAD, cy + 9); cy += 22
+  const purposeReserve = purpose ? 16 : 0
+  const tagsReserve = tags.length > 0 ? 14 : 0
+  const contentMaxBot = maxBot - purposeReserve - tagsReserve
+  if (text.length > 0 && cy < contentMaxBot) {
     ctx.fillStyle = txtPrimary()
-    if (text.length > 80 || text.includes('\n')) {
-      ctx.font = `400 ${10}px Inter, sans-serif`
-      wrapText(ctx, text, x + PAD, cy, w - PAD * 2, 14, h - (cy - y) - PAD - (summary ? 20 : 0) - (purpose ? 16 : 0))
-      cy += Math.min(Math.ceil(text.length / 30) * 14, h - (cy - y) - PAD - 36)
+    if (text.length > 60 || text.includes('\n')) {
+      ctx.font = '400 10px Inter, sans-serif'
+      wrapText(ctx, text, x + PAD, cy, w - PAD * 2, 14, contentMaxBot - cy)
+      const lineCount = Math.min(Math.ceil(text.length / 35), Math.floor((contentMaxBot - cy) / 14))
+      cy += Math.max(14, lineCount * 14)
     } else {
-      ctx.font = text.length > 30 ? `500 ${9}px Inter, sans-serif` : `500 ${10}px Inter, sans-serif`
-      ctx.fillText(text.slice(0, 80), x + PAD, cy)
-      cy += text.length > 30 ? 14 : 14
+      ctx.font = '500 10px Inter, sans-serif'
+      ctx.fillText(text.slice(0, 80), x + PAD, cy); cy += 14
     }
   }
-
-  // Purpose
-  if (purpose && cy < y + h - PAD - 20) {
-    ctx.fillStyle = txtMuted(); ctx.font = `500 ${8}px Inter, sans-serif`
-    ctx.fillText(purpose.slice(0, 50), x + PAD, cy + 2)
-    cy += 14
+  if (purpose && cy < maxBot - tagsReserve) {
+    ctx.fillStyle = txtMuted(); ctx.font = '500 8px Inter, sans-serif'
+    ctx.fillText(purpose.slice(0, 50), x + PAD, cy); cy += 14
   }
-
-  // Summary (purpose + importance)
-  if (summary && cy < y + h - PAD - 12 && !purpose) {
-    ctx.fillStyle = txtMuted(); ctx.font = `400 ${8}px Inter, sans-serif`
-    wrapText(ctx, summary.slice(0, 80), x + PAD, cy, w - PAD * 2, 12, h - (cy - y) - PAD)
-  }
-
-  // Tags at bottom
-  if ('tags' in item && item.tags?.length) {
-    const tags = asArray(item.tags)
-    ctx.fillStyle = txtMuted(); ctx.font = `400 ${8}px Inter, sans-serif`
-    ctx.fillText(tags.slice(0, 3).join(', '), x + PAD, y + h - PAD + 2)
+  if (tags.length > 0) {
+    ctx.fillStyle = txtMuted(); ctx.font = '400 8px Inter, sans-serif'
+    ctx.fillText(tags.slice(0, 3).join(', '), x + PAD, maxBot + 2)
   }
 }
 
