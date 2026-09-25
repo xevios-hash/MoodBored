@@ -190,17 +190,17 @@ export function SettingsModal() {
                   onClick={() => updateSettings({ canvasBgType: 'color' })}
                   className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-fast border ${
                     (settings.canvasBgType || 'color') === 'color'
-                      ? 'bg-[#00fff0] text-[#08000f] border-accent'
+                      ? 'bg-[#7c6cbf] text-white border-accent'
                       : 'bg-surface-2 border-surface-4 text-text-secondary'
                   }`}
                 >
                   Color
                 </button>
                 <button
-                  onClick={() => updateSettings({ canvasBgType: 'video' })}
+                  onClick={() => updateSettings({ canvasBgType: 'video', canvasBgVideo: settings.canvasBgVideo || '/sky-day.mp4' })}
                   className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-fast border ${
                     settings.canvasBgType === 'video'
-                      ? 'bg-[#00fff0] text-[#08000f] border-accent'
+                      ? 'bg-[#7c6cbf] text-white border-accent'
                       : 'bg-surface-2 border-surface-4 text-text-secondary'
                   }`}
                 >
@@ -252,7 +252,7 @@ export function SettingsModal() {
                         onClick={() => updateSettings({ canvasBgVideo: bg.url })}
                         className={`px-3 py-2 rounded-lg text-xs font-medium transition-fast border ${
                           settings.canvasBgVideo === bg.url
-                            ? 'bg-[#00fff0] text-[#08000f] border-accent'
+                            ? 'bg-[#7c6cbf] text-white border-accent'
                             : 'bg-surface-2 border-surface-4 text-text-secondary'
                         }`}
                       >
@@ -269,8 +269,11 @@ export function SettingsModal() {
                       className="input flex-1 text-xs"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && e.currentTarget.value) {
-                          const url = e.currentTarget.value
-                          updateSettings({ customBgUrls: [...(settings.customBgUrls || []), url], canvasBgVideo: url })
+                          const url = e.currentTarget.value.trim()
+                          if (!url) return
+                          const existing = settings.customBgUrls || []
+                          if (existing.includes(url)) { e.currentTarget.value = ''; return }
+                          updateSettings({ customBgUrls: [...existing, url], canvasBgVideo: url })
                           e.currentTarget.value = ''
                         }
                       }}
@@ -280,7 +283,14 @@ export function SettingsModal() {
                       onClick={(e) => {
                         const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement
                         if (input?.value) {
-                          updateSettings({ customBgUrls: [...(settings.customBgUrls || []), input.value], canvasBgVideo: input.value })
+                          const url = input.value.trim()
+                          if (!url) return
+                          const existing = settings.customBgUrls || []
+                          if (!existing.includes(url)) {
+                            updateSettings({ customBgUrls: [...existing, url], canvasBgVideo: url })
+                          } else {
+                            updateSettings({ canvasBgVideo: url })
+                          }
                           input.value = ''
                         }
                       }}

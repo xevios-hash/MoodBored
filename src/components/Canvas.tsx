@@ -5,18 +5,53 @@ import { loadFont } from '@/lib/fonts'
 import { showToast } from '@/lib/toasts'
 import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner } from '@/types'
 
+// ─── Item Creation Defaults ─────────────────────────────────────────
+// Shared between the floating toolbar and the right-click context menu.
+
+const ITEM_TYPES = [
+  { kind: 'note', icon: '📝', label: 'Note', key: 'N' },
+  { kind: 'text', icon: '📄', label: 'Text', key: 'T' },
+  { kind: 'image', icon: '🖼️', label: 'Image', key: 'I' },
+  { kind: 'link', icon: '🔗', label: 'Link', key: 'L' },
+  { kind: 'palette', icon: '🎨', label: 'Palette', key: 'P' },
+  { kind: 'gradient', icon: '🌈', label: 'Gradient', key: 'G' },
+  { kind: 'font', icon: '🔤', label: 'Font', key: 'F' },
+  { kind: 'swatch', icon: '🟧', label: 'Color', key: 'C' },
+  { kind: 'sizeguide', icon: '📐', label: 'Size', key: null },
+  { kind: 'container', icon: '📦', label: 'Group', key: null },
+  { kind: 'video', icon: '🎬', label: 'Video', key: 'V' },
+]
+
+function createDefaultItem(kind: string, pos: Position): BoardItem {
+  const cx = pos.x, cy = pos.y
+  const defaults: Record<string, any> = {
+    note: { kind: 'note', id: crypto.randomUUID(), text: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy } },
+    text: { kind: 'text', id: crypto.randomUUID(), raw: '', pos: { x: cx, y: cy }, size: { w: 300, h: 200 } },
+    image: { kind: 'image', id: crypto.randomUUID(), thumbnail: '', fullSource: '', description: '', source: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 300, h: 200 } },
+    link: { kind: 'link', id: crypto.randomUUID(), url: '', title: '', summary: '', description: '', purpose: '', importance: '', source: '', tags: [], pos: { x: cx, y: cy } },
+    palette: { kind: 'palette', id: crypto.randomUUID(), label: 'New Palette', colors: [{ hex: '#ff7eb3', label: '' }, { hex: '#7c6cbf', label: '' }, { hex: '#fff07a', label: '' }], purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 120 } },
+    gradient: { kind: 'gradient', id: crypto.randomUUID(), label: 'New Gradient', stops: [{ position: 0, color: '#ff7eb3' }, { position: 1, color: '#7c6cbf' }], direction: 90, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 300, h: 80 } },
+    font: { kind: 'font', id: crypto.randomUUID(), fontFamily: 'Inter', weights: [400, 700], sampleText: 'The quick brown fox', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 160 } },
+    swatch: { kind: 'swatch', id: crypto.randomUUID(), hex: '#7c6cbf', name: '', usage: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 160, h: 180 } },
+    sizeguide: { kind: 'sizeguide', id: crypto.randomUUID(), width: 1920, height: 1080, unit: 'px', label: '', orientation: 'landscape', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 200, h: 160 } },
+    container: { kind: 'container', id: crypto.randomUUID(), label: 'New Group', children: [], layout: 'free', gap: 8, collapsed: false, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 400, h: 300 } },
+    video: { kind: 'video', id: crypto.randomUUID(), source: '', sourceUrl: '', startTs: 0, duration: 0, subjectDesc: '', motionDesc: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 240 } },
+  }
+  return defaults[kind] || defaults.note
+}
+
 // ─── Theme ──────────────────────────────────────────────────────────
 
 function isDark() { return document.body.classList.contains('dark') }
-function gridColor() { return isDark() ? 'rgba(0,255,240,0.04)' : 'rgba(0,0,0,0.06)' }
-function crosshairColor() { return isDark() ? 'rgba(0,255,240,0.25)' : 'rgba(0,148,136,0.3)' }
-function cardBg(sel: boolean) { return isDark() ? (sel ? '#1a0040' : '#1a0030') : (sel ? '#e8fcfa' : '#ffffff') }
-function cardBorder(sel: boolean) { return isDark() ? (sel ? 'rgba(0,255,240,0.5)' : 'rgba(0,255,240,0.08)') : (sel ? 'rgba(0,180,170,0.5)' : 'rgba(0,0,0,0.06)') }
-function txtPrimary() { return isDark() ? '#f0eaff' : '#1a0030' }
-function txtSecondary() { return isDark() ? '#b8a8d8' : '#6b5a8a' }
+function gridColor() { return isDark() ? 'rgba(124,108,191,0.06)' : 'rgba(0,0,0,0.06)' }
+function crosshairColor() { return isDark() ? 'rgba(124,108,191,0.2)' : 'rgba(100,80,160,0.25)' }
+function cardBg(sel: boolean) { return isDark() ? (sel ? '#1a1030' : '#150f24') : (sel ? '#f0ecfa' : '#ffffff') }
+function cardBorder(sel: boolean) { return isDark() ? (sel ? 'rgba(124,108,191,0.4)' : 'rgba(160,140,220,0.08)') : (sel ? 'rgba(100,80,160,0.4)' : 'rgba(0,0,0,0.06)') }
+function txtPrimary() { return isDark() ? '#e8e0f5' : '#1a1028' }
+function txtSecondary() { return isDark() ? '#a898c8' : '#6b5a8a' }
 function txtMuted() { return isDark() ? '#7a6a9a' : '#9a8aba' }
-function accent() { return isDark() ? '#00fff0' : '#00b4aa' }
-function shadow(sel: boolean) { return isDark() ? (sel ? 'rgba(0,255,240,0.25)' : 'rgba(0,0,0,0.5)') : (sel ? 'rgba(0,180,170,0.2)' : 'rgba(0,0,0,0.1)') }
+function accent() { return isDark() ? '#7c6cbf' : '#6a5aae' }
+function shadow(sel: boolean) { return isDark() ? (sel ? 'rgba(124,108,191,0.2)' : 'rgba(0,0,0,0.4)') : (sel ? 'rgba(100,80,160,0.15)' : 'rgba(0,0,0,0.08)') }
 
 // ─── LRU Image Cache (max 200) ─────────────────────────────────────
 
@@ -53,12 +88,12 @@ function getImage(url: string): HTMLImageElement | null {
 // ─── Constants ──────────────────────────────────────────────────────
 
 const PORT_RADIUS = 5
-const PORT_COLORS: Record<string, string> = { data: '#00bfff', visual: '#bf5fff', reference: '#00ff88', any: '#8888aa' }
-const CONNECTOR_COLORS: Record<ConnectorOwner, string> = { user: '#00bfff', llm: '#ff2d78', objective: '#ffe600' }
+const PORT_COLORS: Record<string, string> = { data: '#6aa8d8', visual: '#a888d8', reference: '#78c8a0', any: '#8888aa' }
+const CONNECTOR_COLORS: Record<ConnectorOwner, string> = { user: '#6aa8d8', llm: '#ff7eb3', objective: '#c8b860' }
 const KIND_COLORS: Record<string, string> = {
-  text: '#00fff0', note: '#ffe600', image: '#ff2d78', link: '#00bfff',
-  video: '#bf5fff', palette: '#00ff88', gradient: '#ff8844', font: '#ff5599',
-  swatch: '#88ddff', sizeguide: '#aaaaaa', container: '#00ff88', connector: '#666688',
+  text: '#7c6cbf', note: '#e8b840', image: '#ff7eb3', link: '#6aa8d8',
+  video: '#a888d8', palette: '#78c8a0', gradient: '#e89060', font: '#d87898',
+  swatch: '#78b8d8', sizeguide: '#999999', container: '#78c8a0', connector: '#666688',
 }
 const RESIZE_HANDLE_SIZE = 8
 
@@ -602,6 +637,23 @@ export function Canvas() {
           }
         }).catch(() => {})
       }
+
+      // ─── Single-key shortcuts (only when not typing) ───────────
+      // Create items at canvas center
+      const cx = -s.canvas.panX / s.canvas.zoom + 400
+      const cy = -s.canvas.panY / s.canvas.zoom + 300
+      if (e.key === 'n' || e.key === 'N') { s.addItem(createDefaultItem('note', { x: cx + Math.random() * 100, y: cy + Math.random() * 100 })); e.preventDefault() }
+      if (e.key === 't' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('text', { x: cx, y: cy })); e.preventDefault() }
+      if (e.key === 'i' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('image', { x: cx, y: cy })); e.preventDefault() }
+      if (e.key === 'l' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('link', { x: cx, y: cy })); e.preventDefault() }
+      if (e.key === 'p' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('palette', { x: cx, y: cy })); e.preventDefault() }
+      if (e.key === 'g' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('gradient', { x: cx, y: cy })); e.preventDefault() }
+      if (e.key === 'f' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('font', { x: cx, y: cy })); e.preventDefault() }
+      if (e.key === 'v' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('video', { x: cx, y: cy })); e.preventDefault() }
+      // Zoom shortcuts
+      if (e.key === '=' || e.key === '+') { s.setZoom(s.canvas.zoom * 1.2); e.preventDefault() }
+      if (e.key === '-') { s.setZoom(s.canvas.zoom * 0.8); e.preventDefault() }
+      if (e.key === '0') { s.setZoom(1); s.setPan(0, 0); e.preventDefault() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -802,14 +854,11 @@ export function Canvas() {
   // YouTube detection — returns embed URL or null
   function getYouTubeEmbedUrl(url: string): string | null {
     if (!url) return null
-    const patterns = [
-      /(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
-    ]
-    for (const p of patterns) {
-      const m = url.match(p)
-      if (m) return `https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&mute=1&loop=1&playlist=${m[1]}&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&playsinline=1&disablekb=1&fs=0&color=white`
-    }
-    return null
+    // Match v= parameter anywhere in query string, or youtu.be short URL
+    const m = url.match(/(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/)
+    if (!m) return null
+    const id = m[1]
+    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1&fs=0&iv_load_policy=3`
   }
 
   const ytEmbed = getYouTubeEmbedUrl(bgVideo)
@@ -884,19 +933,7 @@ export function Canvas() {
       <div className="add-toolbar">
         {addToolbarOpen && (
           <div className="add-toolbar-items">
-            {[
-              { kind: 'note', icon: '📝', label: 'Note' },
-              { kind: 'text', icon: '📄', label: 'Text' },
-              { kind: 'image', icon: '🖼️', label: 'Image' },
-              { kind: 'link', icon: '🔗', label: 'Link' },
-              { kind: 'palette', icon: '🎨', label: 'Palette' },
-              { kind: 'gradient', icon: '🌈', label: 'Gradient' },
-              { kind: 'font', icon: '🔤', label: 'Font' },
-              { kind: 'swatch', icon: '🟧', label: 'Color' },
-              { kind: 'sizeguide', icon: '📐', label: 'Size' },
-              { kind: 'container', icon: '📦', label: 'Group' },
-              { kind: 'video', icon: '🎬', label: 'Video' },
-            ].map(({ kind, icon, label }) => (
+            {ITEM_TYPES.map(({ kind, icon, label }) => (
               <button
                 key={kind}
                 className="add-toolbar-item"
@@ -905,20 +942,7 @@ export function Canvas() {
                   const state = useStore.getState()
                   const cx = -state.canvas.panX / state.canvas.zoom + 400
                   const cy = -state.canvas.panY / state.canvas.zoom + 300
-                  const defaults: Record<string, any> = {
-                    note: { kind: 'note', id: crypto.randomUUID(), text: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy } },
-                    text: { kind: 'text', id: crypto.randomUUID(), raw: '', pos: { x: cx, y: cy }, size: { w: 300, h: 200 } },
-                    image: { kind: 'image', id: crypto.randomUUID(), thumbnail: '', fullSource: '', description: '', source: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 300, h: 200 } },
-                    link: { kind: 'link', id: crypto.randomUUID(), url: '', title: '', summary: '', description: '', purpose: '', importance: '', source: '', tags: [], pos: { x: cx, y: cy } },
-                    palette: { kind: 'palette', id: crypto.randomUUID(), label: 'New Palette', colors: [{ hex: '#ff2d78', label: '' }, { hex: '#00fff0', label: '' }, { hex: '#ffe600', label: '' }], purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 120 } },
-                    gradient: { kind: 'gradient', id: crypto.randomUUID(), label: 'New Gradient', stops: [{ position: 0, color: '#ff2d78' }, { position: 1, color: '#00fff0' }], direction: 90, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 300, h: 80 } },
-                    font: { kind: 'font', id: crypto.randomUUID(), fontFamily: 'Inter', weights: [400, 700], sampleText: 'The quick brown fox', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 160 } },
-                    swatch: { kind: 'swatch', id: crypto.randomUUID(), hex: '#00fff0', name: '', usage: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 160, h: 180 } },
-                    sizeguide: { kind: 'sizeguide', id: crypto.randomUUID(), width: 1920, height: 1080, unit: 'px', label: '', orientation: 'landscape', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 200, h: 160 } },
-                    container: { kind: 'container', id: crypto.randomUUID(), label: 'New Group', children: [], layout: 'free', gap: 8, collapsed: false, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 400, h: 300 } },
-                    video: { kind: 'video', id: crypto.randomUUID(), source: '', sourceUrl: '', startTs: 0, duration: 0, subjectDesc: '', motionDesc: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 240 } },
-                  }
-                  state.addItem(defaults[kind] || defaults.note)
+                  state.addItem(createDefaultItem(kind, { x: cx, y: cy }))
                   setAddToolbarOpen(false)
                 }}
               >
@@ -1002,22 +1026,37 @@ export function Canvas() {
       {contextMenu && (
         <div
           className="glass-card"
-          style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 100, padding: 4, minWidth: 160 }}
+          style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 100, padding: 4, minWidth: 180 }}
           onMouseLeave={() => setContextMenu(null)}
         >
-          {contextMenu.itemId ? (
+          {/* Add item section */}
+          <div className="px-2 py-1 text-2xs font-semibold text-text-muted uppercase tracking-wider">Add Item</div>
+          {ITEM_TYPES.map(({ kind, icon, label }) => (
+            <CtxItem
+              key={kind}
+              label={`${icon}  ${label}`}
+              onClick={() => {
+                const state = useStore.getState()
+                state.addItem(createDefaultItem(kind, { x: contextMenu.wx, y: contextMenu.wy }))
+                setContextMenu(null)
+              }}
+            />
+          ))}
+          {contextMenu.itemId && (
             <>
+              <div className="status-divider" style={{ margin: '4px 0' }} />
+              <div className="px-2 py-1 text-2xs font-semibold text-text-muted uppercase tracking-wider">Actions</div>
               <CtxItem label="Duplicate" shortcut="⌘C ⌘V" onClick={() => handleContextAction('duplicate')} />
               <CtxItem label="Bring to Front" onClick={() => handleContextAction('bring-front')} />
               <CtxItem label="Send to Back" onClick={() => handleContextAction('send-back')} />
               <div className="status-divider" style={{ margin: '4px 0' }} />
               <CtxItem label="Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
-              <div className="status-divider" style={{ margin: '4px 0' }} />
               <CtxItem label="Delete" shortcut="⌫" onClick={() => handleContextAction('delete')} danger />
             </>
-          ) : (
+          )}
+          {!contextMenu.itemId && (
             <>
-              <CtxItem label="New Note Here" onClick={() => handleContextAction('new-note')} />
+              <div className="status-divider" style={{ margin: '4px 0' }} />
               <CtxItem label="Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
             </>
           )}
@@ -1162,9 +1201,9 @@ function drawPorts(ctx: CanvasRenderingContext2D, item: BoardItem, zoom: number)
     ctx.beginPath(); ctx.arc(pos.x, pos.y, PORT_RADIUS / zoom, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
     ctx.fillStyle = color
     ctx.beginPath(); ctx.arc(pos.x, pos.y, (PORT_RADIUS - 2) / zoom, 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = txtSecondary(); ctx.font = `${8 / zoom}px Inter, sans-serif`
+    ctx.fillStyle = txtSecondary(); ctx.font = `${8}px Inter, sans-serif`
     ctx.textAlign = port.direction === 'input' ? 'left' : 'right'
-    ctx.fillText(port.name, pos.x + (port.direction === 'input' ? 10 : -10) / zoom, pos.y + 3 / zoom)
+    ctx.fillText(port.name, pos.x + (port.direction === 'input' ? 10 : -10) / zoom, pos.y + 3)
     ctx.textAlign = 'start'
   }
 }
@@ -1212,8 +1251,8 @@ function drawResizeHandles(ctx: CanvasRenderingContext2D, item: BoardItem, zoom:
     { x: x + w / 2 - s / 2, y: y + h - s / 2 },
   ]
   for (const handle of handles) {
-    ctx.fillStyle = isDark() ? '#16161f' : '#ffffff'
-    ctx.strokeStyle = '#00fff0'; ctx.lineWidth = 1.5 / zoom
+    ctx.fillStyle = isDark() ? '#150f24' : '#ffffff'
+    ctx.strokeStyle = isDark() ? '#7c6cbf' : '#6a5aae'; ctx.lineWidth = 1.5 / zoom
     ctx.beginPath(); roundRect(ctx, handle.x, handle.y, s, s, 2 / zoom); ctx.fill(); ctx.stroke()
   }
 }
@@ -1231,7 +1270,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
   ctx.shadowColor = 'transparent'
 
   // Card border — thin chrome, constant screen size
-  ctx.strokeStyle = cardBorder(selected); ctx.lineWidth = (selected ? 1.5 : 0.75) / zoom
+  ctx.strokeStyle = selected ? kindColor : cardBorder(false); ctx.lineWidth = (selected ? 1.5 : 0.75) / zoom
   ctx.beginPath(); roundRect(ctx, x, y, w, h, CARD_RADIUS); ctx.stroke()
 
   // Kind accent strip at top — fixed height in world coords
@@ -1256,7 +1295,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
 }
 
 function drawImageItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('IMAGE', x + PAD, y + PAD + 9 / zoom)
+  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('IMAGE', x + PAD, y + PAD + 9)
   const imgTop = y + PAD + 20; const imgH = h - PAD * 2 - 40; const imgW = w - PAD * 2
   const img = getImage(item.thumbnail || item.fullSource)
   if (img) {
@@ -1268,33 +1307,33 @@ function drawImageItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: n
     ctx.drawImage(img, sx, sy, sw, sh, x + PAD, imgTop, imgW, imgH); ctx.restore()
   } else if (item.fullSource?.startsWith('http')) {
     ctx.fillStyle = isDark() ? '#1a1a25' : '#f1f5f9'; ctx.fillRect(x + PAD, imgTop, imgW, imgH)
-    ctx.fillStyle = txtMuted(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
+    ctx.fillStyle = txtMuted(); ctx.font = `${10}px Inter, sans-serif`; ctx.textAlign = 'center'
     ctx.fillText('Loading image...', x + w / 2, imgTop + imgH / 2 + 4); ctx.textAlign = 'start'
   } else {
     ctx.fillStyle = isDark() ? '#1a1a25' : '#f1f5f9'; ctx.fillRect(x + PAD, imgTop, imgW, imgH)
-    ctx.fillStyle = txtMuted(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
+    ctx.fillStyle = txtMuted(); ctx.font = `${10}px Inter, sans-serif`; ctx.textAlign = 'center'
     ctx.fillText('No image', x + w / 2, imgTop + imgH / 2 + 4); ctx.textAlign = 'start'
   }
-  ctx.fillStyle = txtPrimary(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.fillText(item.description || '', x + PAD, y + h - PAD)
+  ctx.fillStyle = txtPrimary(); ctx.font = `${10}px Inter, sans-serif`; ctx.fillText(item.description || '', x + PAD, y + h - PAD)
 }
 
 function drawPaletteItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('PALETTE', x + PAD, y + PAD + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24 / zoom)
+  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('PALETTE', x + PAD, y + PAD + 9)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24)
   const colors = item.colors || []
   const sw = Math.min(60, (w - PAD * 2 - (colors.length - 1) * 4) / Math.max(colors.length, 1))
   const sh = h - PAD * 2 - 44
   for (let i = 0; i < colors.length; i++) {
     const sx = x + PAD + i * (sw + 4)
     ctx.fillStyle = colors[i].hex || '#000'; ctx.beginPath(); roundRect(ctx, sx, y + PAD + 32, sw, sh, 4); ctx.fill()
-    ctx.fillStyle = txtSecondary(); ctx.font = `${8 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
+    ctx.fillStyle = txtSecondary(); ctx.font = `${8}px Inter, sans-serif`; ctx.textAlign = 'center'
     ctx.fillText(colors[i].hex || '', sx + sw / 2, y + PAD + 32 + sh + 12); ctx.textAlign = 'start'
   }
 }
 
 function drawGradientItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('GRADIENT', x + PAD, y + PAD + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24 / zoom)
+  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('GRADIENT', x + PAD, y + PAD + 9)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24)
   const stops = item.stops || []
   if (stops.length >= 2) {
     const dir = (item.direction || 90) * Math.PI / 180
@@ -1307,8 +1346,8 @@ function drawGradientItem(ctx: CanvasRenderingContext2D, item: any, x: number, y
 
 function drawFontItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
   const ff = item.fontFamily || 'Inter'; loadFont(ff)
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('FONT', x + PAD, y + PAD + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${11 / zoom}px Inter, sans-serif`; ctx.fillText(ff, x + PAD, y + PAD + 24 / zoom)
+  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('FONT', x + PAD, y + PAD + 9)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${11}px Inter, sans-serif`; ctx.fillText(ff, x + PAD, y + PAD + 24)
   const sample = item.sampleText || 'The quick brown fox'
   const sizes = [24, 16, 12]; let ty = y + PAD + 44
   for (const size of sizes) {
@@ -1320,30 +1359,30 @@ function drawFontItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: nu
 function drawSwatchItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
   const bh = h * 0.55
   ctx.fillStyle = item.hex || '#000'; ctx.beginPath(); roundRect(ctx, x + PAD, y + PAD, w - PAD * 2, bh, 6); ctx.fill()
-  ctx.fillStyle = txtPrimary(); ctx.font = `600 ${13 / zoom}px Inter, sans-serif`; ctx.fillText(item.name || item.hex, x + PAD, y + PAD + bh + 18 / zoom)
-  ctx.fillStyle = txtSecondary(); ctx.font = `${11 / zoom}px Inter, sans-serif`; ctx.fillText(item.hex, x + PAD, y + PAD + bh + 34 / zoom)
-  if (item.usage) { ctx.fillStyle = txtMuted(); ctx.font = `${10 / zoom}px Inter, sans-serif`; wrapText(ctx, item.usage, x + PAD, y + PAD + bh + 50, w - PAD * 2, 14, h - PAD - bh - 54) }
+  ctx.fillStyle = txtPrimary(); ctx.font = `600 ${13}px Inter, sans-serif`; ctx.fillText(item.name || item.hex, x + PAD, y + PAD + bh + 18)
+  ctx.fillStyle = txtSecondary(); ctx.font = `${11}px Inter, sans-serif`; ctx.fillText(item.hex, x + PAD, y + PAD + bh + 34)
+  if (item.usage) { ctx.fillStyle = txtMuted(); ctx.font = `${10}px Inter, sans-serif`; wrapText(ctx, item.usage, x + PAD, y + PAD + bh + 50, w - PAD * 2, 14, h - PAD - bh - 54) }
 }
 
 function drawSizeGuideItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = accent(); ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('SIZE', x + PAD, y + PAD + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24 / zoom)
+  ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('SIZE', x + PAD, y + PAD + 9)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24)
   const mw = w - PAD * 2; const mh = h - PAD * 2 - 48; const aspect = (item.width || 1) / (item.height || 1)
   let bw = mw * 0.8; let bh = bw / aspect; if (bh > mh) { bh = mh; bw = bh * aspect }
   const cx = x + PAD + (mw - bw) / 2; const by = y + PAD + 34
   ctx.strokeStyle = '#00fff0'; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4 / zoom, 3 / zoom]); ctx.strokeRect(cx, by, bw, bh); ctx.setLineDash([])
-  ctx.fillStyle = accent(); ctx.font = `${10 / zoom}px Inter, sans-serif`; ctx.textAlign = 'center'
+  ctx.fillStyle = accent(); ctx.font = `${10}px Inter, sans-serif`; ctx.textAlign = 'center'
   ctx.fillText(`${item.width}${item.unit}`, cx + bw / 2, by + bh + 14)
   ctx.save(); ctx.translate(cx - 8, by + bh / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(`${item.height}${item.unit}`, 0, 0); ctx.restore()
-  ctx.fillStyle = txtMuted(); ctx.font = `${9 / zoom}px Inter, sans-serif`; ctx.fillText(item.orientation, cx + bw / 2, by + bh + 26); ctx.textAlign = 'start'
+  ctx.fillStyle = txtMuted(); ctx.font = `${9}px Inter, sans-serif`; ctx.fillText(item.orientation, cx + bw / 2, by + bh + 26); ctx.textAlign = 'start'
 }
 
 function drawContainerItem(ctx: CanvasRenderingContext2D, item: ContainerItem, x: number, y: number, w: number, h: number, zoom: number) {
-  ctx.fillStyle = '#059669'; ctx.font = `600 ${9 / zoom}px Inter, sans-serif`; ctx.fillText('CONTAINER', x + PAD, y + PAD + 9 / zoom)
-  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12 / zoom}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24 / zoom)
-  ctx.fillStyle = txtMuted(); ctx.font = `${10 / zoom}px Inter, sans-serif`
+  ctx.fillStyle = '#059669'; ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('CONTAINER', x + PAD, y + PAD + 9)
+  ctx.fillStyle = txtPrimary(); ctx.font = `500 ${12}px Inter, sans-serif`; ctx.fillText(item.label || '', x + PAD, y + PAD + 24)
+  ctx.fillStyle = txtMuted(); ctx.font = `${10}px Inter, sans-serif`
   const childCount = item.children?.length || 0
-  ctx.fillText(`${childCount} items · ${item.layout}${item.collapsed ? ' · collapsed' : ''}`, x + PAD, y + PAD + 40 / zoom)
+  ctx.fillText(`${childCount} items · ${item.layout}${item.collapsed ? ' · collapsed' : ''}`, x + PAD, y + PAD + 40)
 
   const iconX = x + w - PAD - 16
   const iconY = y + PAD + 4
@@ -1374,7 +1413,7 @@ function drawContainerItem(ctx: CanvasRenderingContext2D, item: ContainerItem, x
       ctx.lineWidth = 0.5 / zoom
       ctx.beginPath(); roundRect(ctx, cx, cy, cellW, cellH, 3); ctx.fill(); ctx.stroke()
       ctx.fillStyle = ccolor
-      ctx.font = `600 ${6 / zoom}px Inter, sans-serif`
+      ctx.font = `600 ${6}px Inter, sans-serif`
       ctx.fillText(child.kind.toUpperCase(), cx + 4, cy + 10)
       let preview = ''
       if ('text' in (child as any)) preview = (child as any).text?.slice(0, 20) || ''
@@ -1382,11 +1421,11 @@ function drawContainerItem(ctx: CanvasRenderingContext2D, item: ContainerItem, x
       else if ('url' in (child as any)) preview = (child as any).url?.slice(0, 20) || ''
       else if ('raw' in (child as any)) preview = (child as any).raw?.slice(0, 20) || ''
       ctx.fillStyle = txtSecondary()
-      ctx.font = `${8 / zoom}px Inter, sans-serif`
+      ctx.font = `${8}px Inter, sans-serif`
       ctx.fillText(preview, cx + 4, cy + 22)
     }
   } else if (item.collapsed || !item.children?.length) {
-    ctx.fillStyle = txtMuted(); ctx.font = `${9 / zoom}px Inter, sans-serif`
+    ctx.fillStyle = txtMuted(); ctx.font = `${9}px Inter, sans-serif`
     if (childCount === 0) ctx.fillText('Empty — drag items here or add via chat', x + PAD, y + PAD + 56)
   }
 }
@@ -1421,37 +1460,37 @@ function drawLinkItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: nu
 
 function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
   const label = item.kind.charAt(0).toUpperCase() + item.kind.slice(1).toLowerCase()
-  ctx.fillStyle = accent(); ctx.font = `600 ${10 / zoom}px Inter, sans-serif`; ctx.fillText(label, x + PAD, y + PAD + 10 / zoom)
+  ctx.fillStyle = accent(); ctx.font = `600 ${10}px Inter, sans-serif`; ctx.fillText(label, x + PAD, y + PAD + 10)
   const text = item.text || item.raw || item.content || ''
-  ctx.fillStyle = txtPrimary(); ctx.font = `${12 / zoom}px Inter, sans-serif`
+  ctx.fillStyle = txtPrimary(); ctx.font = `${12}px Inter, sans-serif`
 
   if (text.length > 60 || text.includes('\n')) {
-    wrapText(ctx, text, x + PAD, y + PAD + 24 / zoom, w - PAD * 2, 16 / zoom, h - PAD * 2 - 10 / zoom)
+    wrapText(ctx, text, x + PAD, y + PAD + 24, w - PAD * 2, 16, h - PAD * 2 - 10)
   } else if (text.length > 30) {
-    ctx.font = `500 ${9 / zoom}px Inter, sans-serif`
-    ctx.fillText(text.slice(0, 30), x + PAD, y + PAD + 24 / zoom)
+    ctx.font = `500 ${9}px Inter, sans-serif`
+    ctx.fillText(text.slice(0, 30), x + PAD, y + PAD + 24)
   } else if (text.length > 0) {
-    ctx.font = `500 ${10 / zoom}px Inter, sans-serif`
-    ctx.fillText(text.slice(0, 60), x + PAD, y + PAD + 24 / zoom)
+    ctx.font = `500 ${10}px Inter, sans-serif`
+    ctx.fillText(text.slice(0, 60), x + PAD, y + PAD + 24)
   }
 
   if (item.purpose && h > 100) {
-    ctx.fillStyle = txtMuted(); ctx.font = `500 ${9 / zoom}px Inter, sans-serif`
-    ctx.fillText(item.purpose.slice(0, 40), x + PAD, y + PAD + 40 / zoom)
+    ctx.fillStyle = txtMuted(); ctx.font = `500 ${9}px Inter, sans-serif`
+    ctx.fillText(item.purpose.slice(0, 40), x + PAD, y + PAD + 40)
   }
 
   const summary = [item.purpose, item.importance].filter(Boolean).join(' · ')
   if (summary) {
-    wrapText(ctx, summary, x + PAD, y + PAD + 28 / zoom, w - PAD * 2, 16 / zoom, h - PAD * 2 - 24 / zoom)
+    wrapText(ctx, summary, x + PAD, y + PAD + 28, w - PAD * 2, 16, h - PAD * 2 - 24)
   } else {
-    ctx.font = `500 ${9 / zoom}px Inter, sans-serif`
-    ctx.fillText(item.text?.slice(0, 30) || item.kind, x + PAD, y + PAD + 28 / zoom)
+    ctx.font = `500 ${9}px Inter, sans-serif`
+    ctx.fillText(item.text?.slice(0, 30) || item.kind, x + PAD, y + PAD + 28)
   }
 
   if ('tags' in item && item.tags?.length) {
     const tags = item.tags.join(', ')
-    ctx.fillStyle = txtMuted(); ctx.font = `${8 / zoom}px Inter, sans-serif`
-    ctx.fillText(tags.slice(0, 3).join(', '), x + PAD, y + h - PAD + 14 / zoom)
+    ctx.fillStyle = txtMuted(); ctx.font = `${8}px Inter, sans-serif`
+    ctx.fillText(tags.slice(0, 3).join(', '), x + PAD, y + h - PAD + 14)
   }
 }
 
