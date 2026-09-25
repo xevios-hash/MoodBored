@@ -414,6 +414,72 @@ app.get('/api/board/:id/semantic', async (req, res) => {
   }
 })
 
+// Related items — find items semantically similar to a given item
+app.get('/api/board/:id/items/:itemId/related', async (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const target = vp.items.find(i => i.id === req.params.itemId)
+  if (!target) { res.status(404).json({ error: 'Item not found' }); return }
+
+  const openrouterKey = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || ''
+  if (!openrouterKey) { res.status(501).json({ error: 'Related items requires OPENROUTER_API_KEY env var' }); return }
+
+  try {
+    const targetText = [target.kind, target.text, target.raw, target.description, target.purpose, target.label, target.url, target.fontFamily, target.hex, (target.tags || []).join(' ')].filter(Boolean).join(' ')
+    const embRes = await fetch('https://openrouter.ai/api/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openrouterKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'openai/text-embedding-3-small', input: targetText.slice(0, 8000) }),
+    })
+    if (!embRes.ok) { res.status(502).json({ error: 'Embedding API failed' }); return }
+    const embData = await embRes.json()
+    const tVector = embData.data?.[0]?.embedding
+    if (!tVector) { res.status(502).json({ error: 'No embedding returned' }); return }
+
+    const nonConn = vp.items.filter(i => i.kind !== 'connector' && i.id !== target.id)
+    const scored = []
+    for (const item of nonConn) {
+      const text = [item.kind, item.text, item.raw, item.description, item.purpose, item.label, item.url, item.fontFamily, item.hex, (item.tags || []).join(' ')].filter(Boolean).join(' ')
+      try {
+        const r = await fetch('https://openrouter.ai/api/v1/embeddings', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${openrouterKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'openai/text-embedding-3-small', input: text.slice(0, 8000) }),
+        })
+        if (r.ok) {
+          const d = await r.json()
+          const vec = d.data?.[0]?.embedding
+          if (vec) {
+            const score = cosineSimilarity(tVector, vec)
+            scored.push({ ...itemSummary(item), score })
+          }
+        }
+      } catch {}
+    }
+
+    scored.sort((a, b) => b.score - a.score)
+    const top = scored.filter(s => s.score > 0.2).slice(0, 5)
+    res.json({ target: itemSummary(target), count: top.length, related: top })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Clear board — remove all non-connector items
+app.delete('/api/board/:id/items/all', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+  const count = vp.items.filter(i => i.kind !== 'connector').length
+  vp.items = vp.items.filter(i => i.kind === 'connector')
+  writeBoard(req.params.id, state)
+  res.json({ ok: true, removed: count })
+})
+
 // Arrange items
 app.post('/api/board/:id/arrange', (req, res) => {
   const state = getBoardOr404(req.params.id, res)
@@ -753,9 +819,12 @@ a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}
 <tr><td style="padding:4px 0"><code>POST</code></td><td><code>/api/boards</code></td><td>Create a board <code>{name}</code></td></tr>
 <tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id</code></td><td>Read full board state</td></tr>
 <tr><td style="padding:4px 0"><code>POST</code></td><td><code>/api/board/:id/items</code></td><td>Add items <code>[{kind, text, ...}]</code></td></tr>
-<tr><td style="padding:4px 0"><code>DELETE</code></td><td><code>/api/board/:id/items</code></td><td>Remove items <code>{ids: [...]}</code> or clear all</td></tr>
+<tr><td style="padding:4px 0"><code>DELETE</code></td><td><code>/api/board/:id/items</code></td><td>Remove items <code>{ids: [...]}</code></td></tr>
+<tr><td style="padding:4px 0"><code>DELETE</code></td><td><code>/api/board/:id/items/all</code></td><td>Clear entire board</td></tr>
 <tr><td style="padding:4px 0"><code>PATCH</code></td><td><code>/api/board/:id/items/:itemId</code></td><td>Update item properties</td></tr>
-<tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id/search?q=&tag=&kind=</code></td><td>Search items</td></tr>
+<tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id/search?q=&tag=&kind=</code></td><td>Text + tag search</td></tr>
+<tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id/semantic?q=</code></td><td>Semantic search (meaning-based)</td></tr>
+<tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id/items/:itemId/related</code></td><td>Find related items</td></tr>
 <tr><td style="padding:4px 0"><code>POST</code></td><td><code>/api/board/:id/arrange</code></td><td>Arrange <code>{layout, cols?, gap?}</code></td></tr>
 <tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id/brief?format=markdown|json</code></td><td>Export creative brief</td></tr>
 <tr><td style="padding:4px 0"><code>GET</code></td><td><code>/api/board/:id/events</code></td><td>SSE stream of board changes</td></tr>
