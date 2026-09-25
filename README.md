@@ -25,7 +25,7 @@ MoodBored is a collaborative canvas for creative direction — mood boards, bran
 
 **Try it live:** [moodbored-production.up.railway.app](https://moodbored-production.up.railway.app)
 
-## Quick Start
+## Install & Run
 
 ```bash
 git clone https://github.com/xevios-hash/MoodBored.git
