@@ -562,3 +562,34 @@ body.dark .status-bar {
   .input { font-size: 17px; padding: 12px 16px; border-radius: 10px; }
   .btn { min-height: 44px; border-radius: 12px; font-size: 17px; }
 }
+
+/* ─── Mobile / Small Screens ────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  .status-bar {
+    font-size: 13px;
+    padding: 8px 14px;
+    gap: 12px;
+  }
+  .status-bar-btn {
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+  .add-toolbar-trigger {
+    width: 56px;
+    height: 56px;
+    font-size: 26px;
+  }
+  .add-toolbar-item {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+  }
+  .add-toolbar-items {
+    max-width: 240px;
+    padding: 10px;
+  }
+  canvas {
+    touch-action: none;
+  }
+}
