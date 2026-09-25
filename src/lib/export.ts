@@ -291,6 +291,7 @@ export function importFromBundle(
         canvasBgType: 'color',
         canvasBgVideo: '',
         customBgUrls: [],
+        customBgLabels: {},
       }
     }
 

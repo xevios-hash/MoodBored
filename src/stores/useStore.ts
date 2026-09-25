@@ -163,6 +163,7 @@ const defaultProject: Project = {
     canvasBgType: 'color',
     canvasBgVideo: '',
     customBgUrls: [],
+    customBgLabels: {},
   },
   created: new Date().toISOString(),
   updated: new Date().toISOString(),

@@ -194,6 +194,7 @@ export function Canvas() {
   const [eyedropperActive, setEyedropperActive] = useState(false)
   const [addToolbarOpen, setAddToolbarOpen] = useState(false)
   const [expandedLinks, setExpandedLinks] = useState<Set<string>>(new Set())
+  const [editingItem, setEditingItem] = useState<{ id: string; field: string; value: string } | null>(null)
 
   const project = useStore((s) => s.project)
   const activeViewportId = useStore((s) => s.activeViewportId)
@@ -678,6 +679,14 @@ export function Canvas() {
       return
     }
 
+    // Double-click on note/text → inline edit
+    if (hit.kind === 'note' || hit.kind === 'text') {
+      const field = hit.kind === 'note' ? 'text' : 'raw'
+      const value = (hit as any)[field] || ''
+      setEditingItem({ id: hit.id, field, value })
+      return
+    }
+
     // Double-click on image that's already selected → open lightbox
     if (hit.kind === 'image' && state.selectedIds.has(hit.id)) {
       window.dispatchEvent(new CustomEvent('moodbored:lightbox', { detail: hit }))
@@ -692,6 +701,24 @@ export function Canvas() {
         else next.add(hit.id)
         return next
       })
+      return
+    }
+
+    // Double-click on palette → open color picker for nearest swatch
+    if (hit.kind === 'palette' && 'colors' in hit) {
+      const palette = hit as any
+      const localX = wx - hit.pos.x - PAD
+      const swatchWidth = Math.min(60, ((hit.size?.w ?? 320) - PAD * 2 - (palette.colors.length - 1) * 4) / Math.max(palette.colors.length, 1))
+      const colorIndex = Math.floor((localX - 0) / (swatchWidth + 4))
+      if (colorIndex >= 0 && colorIndex < palette.colors.length) {
+        const color = palette.colors[colorIndex]
+        const newColor = prompt('Edit color hex:', color.hex)
+        if (newColor && /^#[0-9a-fA-F]{6}$/.test(newColor.trim())) {
+          const updatedColors = [...palette.colors]
+          updatedColors[colorIndex] = { ...color, hex: newColor.trim() }
+          state.updateItem(hit.id, { colors: updatedColors })
+        }
+      }
       return
     }
 
@@ -980,9 +1007,16 @@ export function Canvas() {
         const w = (item.size?.w ?? 250) * canvas.zoom
         const h = (item.size?.h ?? 150) * canvas.zoom
         return (
-          <div key={item.id} style={{ position: 'absolute', left: x, top: y, width: w, height: h, borderRadius: 10, overflow: 'hidden', border: `2px solid ${isDark() ? 'rgba(0,255,240,0.3)' : 'rgba(0,180,170,0.3)'}`, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', zIndex: 15 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: isDark() ? '#1a0030' : '#f5f0ff', borderBottom: `1px solid ${isDark() ? 'rgba(0,255,240,0.1)' : 'rgba(0,0,0,0.06)'}`, fontSize: 10, color: isDark() ? '#b8a8d8' : '#6b5a8a' }}>
+          <div key={item.id} className="glass-card" style={{ position: 'absolute', left: x, top: y, width: w, height: h, borderRadius: 10, overflow: 'hidden', zIndex: 15 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderBottom: '1px solid rgba(124,108,191,0.1)', fontSize: 10, color: isDark() ? '#a898c8' : '#6b5a8a' }}>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(item as any).url}</span>
+              <a
+                href={(item as any).url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#7c6cbf', textDecoration: 'none', fontSize: 10, fontWeight: 600 }}
+                onClick={(e) => e.stopPropagation()}
+              >Open ↗</a>
               <button
                 onClick={() => setExpandedLinks((prev) => { const n = new Set(prev); n.delete(item.id); return n })}
                 style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 14, padding: '0 2px' }}
@@ -991,11 +1025,59 @@ export function Canvas() {
             <iframe
               src={(item as any).url}
               style={{ width: '100%', height: 'calc(100% - 28px)', border: 'none' }}
-              sandbox="allow-scripts allow-same-origin allow-forms"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              onError={(e) => {
+                // Fallback: show open-in-new-tab message if iframe fails
+                const el = e.currentTarget.parentElement?.querySelector('.iframe-error') as HTMLElement
+                if (el) el.style.display = 'flex'
+              }}
             />
+            <div className="iframe-error" style={{ display: 'none', position: 'absolute', inset: 0, top: 28, alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, background: isDark() ? '#150f24' : '#f8f5ff', fontSize: 12, color: isDark() ? '#a898c8' : '#6b5a8a' }}>
+              <span>This site can't be embedded</span>
+              <a href={(item as any).url} target="_blank" rel="noopener noreferrer" className="btn btn-accent text-xs">Open in new tab ↗</a>
+            </div>
           </div>
         )
       })}
+
+      {/* Inline text editing overlay */}
+      {editingItem && (() => {
+        const item = items.find(i => i.id === editingItem.id)
+        if (!item || !('pos' in item)) return null
+        const x = item.pos.x * canvas.zoom + canvas.panX + PAD * canvas.zoom
+        const y = item.pos.y * canvas.zoom + canvas.panY + (item.kind === 'note' ? 10 : 24) * canvas.zoom
+        const w = ((item.size?.w ?? 250) - PAD * 2) * canvas.zoom
+        const h = ((item.size?.h ?? 150) - PAD * 2 - 10) * canvas.zoom
+        const fontSize = (item.kind === 'note' ? 12 : 10) * canvas.zoom
+
+        const handleSave = () => {
+          useStore.getState().updateItem(editingItem.id, { [editingItem.field]: editingItem.value })
+          setEditingItem(null)
+        }
+
+        return (
+          <textarea
+            autoFocus
+            value={editingItem.value}
+            onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })}
+            onBlur={handleSave}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setEditingItem(null); e.stopPropagation() }
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave() }
+            }}
+            style={{
+              position: 'absolute', left: x, top: y, width: w, height: Math.max(h, 60),
+              fontSize, fontFamily: 'Inter, sans-serif', lineHeight: 1.6,
+              background: isDark() ? 'rgba(21,15,36,0.95)' : 'rgba(255,255,255,0.95)',
+              color: isDark() ? '#e8e0f5' : '#1a1028',
+              border: `2px solid ${isDark() ? '#7c6cbf' : '#6a5aae'}`,
+              borderRadius: 8, padding: 8, outline: 'none', resize: 'none',
+              zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              backdropFilter: 'blur(8px)',
+            }}
+          />
+        )
+      })()}
 
       {itemCount > 0 && (
         <div className="badge badge-accent" style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>

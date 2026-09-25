@@ -239,6 +239,7 @@ export interface Settings {
   canvasBgType: 'color' | 'video'
   canvasBgVideo: string
   customBgUrls: string[]
+  customBgLabels: Record<string, string>
 }
 
 export interface Project {
@@ -284,6 +285,7 @@ export const DEFAULT_SETTINGS: Settings = {
   canvasBgType: 'color',
   canvasBgVideo: '',
   customBgUrls: [],
+  customBgLabels: {},
 }
 
 // ─── Default ports for item kinds ───────────────────────────────────

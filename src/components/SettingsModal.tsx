@@ -239,13 +239,13 @@ export function SettingsModal() {
               {/* Video options */}
               {settings.canvasBgType === 'video' && (
                 <div className="space-y-2">
+                  {/* Built-in presets */}
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { url: '/sky-day.mp4', label: 'Daytime Sky' },
                       { url: '/sky-night.mp4', label: 'Starry Night' },
                       { url: '/bg-ocean.mp4', label: 'Deep Blue' },
                       { url: '/bg-sunset.mp4', label: 'Golden Hour' },
-                      ...((settings.customBgUrls || []).map((u, i) => ({ url: u, label: `Custom ${i + 1}` }))),
                     ].map((bg) => (
                       <button
                         key={bg.url}
@@ -260,6 +260,55 @@ export function SettingsModal() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Custom backgrounds with rename/delete */}
+                  {(settings.customBgUrls || []).length > 0 && (
+                    <div className="space-y-1">
+                      <label className="text-2xs text-text-muted">Custom backgrounds</label>
+                      {(settings.customBgUrls || []).map((url, i) => {
+                        const labels = settings.customBgLabels || {}
+                        const label = labels[url] || `Custom ${i + 1}`
+                        return (
+                          <div key={url} className="flex items-center gap-2">
+                            <button
+                              onClick={() => updateSettings({ canvasBgVideo: url })}
+                              className={`flex-1 px-3 py-1.5 rounded text-xs text-left truncate transition-fast border ${
+                                settings.canvasBgVideo === url
+                                  ? 'bg-[#7c6cbf] text-white border-accent'
+                                  : 'bg-surface-2 border-surface-4 text-text-secondary hover:border-accent'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                            <button
+                              className="btn btn-ghost text-2xs p-1"
+                              title="Rename"
+                              onClick={() => {
+                                const newName = prompt('Rename background:', label)
+                                if (newName && newName.trim()) {
+                                  updateSettings({ customBgLabels: { ...labels, [url]: newName.trim() } })
+                                }
+                              }}
+                            >✏️</button>
+                            <button
+                              className="btn btn-ghost text-2xs p-1 text-danger"
+                              title="Remove"
+                              onClick={() => {
+                                const remaining = (settings.customBgUrls || []).filter(u => u !== url)
+                                const newLabels = { ...labels }
+                                delete newLabels[url]
+                                updateSettings({
+                                  customBgUrls: remaining,
+                                  customBgLabels: newLabels,
+                                  canvasBgVideo: settings.canvasBgVideo === url ? '/sky-day.mp4' : settings.canvasBgVideo,
+                                })
+                              }}
+                            >×</button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
 
                   {/* Custom URL input */}
                   <div className="flex gap-2">
