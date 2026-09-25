@@ -36,12 +36,19 @@ export function UnsplashSearch({ onClose }: Props) {
 
   const search = useCallback(async (q: string, p: number = 1) => {
     if (!q.trim()) return
+    if (!UNSPLASH_KEY) {
+      showToast('Unsplash API key not configured — set VITE_UNSPLASH_ACCESS_KEY in your environment', 'error')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch(`${UNSPLASH_API}/search/photos?query=${encodeURIComponent(q)}&page=${p}&per_page=20`, {
         headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` },
       })
-      if (!res.ok) throw new Error(`Unsplash API error: ${res.status}`)
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        throw new Error(`Unsplash API error ${res.status}: ${errText || res.statusText}`)
+      }
       const data = await res.json()
       setPhotos(p === 1 ? data.results : [...photos, ...data.results])
       setTotalPages(data.total_pages)
@@ -104,8 +111,18 @@ export function UnsplashSearch({ onClose }: Props) {
           {photos.length === 0 && !loading && (
             <div className="text-center text-text-muted mt-20">
               <Search size={32} className="mx-auto mb-3 opacity-40" />
-              <p className="text-sm">Search for images to add to your mood board</p>
-              <p className="text-xs mt-1">Powered by Unsplash — free for any use</p>
+              {!UNSPLASH_KEY ? (
+                <>
+                  <p className="text-sm font-medium text-text-primary mb-1">Unsplash API key required</p>
+                  <p className="text-xs">Set <code className="bg-surface-2 px-1 rounded">VITE_UNSPLASH_ACCESS_KEY</code> in your environment to enable image search.</p>
+                  <p className="text-xs mt-1">Get a free key at <a href="https://unsplash.com/developers" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">unsplash.com/developers</a></p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm">Search for images to add to your mood board</p>
+                  <p className="text-xs mt-1">Powered by Unsplash — free for any use</p>
+                </>
+              )}
             </div>
           )}
 
