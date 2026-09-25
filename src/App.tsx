@@ -41,15 +41,22 @@ async function loadEmbedProject(): Promise<boolean> {
   if (EMBED_BOARD_ID) {
     try {
       const base = window.location.origin
-      const res = await fetch(`${base}/api/board/${EMBED_BOARD_ID}`)
+      const url = `${base}/api/board/${EMBED_BOARD_ID}`
+      console.info('[MoodBored] Loading board from:', url)
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
         if (data.project) {
           store.setProject(data.project)
+          console.info('[MoodBored] Board loaded:', data.project.name, '—', data.project.viewports?.[0]?.items?.length, 'items')
           return true
         }
+      } else {
+        console.warn('[MoodBored] Board fetch failed:', res.status)
       }
-    } catch {}
+    } catch (err) {
+      console.error('[MoodBored] Board load error:', err)
+    }
   }
   // ?project=<id> — load from IndexedDB
   if (EMBED_PROJECT_ID) {
@@ -58,11 +65,12 @@ async function loadEmbedProject(): Promise<boolean> {
       const project = await getProject(EMBED_PROJECT_ID)
       if (project) {
         store.setProject(project)
+        console.info('[MoodBored] Project loaded from IndexedDB:', project.name)
         return true
       }
     } catch {}
   }
-  // No project specified — create a blank one
+  console.warn('[MoodBored] No board found — using default project')
   return false
 }
 
@@ -277,8 +285,8 @@ export default function App() {
   if (isEmbed) {
     if (!embedReady) return null
     return (
-      <div className="flex flex-col h-full w-full overflow-hidden" style={{ background: 'var(--bg-surface-0)' }}>
-        <div className="flex flex-1 min-h-0 relative">
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: 'var(--bg-surface-0)' }}>
+        <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
           <Canvas />
           <button
             onClick={() => setEmbedSettingsOpen(true)}
@@ -319,7 +327,7 @@ export default function App() {
     <>
       {lightboxItem && <Lightbox item={lightboxItem} onClose={() => setLightboxItem(null)} />}
 
-      <div className="flex h-full w-full overflow-hidden" style={{ background: 'var(--bg-surface-0)' }}>
+      <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--bg-surface-0)' }}>
         <div className={`transition-all duration-200 ease-in-out ${sidebarOpen ? 'w-56 opacity-100' : 'w-0 opacity-0 overflow-hidden'}`}>
           <Sidebar />
         </div>

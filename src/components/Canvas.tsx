@@ -69,21 +69,40 @@ function getImage(url: string): HTMLImageElement | null {
     return cached
   }
   if (!imageCache.has(url)) {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      imageCache.set(url, img)
-      // Evict oldest if over limit
-      while (imageCache.size > MAX_IMAGES) {
-        const first = imageCache.keys().next().value
-        if (first) imageCache.delete(first)
+    try {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        imageCache.set(url, img)
+        needsRedrawGlobal = true
+        // Evict oldest if over limit
+        while (imageCache.size > MAX_IMAGES) {
+          const first = imageCache.keys().next().value
+          if (first) imageCache.delete(first)
+        }
       }
+      img.onerror = () => {
+        imageFailed.add(url)
+        imageCache.delete(url)
+        needsRedrawGlobal = true
+      }
+      img.src = url
+      imageCache.set(url, img) // mark as loading
+    } catch {
+      imageFailed.add(url)
     }
-    img.onerror = () => { imageFailed.add(url) }
-    img.src = url
   }
+  // If currently loading (in cache but not complete), return null
+  if (imageCache.has(url) && !imageFailed.has(url)) return null
   return null
 }
+
+function isImageFailed(url: string): boolean {
+  return !!url && imageFailed.has(url)
+}
+
+// Global redraw flag so image loads can trigger a repaint
+let needsRedrawGlobal = false
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -216,6 +235,11 @@ export function Canvas() {
     if (!ctx) return
 
     const draw = () => {
+      // Check if images finished loading (global flag from getImage callbacks)
+      if (needsRedrawGlobal) {
+        needsRedrawGlobal = false
+        needsRedraw.current = true
+      }
       if (!needsRedraw.current) {
         rafRef.current = requestAnimationFrame(draw)
         return
@@ -1379,7 +1403,8 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
 function drawImageItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
   ctx.fillStyle = accent(); ctx.font = `600 ${9}px Inter, sans-serif`; ctx.fillText('IMAGE', x + PAD, y + PAD + 9)
   const imgTop = y + PAD + 20; const imgH = h - PAD * 2 - 40; const imgW = w - PAD * 2
-  const img = getImage(item.thumbnail || item.fullSource)
+  const src = item.thumbnail || item.fullSource
+  const img = getImage(src)
   if (img) {
     const ir = img.naturalWidth / img.naturalHeight; const ar = imgW / imgH
     let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight
@@ -1387,7 +1412,11 @@ function drawImageItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: n
     else { sh = img.naturalWidth / ar; sy = (img.naturalHeight - sh) / 2 }
     ctx.save(); roundRect(ctx, x + PAD, imgTop, imgW, imgH, 4); ctx.clip()
     ctx.drawImage(img, sx, sy, sw, sh, x + PAD, imgTop, imgW, imgH); ctx.restore()
-  } else if (item.fullSource?.startsWith('http')) {
+  } else if (isImageFailed(src)) {
+    ctx.fillStyle = isDark() ? '#1a0018' : '#fff0f0'; ctx.fillRect(x + PAD, imgTop, imgW, imgH)
+    ctx.fillStyle = isDark() ? '#ff6b6b' : '#d44'; ctx.font = `${10}px Inter, sans-serif`; ctx.textAlign = 'center'
+    ctx.fillText('Image failed to load', x + w / 2, imgTop + imgH / 2 + 4); ctx.textAlign = 'start'
+  } else if (src?.startsWith('http')) {
     ctx.fillStyle = isDark() ? '#1a1a25' : '#f1f5f9'; ctx.fillRect(x + PAD, imgTop, imgW, imgH)
     ctx.fillStyle = txtMuted(); ctx.font = `${10}px Inter, sans-serif`; ctx.textAlign = 'center'
     ctx.fillText('Loading image...', x + w / 2, imgTop + imgH / 2 + 4); ctx.textAlign = 'start'
