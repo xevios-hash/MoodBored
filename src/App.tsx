@@ -285,18 +285,16 @@ export default function App() {
   if (isEmbed) {
     if (!embedReady) return null
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: 'var(--bg-surface-0)' }}>
-        <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-          <Canvas />
-          <button
-            onClick={() => setEmbedSettingsOpen(true)}
-            className="toolbar-btn"
-            style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, background: isDark() ? 'rgba(12,8,20,0.8)' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', borderRadius: 8, padding: 8, border: `1px solid ${isDark() ? 'rgba(124,108,191,0.1)' : 'rgba(0,0,0,0.06)'}` }}
-            title="Board settings"
-          >
-            <Settings size={16} />
-          </button>
-        </div>
+      <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: 'var(--bg-surface-0)', position: 'relative' }}>
+        <Canvas />
+        <button
+          onClick={() => setEmbedSettingsOpen(true)}
+          className="toolbar-btn"
+          style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, background: isDark() ? 'rgba(12,8,20,0.8)' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', borderRadius: 8, padding: 8, border: `1px solid ${isDark() ? 'rgba(124,108,191,0.1)' : 'rgba(0,0,0,0.06)'}` }}
+          title="Board settings"
+        >
+          <Settings size={16} />
+        </button>
         {embedSettingsOpen && <SettingsModal embed onClose={() => setEmbedSettingsOpen(false)} />}
       </div>
     )

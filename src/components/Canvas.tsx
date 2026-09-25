@@ -916,7 +916,7 @@ export function Canvas() {
   const isVideo = bgType === 'video' && bgVideo
 
   return (
-    <div style={{ flex: 1, position: 'relative', overflow: 'hidden', cursor: 'crosshair' }} onDrop={onDrop} onDragOver={e => e.preventDefault()} onContextMenu={e => e.preventDefault()}>
+    <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', cursor: 'crosshair' }} onDrop={onDrop} onDragOver={e => e.preventDefault()} onContextMenu={e => e.preventDefault()}>
       {/* Video background */}
       {isVideo && ytEmbed && (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0 }}>
