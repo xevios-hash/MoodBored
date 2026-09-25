@@ -774,7 +774,9 @@ app.use('/.well-known', express.static(join(__dirname, 'public', '.well-known'))
 // ─── MCP Info Page ──────────────────────────────────────────────────
 
 function buildMcpPage(req) {
-  const origin = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`
+  const proto = req.get('x-forwarded-proto') || req.protocol
+  const host = req.get('x-forwarded-host') || req.get('host')
+  const origin = process.env.PUBLIC_URL || `${proto}://${host}`
   const boards = listBoards()
   const boardList = boards.length > 0
     ? boards.map(b => `<li><code>${b.id}</code> — ${b.name} (${b.itemCount} items)</li>`).join('')
