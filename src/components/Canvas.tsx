@@ -748,7 +748,16 @@ export function Canvas() {
       if (e.key === 'n' || e.key === 'N') { s.addItem(createDefaultItem('note', { x: cx + Math.random() * 100, y: cy + Math.random() * 100 })); e.preventDefault() }
       if (e.key === 't' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('text', { x: cx, y: cy })); e.preventDefault() }
       if (e.key === 'i' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('image', { x: cx, y: cy })); e.preventDefault() }
-      if (e.key === 'l' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('link', { x: cx, y: cy })); e.preventDefault() }
+      if (e.key === 'l' && !e.metaKey && !e.ctrlKey) {
+        const url = prompt('Paste link URL:')
+        if (url && url.trim()) {
+          const item = createDefaultItem('link', { x: cx, y: cy })
+          ;(item as any).url = url.trim()
+          ;(item as any).title = url.trim().split('/').pop() || url.trim()
+          s.addItem(item)
+        }
+        e.preventDefault()
+      }
       if (e.key === 'p' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('palette', { x: cx, y: cy })); e.preventDefault() }
       if (e.key === 'g' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('gradient', { x: cx, y: cy })); e.preventDefault() }
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey) { s.addItem(createDefaultItem('font', { x: cx, y: cy })); e.preventDefault() }
@@ -1071,7 +1080,31 @@ export function Canvas() {
                   const state = useStore.getState()
                   const cx = -state.canvas.panX / state.canvas.zoom + 400
                   const cy = -state.canvas.panY / state.canvas.zoom + 300
-                  state.addItem(createDefaultItem(kind, { x: cx, y: cy }))
+                  // Prompt for URL when creating image or link
+                  if (kind === 'image' || kind === 'link') {
+                    const url = prompt(kind === 'image' ? 'Paste image URL (or leave empty):' : 'Paste link URL:')
+                    if (url && url.trim()) {
+                      const item = createDefaultItem(kind, { x: cx, y: cy })
+                      if (kind === 'image') {
+                        ;(item as any).source = url.trim()
+                        ;(item as any).fullSource = url.trim()
+                        ;(item as any).thumbnail = url.trim()
+                        ;(item as any).description = 'Pasted image'
+                      } else {
+                        ;(item as any).url = url.trim()
+                        ;(item as any).title = url.trim().split('/').pop() || url.trim()
+                      }
+                      state.addItem(item)
+                    } else if (kind === 'link') {
+                      // Links require a URL — cancel if none given
+                      showToast('Link requires a URL', 'info')
+                    } else {
+                      // Images can be blank (uploaded later)
+                      state.addItem(createDefaultItem(kind, { x: cx, y: cy }))
+                    }
+                  } else {
+                    state.addItem(createDefaultItem(kind, { x: cx, y: cy }))
+                  }
                   setAddToolbarOpen(false)
                 }}
               >

@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://moodbored-production.up.railway.app">Live Demo</a> ·
   <a href="#quick-start">Quick Start</a> ·
-  <a href="#mcp-integration">MCP</a> ·
+  <a href="#mcp--rest-api">API</a> ·
   <a href="#features">Features</a> ·
   <a href="#screenshots">Screenshots</a>
 </p>
@@ -21,62 +21,116 @@
 
 ## What is MoodBored?
 
-MoodBored is a collaborative canvas for creative direction — mood boards, brand exploration, design systems, and reference gathering. It integrates with any LLM via [MCP](https://modelcontextprotocol.io) so your AI can read, write, and arrange items on the board as naturally as you can.
-
-**No sign-up required.** Works locally, works deployed. One `npm install` and you're running.
-
-## Screenshots
-
-<p align="center">
-  <img src="public/screenshot-board-day.png" width="800" alt="MoodBored Canvas — Daylight" /><br/>
-  <em>Infinite canvas with daylight clouds video background — images, palettes, gradients, fonts, and notes</em>
-</p>
-
-<p align="center">
-  <img src="public/screenshot-board-dark.png" width="800" alt="MoodBored Canvas — Dark" /><br/>
-  <em>Dark mode canvas with items populated by AI</em>
-</p>
-
-<p align="center">
-  <img src="public/screenshot-mcp.png" width="800" alt="MoodBored MCP Server" /><br/>
-  <em>MCP connection info page — copy-paste configs for any IDE</em>
-</p>
-
-## Quick Start
+MoodBored is a collaborative canvas for creative direction — mood boards, brand exploration, design systems, and reference gathering. Any LLM can read, write, and arrange items via MCP or REST API. No sign-up required.
 
 **Try it live:** [moodbored-production.up.railway.app](https://moodbored-production.up.railway.app)
+
+## Quick Start
 
 ```bash
 git clone https://github.com/xevios-hash/MoodBored.git
 cd MoodBored
 npm install
-npm run dev          # opens at http://localhost:5173
+npm run dev
 ```
 
-**Production server** (serves frontend + MCP endpoints):
+**Production:**
 ```bash
-npm run build
-npm start            # http://localhost:3000
+npm run build && npm start    # serves at http://localhost:3000
 ```
 
 **macOS desktop:**
 ```bash
-npx tauri build      # produces .app + .dmg
+npx tauri build
 ```
 
-## MCP Integration
+## Screenshots
 
-MoodBored exposes an MCP server so any LLM can interact with your board. **7 tools:**
+<p align="center">
+  <img src="public/screenshot-board-day.png" width="800" alt="MoodBored canvas with daylight video background" /><br/>
+  <em>Canvas with video background — images, palettes, gradients, fonts, and notes</em>
+</p>
 
-| Tool | What it does |
+<p align="center">
+  <img src="public/screenshot-mcp.png" width="800" alt="MoodBored MCP connection page" /><br/>
+  <em>MCP connection info page — copy-paste configs for any IDE</em>
+</p>
+
+## Features
+
+### Canvas
+- Infinite pan/zoom with smooth touch gestures (pinch-to-zoom on mobile)
+- Lasso selection, alignment snapping, multi-select
+- Layers panel, minimap, right-click context menu (all 11 item types)
+- Double-click to create notes, click to expand/collapse
+- Image URL prompts when adding via toolbar
+- Link creation prompts for URL input
+- Video/YouTube background support
+- Eyedropper color picker (Chrome/Edge)
+
+### 11 Item Types
+| Kind | Description |
 |------|-------------|
-| `get_board` | Read full board state — items, palette, typography |
-| `add_items` | Add notes, images, palettes, gradients, fonts, links, videos, containers |
-| `remove_items` | Delete items by ID |
-| `update_item` | Edit any item's properties |
-| `search_items` | Text + tag search across all items |
-| `arrange_items` | Grid, horizontal stack, vertical stack, spiral layouts |
-| `clear_board` | Wipe all items |
+| `note` | Text thoughts, quotes, keywords |
+| `text` | Raw content snippet |
+| `image` | Visual reference (Unsplash, URLs, uploads) |
+| `link` | Reference URL with title and summary |
+| `palette` | Color palette with hex codes |
+| `gradient` | Gradient preview with stops and direction |
+| `font` | Typography preview with sample text |
+| `swatch` | Single color with usage notes |
+| `sizeguide` | Dimensions and orientation reference |
+| `video` | Video reference with subject and motion description |
+| `container` | Group of items with layout modes (free/grid/stack) |
+
+### AI
+- LLM chat with tool-calling (OpenRouter) — structured function invocations
+- Image generation via OpenRouter
+- Multi-agent mode (6 specialist roles, toggled off by default)
+- Semantic search — find items by meaning, not just keywords
+- Related items — find items that complement a given item
+- Automatic board population from natural language
+
+### Content Creation
+- **Unsplash search** — built-in image browser with one-click add
+- **Color picker** — HSL sliders, harmony generators (complementary, analogous, triadic)
+- **Palette extraction** — extract dominant colors from canvas pixels
+- **Export for Creation** — 8 creation types (image, video, game, web, 3D, audio, document), 3 formats (Markdown, JSON, XML)
+
+### MCP Server
+- 9 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`
+- Stdio transport (Claude Desktop, Cursor) + SSE transport (OpenCode, web IDEs)
+- `/.well-known/mcp.json` discovery endpoint
+- Connection info page at `/mcp`
+
+### REST API
+Same tools as MCP, plain HTTP for any client:
+```
+POST   /api/board/:id/items              — add items
+DELETE /api/board/:id/items              — remove items
+DELETE /api/board/:id/items/all          — clear board
+PATCH  /api/board/:id/items/:itemId      — update item
+GET    /api/board/:id/search?q=&tag=     — text search
+GET    /api/board/:id/semantic?q=        — semantic search
+GET    /api/board/:id/items/:id/related  — related items
+POST   /api/board/:id/arrange            — grid/stack/spiral layout
+GET    /api/board/:id/brief              — creative brief export
+```
+
+### Collaboration
+- Share boards via links with view/edit roles
+- Real-time presence with cursor tracking
+- No sign-up required for viewers
+- Anonymous identity ("Blue Penguin" style names)
+
+### Platform
+- Web (any browser)
+- macOS desktop (Tauri)
+- PWA (installable, works offline)
+- Railway deployment (Express server + MCP SSE)
+- Code splitting (vendor/store/UI chunks)
+
+## MCP & REST API
 
 ### Claude Desktop / Cursor (stdio)
 
@@ -95,56 +149,23 @@ MoodBored exposes an MCP server so any LLM can interact with your board. **7 too
 ### OpenCode / Web IDEs (SSE)
 
 ```
-https://moodbored-production.up.railway.app/mcp/sse?board=your-board-id
+https://your-domain.com/mcp/sse?board=your-board-id
 ```
 
-### Connection Info
+### REST API
 
-Open `https://moodbored-production.up.railway.app/mcp` for copy-paste connection configs.
+```bash
+# Create a board
+curl -X POST https://your-domain.com/api/boards -H "Content-Type: application/json" -d '{"name":"My Board"}'
 
-### Discovery
+# Add items
+curl -X POST https://your-domain.com/api/board/BOARD_ID/items \
+  -H "Content-Type: application/json" \
+  -d '[{"kind":"note","text":"Hello from curl!"},{"kind":"palette","label":"Colors","colors":[{"hex":"#FF6B35","label":"Orange"}]}]'
 
-MCP clients can auto-discover the server via `/.well-known/mcp.json`.
-
-## Features
-
-### Canvas
-- Infinite pan/zoom with smooth touch gestures
-- Lasso selection, alignment snapping, multi-select
-- Layers panel, minimap, context menu (all 11 item types)
-- Inline text editing on notes (double-click)
-- Palette color editing (double-click swatch)
-- Eyedropper color picker
-- 11 item types: note, text, image, link, palette, gradient, font, swatch, size guide, video, container
-
-### AI
-- LLM chat with tool-calling (OpenRouter)
-- Automatic board population from natural language
-- Image generation via OpenRouter
-- Multi-agent mode (6 specialist roles, toggled off by default)
-- Jev quality gate for coherence scoring
-
-### Content
-- Unsplash image search (built-in browser)
-- Clipboard paste (images from clipboard → canvas)
-- YouTube video backgrounds
-- Custom video backgrounds with rename/delete
-- Color picker with harmony generators (complementary, analogous, triadic)
-- Palette extraction from canvas pixels
-
-### Integration
-- MCP server (stdio + SSE transports)
-- Export for Creation (8 creation types, 3 formats)
-- Supabase cloud sync (optional)
-- Real-time collaboration with cursor presence (optional)
-- Embed mode for IDE integration (`?embed=1`)
-- PostMessage API for parent-frame control
-
-### Platform
-- Web (any browser)
-- macOS desktop (Tauri)
-- PWA (installable, works offline)
-- Code splitting (vendor/store/UI chunks)
+# Semantic search
+curl "https://your-domain.com/api/board/BOARD_ID/semantic?q=warm+coastal+vibes"
+```
 
 ## Keyboard Shortcuts
 
@@ -161,21 +182,15 @@ MCP clients can auto-discover the server via `/.well-known/mcp.json`.
 | `Delete` | Delete selected | `Escape` | Cancel/deselect |
 | Double-click | Create note | Right-click | Context menu |
 
-## Item Types
+## Environment Variables
 
-| Kind | Description | Example |
-|------|-------------|---------|
-| `note` | Text thoughts, quotes | `"The ocean stirs the heart"` |
-| `text` | Raw content snippet | Copy/paste from articles |
-| `image` | Visual reference | Unsplash URLs, uploads |
-| `link` | Reference URL | YouTube videos, articles |
-| `palette` | Color palette | `[#00CED1, #20B2AA, #006994]` |
-| `gradient` | Gradient preview | Sand → teal → midnight |
-| `font` | Typography preview | Playfair Display, Inter |
-| `swatch` | Single color | `#00CED1 — Shallow Reef` |
-| `sizeguide` | Dimensions | 1920×1080 hero banner |
-| `video` | Video reference | Subject + motion description |
-| `container` | Group of items | Free/grid/stack layout modes |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENROUTER_API_KEY` | For AI features | OpenRouter API key for chat, image gen, semantic search |
+| `VITE_UNSPLASH_ACCESS_KEY` | For image search | Unsplash API key (free at unsplash.com/developers) |
+| `VITE_SUPABASE_URL` | For cloud sync | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | For cloud sync | Supabase anon key |
+| `PORT` | No | Server port (default: 3000) |
 
 ## License
 
