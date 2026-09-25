@@ -12,6 +12,14 @@ import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+
+function cosineSimilarity(a, b) {
+  let dot = 0, normA = 0, normB = 0
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; normA += a[i] * a[i]; normB += b[i] * b[i] }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB)
+  return denom === 0 ? 0 : dot / denom
+}
+
 const PORT = process.env.PORT || 3000
 const BOARDS_DIR = process.env.BOARDS_DIR || join(process.env.HOME || '/tmp', '.moodbored', 'boards')
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ''
@@ -348,6 +356,62 @@ app.get('/api/board/:id/search', (req, res) => {
   })
 
   res.json({ count: results.length, items: results.map(itemSummary) })
+})
+
+// Semantic search — finds items related by meaning, not just keywords
+// Requires OPENROUTER_API_KEY env var for embeddings
+app.get('/api/board/:id/semantic', async (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const q = req.query.q || ''
+  if (!q) { res.status(400).json({ error: 'q parameter required' }); return }
+
+  const openrouterKey = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || ''
+  if (!openrouterKey) { res.status(501).json({ error: 'Semantic search requires OPENROUTER_API_KEY env var' }); return }
+
+  try {
+    // Embed the query
+    const embRes = await fetch('https://openrouter.ai/api/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openrouterKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'openai/text-embedding-3-small', input: q.slice(0, 8000) }),
+    })
+    if (!embRes.ok) { res.status(502).json({ error: 'Embedding API failed' }); return }
+    const embData = await embRes.json()
+    const qVector = embData.data?.[0]?.embedding
+    if (!qVector) { res.status(502).json({ error: 'No embedding returned' }); return }
+
+    // Embed each item and compute similarity
+    const nonConn = vp.items.filter(i => i.kind !== 'connector')
+    const scored = []
+    for (const item of nonConn) {
+      const text = [item.kind, item.text, item.raw, item.description, item.purpose, item.label, item.url, item.fontFamily, item.hex, (item.tags || []).join(' ')].filter(Boolean).join(' ')
+      try {
+        const r = await fetch('https://openrouter.ai/api/v1/embeddings', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${openrouterKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'openai/text-embedding-3-small', input: text.slice(0, 8000) }),
+        })
+        if (r.ok) {
+          const d = await r.json()
+          const vec = d.data?.[0]?.embedding
+          if (vec) {
+            const score = cosineSimilarity(qVector, vec)
+            scored.push({ ...itemSummary(item), score, text: text.slice(0, 100) })
+          }
+        }
+      } catch {}
+    }
+
+    scored.sort((a, b) => b.score - a.score)
+    const top = scored.filter(s => s.score > 0.1).slice(0, 10)
+    res.json({ query: q, count: top.length, items: top })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // Arrange items

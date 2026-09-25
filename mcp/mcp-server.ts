@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { v4 as uuid } from 'uuid'
+import { VectorStore } from './vector-store.js'
 
 // ─── State File ─────────────────────────────────────────────────────
 
@@ -34,6 +35,12 @@ function getStatePath(): string {
 }
 
 const STATE_PATH = getStatePath()
+
+// ─── Vector Store (semantic search) ─────────────────────────────────
+
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || ''
+const INDEX_DIR = join(BOARDS_DIR, '.index')
+const vecStore = new VectorStore(join(INDEX_DIR, 'vectors.json'), OPENROUTER_KEY)
 
 function ensureDir() {
   const dir = dirname(STATE_PATH)
@@ -105,22 +112,33 @@ server.resource('summary', 'board://summary', async (uri) => {
 
 // ─── Tools ──────────────────────────────────────────────────────────
 
-server.tool('get_board', 'Read the current mood board state — all items, palette, typography', {}, async () => {
+server.tool('get_board', 'Read the full mood board — items, palette, typography, spatial layout, and relationships', {}, async () => {
   const state = readState()
   const items = getItems(state)
   const nonConn = items.filter((i: any) => i.kind !== 'connector')
   const palette: any[] = []
   const typography: any[] = []
   const notes: any[] = []
+  const images: any[] = []
+  const links: any[] = []
+  const gradients: any[] = []
+  const containers: any[] = []
 
   for (const item of nonConn) {
-    if (item.kind === 'palette') {
-      for (const c of item.colors || []) palette.push({ hex: c.hex, name: c.label })
-    }
-    if (item.kind === 'swatch') palette.push({ hex: item.hex, name: item.name, usage: item.usage })
-    if (item.kind === 'font') typography.push({ family: item.fontFamily, weights: item.weights })
-    if (item.kind === 'note' || item.kind === 'text') notes.push({ text: item.text || item.raw, purpose: item.purpose })
+    if (item.kind === 'palette') palette.push({ id: item.id, label: item.label, colors: (item.colors || []).map((c: any) => ({ hex: c.hex, name: c.label })), pos: item.pos })
+    if (item.kind === 'swatch') palette.push({ id: item.id, hex: item.hex, name: item.name, usage: item.usage, pos: item.pos })
+    if (item.kind === 'gradient') gradients.push({ id: item.id, label: item.label, stops: item.stops, direction: item.direction, pos: item.pos })
+    if (item.kind === 'font') typography.push({ id: item.id, family: item.fontFamily, weights: item.weights, sample: item.sampleText, pos: item.pos })
+    if (item.kind === 'note' || item.kind === 'text') notes.push({ id: item.id, text: item.text || item.raw, purpose: item.purpose, importance: item.importance, tags: item.tags, pos: item.pos })
+    if (item.kind === 'image') images.push({ id: item.id, description: item.description, source: item.source, purpose: item.purpose, tags: item.tags, pos: item.pos })
+    if (item.kind === 'link') links.push({ id: item.id, url: item.url, title: item.title, summary: item.summary, pos: item.pos })
+    if (item.kind === 'video') images.push({ id: item.id, description: item.subjectDesc, motion: item.motionDesc, source: item.sourceUrl, pos: item.pos })
+    if (item.kind === 'container') containers.push({ id: item.id, label: item.label, layout: item.layout, childCount: item.children?.length || 0, collapsed: item.collapsed, pos: item.pos })
   }
+
+  const connectors = items.filter((i: any) => i.kind === 'connector').map((c: any) => ({
+    from: c.fromId, to: c.toId, label: c.label, style: c.style,
+  }))
 
   return {
     content: [{
@@ -129,13 +147,13 @@ server.tool('get_board', 'Read the current mood board state — all items, palet
         projectName: state.project?.name,
         itemCount: nonConn.length,
         palette,
+        gradients,
         typography,
-        notes: notes.slice(0, 10),
-        items: nonConn.map((i: any) => ({
-          id: i.id, kind: i.kind,
-          text: i.text || i.raw || i.description || i.label || i.url || '',
-          pos: i.pos, size: i.size,
-        })),
+        notes,
+        images,
+        links,
+        containers,
+        connectors,
       }, null, 2),
     }],
   }
@@ -216,6 +234,11 @@ server.tool(
     }
 
     writeState(state)
+    // Index newly added items for semantic search
+    for (const item of vp.items.slice(-newItems.length)) {
+      await vecStore.indexItem(item)
+    }
+    vecStore.persist()
     return {
       content: [{
         type: 'text',
@@ -325,6 +348,60 @@ server.tool('arrange_items', 'Organize items on the board — grid, horizontal s
   writeState(state)
   return { content: [{ type: 'text', text: `Arranged ${positioned.length} items in ${layout} layout.` }] }
 })
+
+server.tool(
+  'semantic_search',
+  'Search items by meaning, not just keywords. Finds items related to the query concept even if they use different words. Requires OPENROUTER_API_KEY env var.',
+  { query: z.string().describe('Natural language query — e.g. "warm coastal vibes", "luxury minimalist", "energetic youthful"') },
+  async ({ query }) => {
+    const state = readState()
+    const items = getItems(state).filter((i: any) => i.kind !== 'connector')
+    if (vecStore.size === 0) {
+      // Index all items on first search
+      for (const item of items) await vecStore.indexItem(item)
+      vecStore.persist()
+    }
+    const results = await vecStore.search(query, 10)
+    if (results.length === 0) {
+      return { content: [{ type: 'text', text: `No items matched "${query}". Try rephrasing or use search_items for exact text matches.` }] }
+    }
+    const lines = results.map((r, i) => {
+      const item = items.find((it: any) => it.id === r.id)
+      const label = item ? (item.text || item.description || item.label || item.url || item.hex || r.id) : r.id
+      const score = (r.score * 100).toFixed(0)
+      return `${i + 1}. [${item?.kind || '?'}] ${label} (relevance: ${score}%)`
+    })
+    return { content: [{ type: 'text', text: `Semantic search for "${query}":\n${lines.join('\n')}\n\n${results.length} result(s). IDs can be used with update_item/remove_items.` }] }
+  }
+)
+
+server.tool(
+  'related_items',
+  'Find items on the board that are semantically related to a given item. Returns items that complement or relate to the given item.',
+  { item_id: z.string().describe('ID of the item to find relations for') },
+  async ({ item_id }) => {
+    const state = readState()
+    const items = getItems(state).filter((i: any) => i.kind !== 'connector')
+    const target = items.find((i: any) => i.id === item_id)
+    if (!target) return { content: [{ type: 'text', text: `Item ${item_id} not found.` }] }
+
+    if (vecStore.size === 0) {
+      for (const item of items) await vecStore.indexItem(item)
+      vecStore.persist()
+    }
+
+    const results = await vecStore.related(item_id, 5)
+    if (results.length === 0) {
+      return { content: [{ type: 'text', text: `No related items found for "${target.text || target.description || target.label || item_id}".` }] }
+    }
+    const targetLabel = target.text || target.description || target.label || target.url || target.hex || item_id
+    const lines = results.map(r => {
+      const item = items.find((it: any) => it.id === r.id)
+      return `- [${item?.kind || '?'}] ${item?.text || item?.description || item?.label || item?.url || r.id} (similarity: ${(r.score * 100).toFixed(0)}%)`
+    })
+    return { content: [{ type: 'text', text: `Items related to "${targetLabel}":\n${lines.join('\n')}` }] }
+  }
+)
 
 server.tool('clear_board', 'Remove all items from the current board', {}, async () => {
   const state = readState()
