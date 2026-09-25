@@ -246,6 +246,7 @@ export function Canvas() {
       }
       needsRedraw.current = false
 
+      try {
       const state = useStore.getState()
       const vp = state.project.viewports.find(v => v.id === state.activeViewportId) ?? state.project.viewports[0]
       const its = vp?.items ?? []
@@ -376,6 +377,10 @@ export function Canvas() {
       }
 
       ctx.restore()
+      } catch (err) {
+        console.warn('[MoodBored] draw error:', err)
+        needsRedraw.current = true // retry next frame
+      }
       rafRef.current = requestAnimationFrame(draw)
     }
 
