@@ -20,6 +20,14 @@
       "description": "Add one or more items to the board (notes, images, palettes, gradients, fonts, links, videos, containers, etc.)"
     },
     {
+      "name": "get_board",
+      "description": "Read the full board state — items, palette, typography, spatial layout, relationships"
+    },
+    {
+      "name": "add_items",
+      "description": "Add items to the board (notes, images, palettes, gradients, fonts, links, videos, containers, etc.)"
+    },
+    {
       "name": "remove_items",
       "description": "Remove items from the board by their IDs"
     },

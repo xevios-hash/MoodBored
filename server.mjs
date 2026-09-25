@@ -171,6 +171,7 @@ function notifyBoardChange(boardId, state) {
 // ─── Express App ────────────────────────────────────────────────────
 
 const app = express()
+app.set('trust proxy', true) // Railway, Cloudflare, etc. set X-Forwarded-Proto
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 
@@ -755,6 +756,14 @@ async function executeTool(name, args, sessionBoardId) {
   }
 }
 
+// Sanity check: verify /mcp page origin is correct (dev-only)
+app.get('/mcp/selftest', (req, res) => {
+  const expected = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`
+  const rendered = buildMcpPage(req)
+  const ok = rendered.includes(expected) && !rendered.includes('localhost')
+  res.json({ expected, contains_localhost: rendered.includes('localhost'), ok })
+})
+
 // ─── MCP Discovery (before SPA fallback) ────────────────────────────
 
 // MCP Discovery — serve .well-known from dist (built) or public (dev)
@@ -762,22 +771,22 @@ app.use('/.well-known', express.static(join(__dirname, 'dist', '.well-known')))
 app.use('/.well-known', express.static(join(__dirname, 'public', '.well-known')))
 
 // MCP connection info page — human-readable, copy-pasteable
-app.get('/mcp', (req, res) => {
-  const origin = `${req.protocol}://${req.get('host')}`
+// ─── MCP Info Page ──────────────────────────────────────────────────
+
+function buildMcpPage(req) {
+  const origin = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`
   const boards = listBoards()
   const boardList = boards.length > 0
     ? boards.map(b => `<li><code>${b.id}</code> — ${b.name} (${b.itemCount} items)</li>`).join('')
     : '<li>No boards yet. Create one at <a href="/">the app</a>.</li>'
 
-  res.type('html').send(`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>MoodBored MCP Server</title>
 <style>body{font-family:Inter,system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 20px;color:#e8e0f5;background:#0c0814}
 code{background:#1a0030;padding:2px 6px;border-radius:4px;font-size:13px}
 pre{background:#1a0030;padding:16px;border-radius:8px;overflow-x:auto;font-size:13px}
 h1{font-size:20px}h2{font-size:15px;margin-top:24px;border-bottom:1px solid #2d0055;padding-bottom:6px}
-a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}
-.copy{background:#7c6cbf;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:8px}
-.copy:hover{background:#9b8ce0}</style></head>
+a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}</style></head>
 <body>
 <h1>MoodBored MCP Server</h1>
 <p>Visual mood-board workspace — any LLM can read, write, and arrange items via MCP tools.</p>
@@ -807,6 +816,8 @@ a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}
 <li><strong>remove_items</strong> — delete by ID</li>
 <li><strong>update_item</strong> — edit any item properties</li>
 <li><strong>search_items</strong> — text + tag search</li>
+<li><strong>semantic_search</strong> — meaning-based search</li>
+<li><strong>related_items</strong> — find items related to a given item</li>
 <li><strong>arrange_items</strong> — grid, stack, spiral layouts</li>
 <li><strong>clear_board</strong> — wipe all items</li>
 </ul>
@@ -839,7 +850,19 @@ a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}
 <li><code>board://current</code> — full board JSON</li>
 <li><code>board://summary</code> — text summary</li>
 </ul>
-</body></html>`)
+</body></html>`
+}
+
+app.get('/mcp', (req, res) => {
+  res.type('html').send(buildMcpPage(req))
+})
+
+// Sanity check: verify rendered page uses correct origin
+app.get('/mcp/selftest', (req, res) => {
+  const expected = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`
+  const rendered = buildMcpPage(req)
+  const ok = rendered.includes(expected)
+  res.json({ expected, rendered_contains_localhost: rendered.includes('localhost'), ok })
 })
 
 // MCP manifest fallback (for clients that can't access .well-known)
@@ -868,9 +891,10 @@ ensureDir(BOARDS_DIR)
 await loadFromSupabase().catch(() => {})
 
 app.listen(PORT, () => {
+  const origin = process.env.PUBLIC_URL || `http://localhost:${PORT}`
   console.log(`MoodBored server on port ${PORT}`)
-  console.log(`  Frontend:  http://localhost:${PORT}`)
-  console.log(`  Boards:    http://localhost:${PORT}/api/boards`)
-  console.log(`  MCP SSE:   http://localhost:${PORT}/mcp/sse`)
+  console.log(`  Frontend:  ${origin}`)
+  console.log(`  Boards:    ${origin}/api/boards`)
+  console.log(`  MCP SSE:   ${origin}/mcp/sse`)
   console.log(`  Board dir: ${BOARDS_DIR}`)
 })
