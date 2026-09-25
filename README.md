@@ -182,16 +182,6 @@ curl "https://your-domain.com/api/board/BOARD_ID/semantic?q=warm+coastal+vibes"
 | `Delete` | Delete selected | `Escape` | Cancel/deselect |
 | Double-click | Create note | Right-click | Context menu |
 
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENROUTER_API_KEY` | For AI features | OpenRouter API key for chat, image gen, semantic search |
-| `VITE_UNSPLASH_ACCESS_KEY` | For image search | Unsplash API key (free at unsplash.com/developers) |
-| `VITE_SUPABASE_URL` | For cloud sync | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | For cloud sync | Supabase anon key |
-| `PORT` | No | Server port (default: 3000) |
-
 ## License
 
 Apache 2.0
