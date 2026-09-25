@@ -387,7 +387,8 @@ app.use('/.well-known', express.static(join(__dirname, 'dist', '.well-known')))
 app.use('/.well-known', express.static(join(__dirname, 'public', '.well-known')))
 
 // MCP connection info page — human-readable, copy-pasteable
-app.get('/mcp', (_req, res) => {
+app.get('/mcp', (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`
   const boards = listBoards()
   const boardList = boards.length > 0
     ? boards.map(b => `<li><code>${b.id}</code> — ${b.name} (${b.itemCount} items)</li>`).join('')
@@ -410,7 +411,7 @@ a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}
 <ul>${boardList}</ul>
 
 <h2>Connect via SSE (OpenCode, web-based IDEs)</h2>
-<pre>http://localhost:${PORT}/mcp/sse?board=BOARD_ID</pre>
+<pre>${origin}/mcp/sse?board=BOARD_ID</pre>
 
 <h2>Connect via stdio (Claude Desktop, Cursor)</h2>
 <pre>{
