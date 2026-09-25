@@ -146,23 +146,6 @@ MCP clients can auto-discover the server via `/.well-known/mcp.json`.
 - PWA (installable, works offline)
 - Code splitting (vendor/store/UI chunks)
 
-## Embed Mode
-
-Open any board URL to get a canvas-only view — no chat, no sidebar:
-
-```
-http://localhost:3000/board/{id}
-http://localhost:3000/board/{id}?embed=1&theme=dark
-http://localhost:3000/board/{id}?readonly=1
-```
-
-PostMessage API:
-```js
-window.postMessage({ type: 'addItems', items: [...] }, '*')
-window.postMessage({ type: 'setTheme', theme: 'dark' }, '*')
-window.postMessage({ type: 'focusItem', id: '...' }, '*')
-```
-
 ## Keyboard Shortcuts
 
 | Key | Action | Key | Action |
@@ -193,37 +176,6 @@ window.postMessage({ type: 'focusItem', id: '...' }, '*')
 | `sizeguide` | Dimensions | 1920×1080 hero banner |
 | `video` | Video reference | Subject + motion description |
 | `container` | Group of items | Free/grid/stack layout modes |
-
-## Architecture
-
-```
-src/                      React frontend
-├── components/           Canvas, Chat, Inspector, Settings, etc.
-├── lib/                  Core logic
-│   ├── api.ts            OpenRouter streaming + tool-calling
-│   ├── tools.ts          MCP tool definitions
-│   ├── sync.ts           Supabase sync (optional)
-│   ├── storage.ts        IndexedDB persistence
-│   ├── exportForCreation.ts  Creative brief export
-│   └── collaboration.ts  Share links + presence
-├── stores/               Zustand state management
-└── types/                TypeScript type definitions
-
-mcp/mcp-server.ts         MCP server (stdio transport)
-server.mjs                Express server (static + SSE + board API)
-src-tauri/                Tauri desktop wrapper (macOS)
-bend/                     Formal verification (data model, laws, proofs)
-```
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PORT` | No | Server port (default: 3000) |
-| `BOARDS_DIR` | No | Board storage directory |
-| `VITE_SUPABASE_URL` | No | Supabase project URL (for cloud sync) |
-| `VITE_SUPABASE_ANON_KEY` | No | Supabase anon key (for cloud sync) |
-| `MOODBORED_BOARD_ID` | No | MCP: target a specific board |
 
 ## License
 

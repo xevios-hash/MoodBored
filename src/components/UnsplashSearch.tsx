@@ -19,8 +19,8 @@ interface Props {
 }
 
 // Unsplash demo access key — rate-limited to 50 req/hour.
-// For production, users should provide their own key in Settings.
-const UNSPLASH_KEY = 'vMRWnpbOyBJAGzV䧘ZQKh⻄oHjCglm3M䁖㹘njY獍w'
+// @ts-expect-error import.meta.env is Vite-specific
+const UNSPLASH_KEY = import.meta.env?.VITE_UNSPLASH_ACCESS_KEY || ''
 const UNSPLASH_API = 'https://api.unsplash.com'
 
 export function UnsplashSearch({ onClose }: Props) {
