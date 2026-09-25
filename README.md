@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logo-transparent.png" width="120" alt="MoodBored Logo" />
+  <img src="public/logo-hero.png" width="200" alt="MoodBored" />
 </p>
 
 <h1 align="center">MoodBored</h1>
@@ -28,8 +28,13 @@ MoodBored is a collaborative canvas for creative direction — mood boards, bran
 ## Screenshots
 
 <p align="center">
-  <img src="public/screenshot-board.png" width="800" alt="MoodBored Canvas" /><br/>
-  <em>Infinite canvas with images, palettes, gradients, fonts, and notes</em>
+  <img src="public/screenshot-board-day.png" width="800" alt="MoodBored Canvas — Daylight" /><br/>
+  <em>Infinite canvas with daylight clouds video background — images, palettes, gradients, fonts, and notes</em>
+</p>
+
+<p align="center">
+  <img src="public/screenshot-board-dark.png" width="800" alt="MoodBored Canvas — Dark" /><br/>
+  <em>Dark mode canvas with items populated by AI</em>
 </p>
 
 <p align="center">
