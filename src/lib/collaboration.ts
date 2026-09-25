@@ -11,6 +11,11 @@
 import { supabase } from './sync'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
+function requireSupabase() {
+  if (!supabase) throw new Error('Supabase not configured')
+  return supabase
+}
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 export type ShareRole = 'viewer' | 'editor'
@@ -98,7 +103,7 @@ export async function createShareLink(
   role: ShareRole = 'viewer',
 ): Promise<BoardShare | null> {
   const userId = await getCurrentUserIdOrNull()
-  const { data, error } = await supabase
+  const { data, error } = await requireSupabase()
     .from('board_shares')
     .insert({
       board_id: boardId,
@@ -116,7 +121,7 @@ export async function createShareLink(
 }
 
 export async function getShareByToken(token: string): Promise<BoardShare | null> {
-  const { data, error } = await supabase
+  const { data, error } = await requireSupabase()
     .from('board_shares')
     .select('*')
     .eq('share_token', token)
@@ -128,7 +133,7 @@ export async function getShareByToken(token: string): Promise<BoardShare | null>
 }
 
 export async function listShareLinks(boardId: string): Promise<BoardShare[]> {
-  const { data, error } = await supabase
+  const { data, error } = await requireSupabase()
     .from('board_shares')
     .select('*')
     .eq('board_id', boardId)
@@ -140,7 +145,7 @@ export async function listShareLinks(boardId: string): Promise<BoardShare[]> {
 }
 
 export async function updateShareRole(shareId: string, role: ShareRole): Promise<boolean> {
-  const { error } = await supabase
+  const { error } = await requireSupabase()
     .from('board_shares')
     .update({ role })
     .eq('id', shareId)
@@ -149,7 +154,7 @@ export async function updateShareRole(shareId: string, role: ShareRole): Promise
 }
 
 export async function revokeShareLink(shareId: string): Promise<boolean> {
-  const { error } = await supabase
+  const { error } = await requireSupabase()
     .from('board_shares')
     .update({ is_active: false })
     .eq('id', shareId)
@@ -178,6 +183,7 @@ export function joinBoard(
   const sessionId = getSessionId()
   const channelName = `board:${boardId}`
 
+  if (!supabase) return { channel: null as any, leave: () => {} }
   const channel = supabase.channel(channelName, {
     config: { presence: { key: sessionId } },
   })
@@ -254,7 +260,7 @@ export function joinBoard(
   })
 
   const leave = () => {
-    supabase.removeChannel(channel)
+    if (supabase) supabase.removeChannel(channel)
   }
 
   return { channel, leave }
@@ -312,6 +318,7 @@ export function canView(role: ShareRole): boolean {
 
 async function getCurrentUserIdOrNull(): Promise<string | null> {
   try {
+    if (!supabase) return null
     const { data } = await supabase.auth.getUser()
     return data.user?.id ?? null
   } catch {

@@ -276,7 +276,7 @@ export interface SearchResult {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  apiKey: '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',
+  apiKey: '',
   defaultModel: 'anthropic/claude-sonnet-4',
   jevThreshold: 0.2,
   multiAgent: false,

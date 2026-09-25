@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import { streamChat, buildSystemPrompt, parseAgentActions, resetAgentDiagnostics, agentDiagnostics } from './api'
 import { useStore } from '@/stores/useStore'
 
-const API_KEY = process.env.MOODBORED_TEST_KEY || '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'
+const API_KEY = process.env.MOODBORED_TEST_KEY || ''
 const MODEL = 'anthropic/claude-sonnet-4'
 
 describe.skipIf(!process.env.MOODBORED_LIVE)('live streaming agent round-trip (ChatPanel replica)', () => {

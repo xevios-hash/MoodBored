@@ -380,7 +380,70 @@ async function executeTool(name, args, sessionBoardId) {
   }
 }
 
-// ─── SPA Fallback ───────────────────────────────────────────────────
+// ─── MCP Discovery (before SPA fallback) ────────────────────────────
+
+app.get('/.well-known/mcp.json', (_req, res) => {
+  res.sendFile(join(__dirname, 'public', '.well-known', 'mcp.json'))
+})
+
+// MCP connection info page — human-readable, copy-pasteable
+app.get('/mcp', (_req, res) => {
+  const boards = listBoards()
+  const boardList = boards.length > 0
+    ? boards.map(b => `<li><code>${b.id}</code> — ${b.name} (${b.itemCount} items)</li>`).join('')
+    : '<li>No boards yet. Create one at <a href="/">the app</a>.</li>'
+
+  res.type('html').send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>MoodBored MCP Server</title>
+<style>body{font-family:Inter,system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 20px;color:#e8e0f5;background:#0c0814}
+code{background:#1a0030;padding:2px 6px;border-radius:4px;font-size:13px}
+pre{background:#1a0030;padding:16px;border-radius:8px;overflow-x:auto;font-size:13px}
+h1{font-size:20px}h2{font-size:15px;margin-top:24px;border-bottom:1px solid #2d0055;padding-bottom:6px}
+a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}
+.copy{background:#7c6cbf;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:8px}
+.copy:hover{background:#9b8ce0}</style></head>
+<body>
+<h1>MoodBored MCP Server</h1>
+<p>Visual mood-board workspace — any LLM can read, write, and arrange items via MCP tools.</p>
+
+<h2>Available Boards</h2>
+<ul>${boardList}</ul>
+
+<h2>Connect via SSE (OpenCode, web-based IDEs)</h2>
+<pre>http://localhost:${PORT}/mcp/sse?board=BOARD_ID</pre>
+
+<h2>Connect via stdio (Claude Desktop, Cursor)</h2>
+<pre>{
+  "mcpServers": {
+    "moodbored": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/MoodBored/mcp/mcp-server.ts"],
+      "env": { "MOODBORED_BOARD_ID": "BOARD_ID" }
+    }
+  }
+}</pre>
+<p>Replace <code>BOARD_ID</code> with one from the list above, or omit to auto-pick the most recent board.</p>
+
+<h2>Tools</h2>
+<ul>
+<li><strong>get_board</strong> — read full board state</li>
+<li><strong>add_items</strong> — add notes, images, palettes, fonts, gradients, links, videos, containers</li>
+<li><strong>remove_items</strong> — delete by ID</li>
+<li><strong>update_item</strong> — edit any item properties</li>
+<li><strong>search_items</strong> — text + tag search</li>
+<li><strong>arrange_items</strong> — grid, stack, spiral layouts</li>
+<li><strong>clear_board</strong> — wipe all items</li>
+</ul>
+
+<h2>Resources</h2>
+<ul>
+<li><code>board://current</code> — full board JSON</li>
+<li><code>board://summary</code> — text summary</li>
+</ul>
+</body></html>`)
+})
+
+// ─── SPA Fallback (catch-all, last) ─────────────────────────────────
 
 app.use(express.static(join(__dirname, 'dist'), { maxAge: '1y', immutable: true }))
 app.get('/{*splat}', (_req, res) => {

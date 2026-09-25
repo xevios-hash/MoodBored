@@ -2,11 +2,22 @@ import { createClient } from '@supabase/supabase-js'
 import type { Project } from '@/types'
 
 // @ts-expect-error import.meta.env is Vite-specific
-const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://riryaptlqpbuswjtiivg.supabase.co'
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || ''
 // @ts-expect-error import.meta.env is Vite-specific
-const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_o4mTwfp_iYzFtWIMgWXZHA_KQZ2wpb-'
+const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || ''
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.info('[MoodBored] Supabase not configured — cloud sync disabled. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable.')
+}
+
+export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null
+
+function requireSupabase() {
+  if (!supabase) throw new Error('Supabase not configured — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
+  return supabase
+}
 
 // ─── Project Sync ───────────────────────────────────────────────────
 
@@ -29,8 +40,9 @@ function sanitizeForRemote(project: Project): Project {
 }
 
 export async function pushProject(project: Project, userId: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
   if (!userId) throw new Error('Not signed in — projects cannot be synced anonymously')
-  const { error } = await supabase
+  const { error } = await requireSupabase()
     .from('projects')
     .upsert({
       id: project.id,
@@ -49,7 +61,7 @@ export async function pushProject(project: Project, userId: string): Promise<voi
 }
 
 export async function pullProject(id: string): Promise<Project | null> {
-  const { data, error } = await supabase
+  const { data, error } = await requireSupabase()
     .from('projects')
     .select('data')
     .eq('id', id)
@@ -62,8 +74,7 @@ export async function pullProject(id: string): Promise<Project | null> {
 }
 
 export async function listRemoteProjects(userId?: string): Promise<RemoteProject[]> {
-  // Anonymous users see nothing; signed-in users see their own projects.
-  if (!userId) return []
+  if (!supabase || !userId) return []
   let query = supabase
     .from('projects')
     .select('*')
@@ -80,6 +91,7 @@ export async function listRemoteProjects(userId?: string): Promise<RemoteProject
 }
 
 export async function deleteRemoteProject(id: string): Promise<void> {
+  if (!supabase) return
   const { error } = await supabase.from('projects').delete().eq('id', id)
   if (error) console.error('[MoodBored] Failed to delete project:', error)
 }
@@ -90,6 +102,7 @@ export function subscribeToProject(
   projectId: string,
   onChange: (project: Project) => void
 ): () => void {
+  if (!supabase) return () => {}
   const channel = supabase
     .channel(`project:${projectId}`)
     .on(
@@ -109,31 +122,37 @@ export function subscribeToProject(
     .subscribe()
 
   return () => {
-    supabase.removeChannel(channel)
+    requireSupabase().removeChannel(channel)
   }
 }
 
 // ─── Auth Helpers ───────────────────────────────────────────────────
 
 export async function signInAnonymously(): Promise<string | null> {
-  const { data, error } = await supabase.auth.signInAnonymously()
-  if (error) {
-    console.error('[MoodBored] Anonymous sign-in failed:', error)
-    return null
-  }
-  return data.user?.id ?? null
+  try {
+    const { data, error } = await requireSupabase().auth.signInAnonymously()
+    if (error) {
+      console.error('[MoodBored] Anonymous sign-in failed:', error)
+      return null
+    }
+    return data.user?.id ?? null
+  } catch { return null }
 }
 
 export async function signInWithEmail(email: string): Promise<void> {
-  const { error } = await supabase.auth.signInWithOtp({ email })
-  if (error) console.error('[MoodBored] Email sign-in failed:', error)
+  try {
+    const { error } = await requireSupabase().auth.signInWithOtp({ email })
+    if (error) console.error('[MoodBored] Email sign-in failed:', error)
+  } catch {}
 }
 
 export async function signOut(): Promise<void> {
-  await supabase.auth.signOut()
+  try { await requireSupabase().auth.signOut() } catch {}
 }
 
 export async function getCurrentUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.getUser()
-  return data.user?.id ?? null
+  try {
+    const { data } = await requireSupabase().auth.getUser()
+    return data.user?.id ?? null
+  } catch { return null }
 }
