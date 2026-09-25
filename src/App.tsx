@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useStore } from '@/stores/useStore'
+import { Settings } from 'lucide-react'
 import { Sidebar } from '@/components/Sidebar'
 import { Canvas } from '@/components/Canvas'
 import { ChatPanel } from '@/components/ChatPanel'
@@ -22,11 +23,12 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 // ─── URL Params (read once, before React renders) ───────────────────
 
 const URL_PARAMS = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
-const IS_EMBED = URL_PARAMS.has('embed')
+const PATH_BOARD_ID = typeof window !== 'undefined' ? window.location.pathname.match(/\/board\/([^/?]+)/)?.[1] ?? null : null
+const EMBED_BOARD_ID = URL_PARAMS.get('board') || PATH_BOARD_ID
+const IS_EMBED = URL_PARAMS.has('embed') || !!PATH_BOARD_ID
 const EMBED_READONLY = URL_PARAMS.has('readonly')
 const EMBED_THEME = URL_PARAMS.get('theme') as 'dark' | 'light' | null
 const EMBED_PROJECT_ID = URL_PARAMS.get('project')
-const EMBED_BOARD_ID = URL_PARAMS.get('board')
 
 // Detect if running inside an iframe (auto-enable embed if no explicit param)
 const IS_IFRAME = typeof window !== 'undefined' && window.self !== window.top
@@ -102,6 +104,8 @@ function initBoardSync(boardId: string | null) {
 
 // ─── Main App ───────────────────────────────────────────────────────
 
+function isDark() { return document.body.classList.contains('dark') }
+
 export default function App() {
   const isEmbed = IS_EMBED || (IS_IFRAME && !URL_PARAMS.has('token'))
   const [phase, setPhase] = useState<'splash' | 'start' | 'workspace'>(isEmbed ? 'workspace' : 'splash')
@@ -119,6 +123,7 @@ export default function App() {
   const [unsplashOpen, setUnsplashOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
+  const [embedSettingsOpen, setEmbedSettingsOpen] = useState(false)
 
   // Collaboration state
   const [collab, setCollab] = useState<CollaborationState>({
@@ -268,14 +273,23 @@ export default function App() {
     if (!isEmbed) broadcastSelection(channelRef.current, [...selectedIds][0] ?? null)
   }, [selectedIds, isEmbed])
 
-  // ─── Embed mode: canvas only ───
+  // ─── Embed mode: canvas only + background settings ───
   if (isEmbed) {
-    if (!embedReady) return null // loading
+    if (!embedReady) return null
     return (
       <div className="flex flex-col h-full w-full overflow-hidden" style={{ background: 'var(--bg-surface-0)' }}>
         <div className="flex flex-1 min-h-0 relative">
           <Canvas />
+          <button
+            onClick={() => setEmbedSettingsOpen(true)}
+            className="toolbar-btn"
+            style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, background: isDark() ? 'rgba(12,8,20,0.8)' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', borderRadius: 8, padding: 8, border: `1px solid ${isDark() ? 'rgba(124,108,191,0.1)' : 'rgba(0,0,0,0.06)'}` }}
+            title="Board settings"
+          >
+            <Settings size={16} />
+          </button>
         </div>
+        {embedSettingsOpen && <SettingsModal embed onClose={() => setEmbedSettingsOpen(false)} />}
       </div>
     )
   }

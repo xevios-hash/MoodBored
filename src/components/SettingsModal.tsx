@@ -4,25 +4,27 @@ import { useState } from 'react'
 import { resetJevCounter } from '@/lib/api'
 import { showToast } from '@/lib/toasts'
 
-export function SettingsModal() {
+export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: () => void }) {
   const settings = useStore((s) => s.project.settings)
   const updateSettings = useStore((s) => s.updateSettings)
   const toggleSettings = useStore((s) => s.toggleSettings)
   const [showApiKey, setShowApiKey] = useState(false)
 
+  const handleClose = onClose || toggleSettings
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center animate-fadeIn"
-      onClick={(e) => e.target === e.currentTarget && toggleSettings()}
+      onClick={(e) => e.target === e.currentTarget && handleClose()}
       role="dialog"
       aria-modal="true"
       aria-label="Settings"
     >
       <div className="w-[min(480px,90vw)] glass-card rounded-xl shadow-panel overflow-hidden animate-scaleIn">
         <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
-          <h2 className="text-base font-semibold text-text-primary">Settings</h2>
+          <h2 className="text-base font-semibold text-text-primary">{embed ? 'Board Settings' : 'Settings'}</h2>
           <button
-            onClick={toggleSettings}
+            onClick={handleClose}
             className="btn p-1 text-text-muted hover:text-text-primary hover:bg-surface-2 rounded"
             aria-label="Close settings"
           >
@@ -31,6 +33,7 @@ export function SettingsModal() {
         </div>
 
         <div className="p-4 space-y-5 max-h-[60vh] overflow-y-auto">
+          {!embed && (<>
           <Section title="API Configuration">
             <div>
               <label className="text-xs text-text-muted block mb-1">OpenRouter API Key</label>
@@ -153,6 +156,7 @@ export function SettingsModal() {
               <p className="text-2xs text-text-muted mt-2">To use: update the path in the copied config to your actual MoodBored project folder, then paste into Claude Desktop settings.</p>
             </div>
           </Section>
+          </>)}
 
           <Section title="Appearance">
             {/* Theme toggle */}
@@ -354,7 +358,7 @@ export function SettingsModal() {
         </div>
 
         <div className="p-4 border-t border-white/[0.06] flex justify-end">
-          <button onClick={toggleSettings} className="btn btn-primary" aria-label="Close settings">
+          <button onClick={handleClose} className="btn btn-primary" aria-label="Close settings">
             Done
           </button>
         </div>
