@@ -16,6 +16,9 @@ import { ExportModal } from '@/components/ExportModal'
 import { UnsplashSearch } from '@/components/UnsplashSearch'
 import { ShareModal } from '@/components/ShareModal'
 import { ColorPicker } from '@/components/ColorPicker'
+import { SnapshotTimeline } from '@/components/SnapshotTimeline'
+import { WorkspaceManager } from '@/components/WorkspaceManager'
+import { ChromeImport } from '@/components/ChromeImport'
 import { PresenceBar, RemoteCursors } from '@/components/Presence'
 import { joinBoard, getShareByToken, broadcastCursor, broadcastSelection, type PresenceUser, type ShareRole, type CollaborationState } from '@/lib/collaboration'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -132,6 +135,9 @@ export default function App() {
   const [shareOpen, setShareOpen] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const [embedSettingsOpen, setEmbedSettingsOpen] = useState(false)
+  const [snapshotTimelineOpen, setSnapshotTimelineOpen] = useState(false)
+  const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false)
+  const [chromeImportOpen, setChromeImportOpen] = useState(false)
 
   // Collaboration state
   const [collab, setCollab] = useState<CollaborationState>({
@@ -238,6 +244,9 @@ export default function App() {
   const handleUnsplashSearch = useCallback(() => setUnsplashOpen(true), [])
   const handleShareOpen = useCallback(() => setShareOpen(true), [])
   const handleColorPickerOpen = useCallback(() => setColorPickerOpen(true), [])
+  const handleSnapshotTimeline = useCallback(() => setSnapshotTimelineOpen(true), [])
+  const handleWorkspaceManager = useCallback(() => setWorkspaceManagerOpen(true), [])
+  const handleChromeImport = useCallback(() => setChromeImportOpen(true), [])
 
   const canEdit = isEmbed ? !EMBED_READONLY : (collab.role === 'editor' || !collab.shareToken)
 
@@ -335,7 +344,7 @@ export default function App() {
           <Sidebar />
         </div>
         <main className="flex flex-col flex-1 min-w-0">
-          <TopBar onExportForCreation={handleExportForCreation} onUnsplashSearch={handleUnsplashSearch} onShare={handleShareOpen} onColorPicker={handleColorPickerOpen} presenceBar={<PresenceBar users={remoteUsers} isConnected={collab.isConnected} />} />
+          <TopBar onExportForCreation={handleExportForCreation} onUnsplashSearch={handleUnsplashSearch} onShare={handleShareOpen} onColorPicker={handleColorPickerOpen} onSnapshotTimeline={handleSnapshotTimeline} onWorkspaceManager={handleWorkspaceManager} onChromeImport={handleChromeImport} presenceBar={<PresenceBar users={remoteUsers} isConnected={collab.isConnected} />} />
           <div className="flex flex-1 min-h-0 relative">
             <Canvas />
             <RemoteCursors users={remoteUsers} canvasPanX={canvas.panX} canvasPanY={canvas.panY} canvasZoom={canvas.zoom} />
@@ -358,6 +367,9 @@ export default function App() {
         {unsplashOpen && <UnsplashSearch onClose={() => setUnsplashOpen(false)} />}
         {shareOpen && <ShareModal onClose={() => setShareOpen(false)} />}
         {colorPickerOpen && <ColorPicker onClose={() => setColorPickerOpen(false)} />}
+        {snapshotTimelineOpen && <SnapshotTimeline onClose={() => setSnapshotTimelineOpen(false)} />}
+        {workspaceManagerOpen && <WorkspaceManager onClose={() => setWorkspaceManagerOpen(false)} />}
+        {chromeImportOpen && <ChromeImport onClose={() => setChromeImportOpen(false)} />}
       </div>
     </>
   )

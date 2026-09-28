@@ -3,7 +3,8 @@ import { useStore } from '@/stores/useStore'
 import { hitTestItem } from '@/lib/layout'
 import { loadFont } from '@/lib/fonts'
 import { showToast } from '@/lib/toasts'
-import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner } from '@/types'
+import { WebNode } from '@/components/WebNode'
+import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner, WebItem, ConnectionType } from '@/types'
 
 // ─── Item Creation Defaults ─────────────────────────────────────────
 // Shared between the floating toolbar and the right-click context menu.
@@ -150,6 +151,7 @@ const KIND_COLORS: Record<string, string> = {
   text: '#8b7dc8', note: '#e8b840', image: '#e88098', link: '#6aa8d8',
   video: '#a888d8', palette: '#78c8a0', gradient: '#e89060', font: '#d87898',
   swatch: '#78b8d8', sizeguide: '#999999', container: '#78c8a0', connector: '#666688',
+  web: '#6aa8d8',
 }
 const RESIZE_HANDLE_SIZE = 8
 
@@ -713,7 +715,11 @@ export function Canvas() {
       if (e.key === 'Delete' || e.key === 'Backspace') { for (const id of s.selectedIds) s.removeItem(id) }
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); s.toggleSearch() }
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') { e.preventDefault(); s.selectAll() }
-      if (e.key === 'Escape') { s.endConnect(); s.clearSelection() }
+      if (e.key === 'Escape') {
+        s.endConnect()
+        s.clearSelection()
+        if (s.focusedWebNodeId) s.focusWebNode(null)
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); s.undo() }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) { e.preventDefault(); s.redo() }
       if ((e.metaKey || e.ctrlKey) && e.key === 'y') { e.preventDefault(); s.redo() }
@@ -780,13 +786,9 @@ export function Canvas() {
     const vp = state.project.viewports.find(v => v.id === state.activeViewportId) ?? state.project.viewports[0]
     const hit = hitTestItem(vp?.items ?? [], wx, wy)
 
-    // Double-click on empty canvas → create a new note
+    // Double-click on empty canvas → create a blank card
     if (!hit) {
-      state.addItem({
-        kind: 'note', id: crypto.randomUUID(), text: '',
-        purpose: '', importance: '', tags: [],
-        pos: { x: wx - 125, y: wy - 75 },
-      })
+      state.createBlankCard({ x: wx - 150, y: wy - 100 })
       return
     }
 
@@ -1175,6 +1177,69 @@ export function Canvas() {
         )
       })}
 
+      {/* Web node overlays */}
+      {items.filter(i => i.kind === 'web').map(item => {
+        if (!('pos' in item) || item.kind !== 'web') return null
+        const webItem = item as WebItem
+        const isSelected = useStore.getState().selectedIds.has(item.id)
+        const isFocused = useStore.getState().focusedWebNodeId === item.id
+        return (
+          <WebNode
+            key={item.id}
+            item={webItem}
+            canvasZoom={canvas.zoom}
+            canvasPanX={canvas.panX}
+            canvasPanY={canvas.panY}
+            isSelected={isSelected}
+            isFocused={isFocused}
+          />
+        )
+      })}
+
+      {/* Typed connection overlays */}
+      {(viewport?.typedConnections || []).map((conn, idx) => {
+        const fromItem = items.find(i => i.id === conn.fromItemId)
+        const toItem = items.find(i => i.id === conn.toItemId)
+        if (!fromItem || !toItem || !('pos' in fromItem) || !('pos' in toItem)) return null
+        const fx = (fromItem.pos.x + (fromItem.size?.w ?? 250) / 2) * canvas.zoom + canvas.panX
+        const fy = (fromItem.pos.y + (fromItem.size?.h ?? 150) / 2) * canvas.zoom + canvas.panY
+        const tx = (toItem.pos.x + (toItem.size?.w ?? 250) / 2) * canvas.zoom + canvas.panX
+        const ty = (toItem.pos.y + (toItem.size?.h ?? 150) / 2) * canvas.zoom + canvas.panY
+        const connColors: Record<string, string> = {
+          citation: '#6aa8d8', dependency: '#e88098', contradiction: '#e89060',
+          related: '#78c8a0', mcp: '#a888d8', api: '#d87898', custom: '#8888aa',
+        }
+        const color = connColors[conn.connectionType] || '#8888aa'
+        return (
+          <svg key={`typed-${idx}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5 }}>
+            <defs>
+              <marker id={`arrow-${idx}`} markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <path d={`M0,0 L8,3 L0,6`} fill={color} />
+              </marker>
+            </defs>
+            <line
+              x1={fx} y1={fy} x2={tx} y2={ty}
+              stroke={color}
+              strokeWidth={2}
+              strokeDasharray={conn.connectionType === 'contradiction' ? '6,4' : 'none'}
+              markerEnd={`url(#arrow-${idx})`}
+            />
+            {conn.label && (
+              <text
+                x={(fx + tx) / 2}
+                y={(fy + ty) / 2 - 8}
+                textAnchor="middle"
+                fill={color}
+                fontSize={10}
+                fontFamily="Inter, sans-serif"
+              >
+                {conn.label}
+              </text>
+            )}
+          </svg>
+        )
+      })}
+
       {/* Inline text editing overlay */}
       {editingItem && (() => {
         const item = items.find(i => i.id === editingItem.id)
@@ -1506,6 +1571,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
     case 'sizeguide': drawSizeGuideItem(ctx, item, x, y, w, h, zoom); break
     case 'container': drawContainerItem(ctx, item, x, y, w, h, zoom); break
     case 'link': drawLinkItem(ctx, item, x, y, w, h, zoom); break
+    case 'web': drawWebItem(ctx, item as any, x, y, w, h, zoom); break
     default: drawTextBasedItem(ctx, item, x, y, w, h, zoom); break
   }
   ctx.restore()
@@ -1701,6 +1767,69 @@ function drawLinkItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: nu
     ctx.fillRect(x + PAD, maxBot - 14, w - PAD * 2, 14)
     ctx.fillStyle = txtMuted(); ctx.font = '8px Inter, sans-serif'
     ctx.fillText(url.slice(0, 50) + (url.length > 50 ? '…' : ''), x + PAD + 4, maxBot - 3)
+  }
+}
+
+function drawWebItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  const url = item.url || ''
+  let domain = ''
+  try { domain = new URL(url).hostname.replace('www.', '') } catch {}
+  const title = item.title || domain || 'Web'
+  const cardType = item.cardType || 'web'
+  const maxBot = y + h - PAD
+  let cy = y + PAD
+
+  // Card type label
+  const typeLabels: Record<string, string> = {
+    blank: 'NEW CARD', web: 'WEB', note: 'NOTE', search: 'SEARCH', file: 'FILE', ai: 'AI', image: 'IMAGE', link: 'LINK',
+  }
+  ctx.fillStyle = accent(); ctx.font = '600 9px Inter, sans-serif'
+  ctx.fillText(typeLabels[cardType] || 'WEB', x + PAD, cy + 9); cy += 20
+
+  if (cardType === 'blank') {
+    // Blank card - show placeholder
+    ctx.fillStyle = txtMuted(); ctx.font = '400 11px Inter, sans-serif'
+    ctx.fillText('Type a URL, search, or note...', x + PAD, cy + 2)
+    return
+  }
+
+  if (cardType === 'note' || cardType === 'ai') {
+    // Note/AI card - show content
+    const content = item.content || ''
+    if (title && title !== 'Note' && title !== 'AI Response') {
+      ctx.fillStyle = txtPrimary(); ctx.font = '600 12px Inter, sans-serif'
+      ctx.fillText(title.slice(0, 40), x + PAD, cy + 2); cy += 18
+    }
+    if (content && cy < maxBot) {
+      ctx.fillStyle = txtSecondary(); ctx.font = '10px Inter, sans-serif'
+      wrapText(ctx, content.slice(0, 200), x + PAD, cy, w - PAD * 2, 14, maxBot - cy)
+    }
+    return
+  }
+
+  // Web/Search/Image cards - show URL and favicon area
+  ctx.fillStyle = txtPrimary(); ctx.font = '600 12px Inter, sans-serif'
+  ctx.fillText(title.slice(0, 40), x + PAD, cy + 2); cy += 18
+
+  if (domain && cy < maxBot) {
+    ctx.fillStyle = txtMuted(); ctx.font = '8px Inter, sans-serif'
+    ctx.fillText(domain, x + PAD, cy); cy += 14
+  }
+
+  if (url && cy < maxBot) {
+    ctx.fillStyle = isDark() ? 'rgba(139,125,200,0.06)' : 'rgba(0,0,0,0.03)'
+    ctx.fillRect(x + PAD, maxBot - 14, w - PAD * 2, 14)
+    ctx.fillStyle = txtMuted(); ctx.font = '8px Inter, sans-serif'
+    ctx.fillText(url.slice(0, 50) + (url.length > 50 ? '…' : ''), x + PAD + 4, maxBot - 3)
+  }
+
+  // Loading indicator
+  if (item.isLoading) {
+    ctx.fillStyle = isDark() ? 'rgba(139,125,200,0.1)' : 'rgba(106,90,174,0.1)'
+    ctx.fillRect(x + PAD, cy, w - PAD * 2, maxBot - cy - 18)
+    ctx.fillStyle = txtMuted(); ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText('Loading...', x + w / 2, cy + (maxBot - cy - 18) / 2 + 4)
+    ctx.textAlign = 'start'
   }
 }
 

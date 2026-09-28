@@ -21,7 +21,7 @@ export const BOARD_TOOLS = [
               properties: {
                 kind: {
                   type: 'string' as const,
-                  enum: ['note', 'text', 'image', 'link', 'palette', 'gradient', 'font', 'swatch', 'sizeguide', 'container', 'video'],
+                  enum: ['note', 'text', 'image', 'link', 'palette', 'gradient', 'font', 'swatch', 'sizeguide', 'container', 'video', 'web'],
                   description: 'The type of item to create',
                 },
                 text: { type: 'string' as const, description: 'Content for notes/text items' },
@@ -191,6 +191,42 @@ export const BOARD_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'open_url',
+      description: 'Open a URL as a live web page node on the board. Creates an interactive browser card that the user can navigate.',
+      parameters: {
+        type: 'object' as const,
+        required: ['url'],
+        properties: {
+          url: { type: 'string' as const, description: 'The URL to open' },
+          title: { type: 'string' as const, description: 'Display title for the card' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'draw_connection',
+      description: 'Draw a typed connection between two items on the board. Use this to show relationships like citation, dependency, contradiction, or related content.',
+      parameters: {
+        type: 'object' as const,
+        required: ['from_id', 'to_id', 'connection_type'],
+        properties: {
+          from_id: { type: 'string' as const, description: 'Source item ID' },
+          to_id: { type: 'string' as const, description: 'Target item ID' },
+          connection_type: {
+            type: 'string' as const,
+            enum: ['citation', 'dependency', 'contradiction', 'related', 'mcp', 'api', 'custom'],
+            description: 'Type of connection',
+          },
+          label: { type: 'string' as const, description: 'Optional label for the connection' },
+        },
+      },
+    },
+  },
 ]
 
 // System prompt for tool-calling mode — shorter than the JSON-block prompt
@@ -210,6 +246,9 @@ RULES:
 7. If the board is empty, populate it with items matching the user's request.
 8. NEVER ask clarifying questions. Choose a strong direction and add concrete items.
 9. You may write a short friendly message alongside your tool calls.
+10. Use open_url to open web pages as live browser cards on the board.
+11. Use draw_connection to show relationships between items (citation, dependency, contradiction, related).
+12. When the user asks about connections or relationships between items, draw them visually.
 
 CURRENT BOARD:
 ${projectSummary}
@@ -218,7 +257,7 @@ ${boardDescription}`
 }
 
 // Process tool calls from the LLM response into AgentActions
-export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove_item' | 'update_item' | 'group_items' | 'arrange_items' | 'generate_image'; item?: any; itemId?: string; updates?: any; label?: string; layout?: string; cols?: number; gap?: number; prompt?: string; description?: string; purpose?: string; tags?: string[] }[] {
+export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove_item' | 'update_item' | 'group_items' | 'arrange_items' | 'generate_image' | 'open_url' | 'draw_connection'; item?: any; itemId?: string; updates?: any; label?: string; layout?: string; cols?: number; gap?: number; prompt?: string; description?: string; purpose?: string; tags?: string[]; url?: string; fromId?: string; toId?: string; connectionType?: string }[] {
   const actions: any[] = []
   for (const tc of toolCalls) {
     const fn = tc.function
@@ -255,6 +294,16 @@ export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove
         break
       case 'generate_image':
         actions.push({ type: 'generate_image', prompt: args.prompt, description: args.description, purpose: args.purpose, tags: args.tags })
+        break
+      case 'open_url':
+        if (args.url) {
+          actions.push({ type: 'open_url', url: args.url, title: args.title })
+        }
+        break
+      case 'draw_connection':
+        if (args.from_id && args.to_id && args.connection_type) {
+          actions.push({ type: 'draw_connection', fromId: args.from_id, toId: args.to_id, connectionType: args.connection_type, label: args.label })
+        }
         break
     }
   }

@@ -957,5 +957,7 @@ function getSearchText(item: BoardItem): string {
     case 'sizeguide': return `${item.label} ${item.width}x${item.height}${item.unit} ${item.purpose}`
     case 'container': return `${item.label} ${item.purpose} ${item.importance}`
     case 'connector': return `${item.label} ${item.fromId} ${item.toId}`
+    case 'web': return `${item.title || ''} ${item.url || ''} ${item.content || ''} ${item.purpose || ''} ${item.importance || ''}`
+    default: return ''
   }
 }
