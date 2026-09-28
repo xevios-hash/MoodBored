@@ -5,6 +5,7 @@ import {
   Download, Upload, Keyboard, FileText, Check, Cloud,
   LayoutGrid, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
   RotateCcw, Group, ArrowUpDown, Sparkles, ImageIcon, Share2, Palette,
+  Camera, FolderOpen, Globe,
 } from 'lucide-react'
 
 interface Props {
@@ -12,10 +13,13 @@ interface Props {
   onUnsplashSearch?: () => void
   onShare?: () => void
   onColorPicker?: () => void
+  onSnapshotTimeline?: () => void
+  onWorkspaceManager?: () => void
+  onChromeImport?: () => void
   presenceBar?: React.ReactNode
 }
 
-export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColorPicker, presenceBar }: Props) {
+export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColorPicker, onSnapshotTimeline, onWorkspaceManager, onChromeImport, presenceBar }: Props) {
   const project = useStore((s) => s.project)
   const [saved, setSaved] = useState(true)
   const [showOrgMenu, setShowOrgMenu] = useState(false)
@@ -130,6 +134,10 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
         <ToolbarButton icon={<ImageIcon size={16} />} onClick={onUnsplashSearch ?? (() => {})} title="Search Unsplash for images" />
         <ToolbarButton icon={<Share2 size={16} />} onClick={onShare ?? (() => {})} title="Share board" />
         <ToolbarButton icon={<Palette size={16} />} onClick={onColorPicker ?? (() => {})} title="Color picker & palette generator" />
+        <div className="w-px h-5 bg-surface-4 mx-1" />
+        <ToolbarButton icon={<Camera size={16} />} onClick={onSnapshotTimeline ?? (() => {})} title="Snapshots & versioning" />
+        <ToolbarButton icon={<FolderOpen size={16} />} onClick={onWorkspaceManager ?? (() => {})} title="Workspaces" />
+        <ToolbarButton icon={<Globe size={16} />} onClick={onChromeImport ?? (() => {})} title="Import Chrome tabs" />
         <div className="w-px h-5 bg-surface-4 mx-1" />
         <div className="relative">
           <ToolbarButton icon={<LayoutGrid size={16} />} onClick={() => setShowOrgMenu(!showOrgMenu)} title="Arrange items" />

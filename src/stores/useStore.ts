@@ -15,6 +15,13 @@ import type {
   PortConnection,
   ContainerItem,
   LayoutMode,
+  WebItem,
+  CardType,
+  TypedConnection,
+  ConnectionType,
+  SnapshotMeta,
+  WorkspaceMeta,
+  BrowserHistory,
 } from '@/types'
 
 interface CanvasState {
@@ -44,6 +51,39 @@ interface AppState {
   hoveredPortId: string | null
   connectingFrom: { itemId: string; portId: string } | null
   setExpandedItem: (id: string | null) => void
+
+  // Browser / Spatial Tabs
+  focusedWebNodeId: string | null
+  webNodes: Map<string, WebItem>
+  focusWebNode: (id: string | null) => void
+  navigateWebNode: (id: string, url: string) => void
+  webNodeGoBack: (id: string) => void
+  webNodeGoForward: (id: string) => void
+  webNodeReload: (id: string) => void
+  closeWebNode: (id: string) => void
+  updateWebNode: (id: string, updates: Partial<WebItem>) => void
+
+  // Typed Connections
+  typedConnections: TypedConnection[]
+  addTypedConnection: (conn: TypedConnection) => void
+  removeTypedConnection: (fromId: string, toId: string) => void
+  updateTypedConnection: (fromId: string, toId: string, updates: Partial<TypedConnection>) => void
+
+  // Snapshots
+  snapshots: SnapshotMeta[]
+  loadSnapshots: () => Promise<void>
+  createSnapshot: (name: string, description?: string) => Promise<void>
+  restoreSnapshot: (id: string) => Promise<void>
+  deleteSnapshot: (id: string) => Promise<void>
+  forkSnapshot: (id: string, name?: string) => Promise<void>
+
+  // Workspaces
+  workspaces: WorkspaceMeta[]
+  loadWorkspaces: () => Promise<void>
+  saveWorkspace: (name: string, description?: string) => Promise<void>
+  restoreWorkspace: (id: string) => Promise<void>
+  deleteWorkspace: (id: string) => Promise<void>
+  togglePinWorkspace: (id: string) => Promise<void>
 
   // History (undo/redo)
   history: Project[]
@@ -135,6 +175,11 @@ interface AppState {
   exportProjectSummary: () => string
   exportForAI: () => Promise<void>
   importProject: (json: string) => boolean
+  importChromeTabs: (tabs: { title: string; url: string; favIconUrl?: string; pinned: boolean }[]) => void
+
+  // Actions - Blank Card
+  createBlankCard: (pos: Position) => string
+  morphCard: (id: string, cardType: CardType, data?: Record<string, any>) => void
 }
 
 const defaultViewport: Viewport = {
@@ -142,6 +187,7 @@ const defaultViewport: Viewport = {
   name: 'Main Board',
   items: [],
   connections: [],
+  typedConnections: [],
   messages: [],
   camX: 0,
   camY: 0,
@@ -153,6 +199,7 @@ const defaultProject: Project = {
   name: 'Untitled Project',
   viewports: [defaultViewport],
   components: [],
+  snapshots: [],
   settings: {
     apiKey: '',
     defaultModel: 'anthropic/claude-sonnet-4',
@@ -198,10 +245,21 @@ export const useStore = create<AppState>()(
   messages: [],
   isStreaming: false,
 
+  // Browser / Spatial Tabs
+  focusedWebNodeId: null,
+  webNodes: new Map<string, WebItem>(),
+
+  // Typed Connections
+  typedConnections: [],
+
+  // Snapshots & Workspaces
+  snapshots: [],
+  workspaces: [],
+
   // Project
   setProject: (p) => {
     if (!p.viewports || p.viewports.length === 0) {
-      p = { ...p, viewports: [{ id: crypto.randomUUID(), name: 'Main Board', items: [], connections: [], messages: [], camX: 0, camY: 0, zoom: 1 }] }
+      p = { ...p, viewports: [{ id: crypto.randomUUID(), name: 'Main Board', items: [], connections: [], typedConnections: [], messages: [], camX: 0, camY: 0, zoom: 1 }] }
     }
     set({ project: p, activeViewportId: p.viewports[0].id, history: [JSON.parse(JSON.stringify(p))], historyIndex: 0 })
   },
@@ -216,6 +274,7 @@ export const useStore = create<AppState>()(
       name: `Board ${get().project.viewports.length + 1}`,
       items: [],
       connections: [],
+      typedConnections: [],
       messages: [],
       camX: 0,
       camY: 0,
@@ -815,6 +874,283 @@ export const useStore = create<AppState>()(
   clearMessages: () => set({ messages: [] }),
   setStreaming: (v) => set({ isStreaming: v }),
 
+  // Browser / Spatial Tab Actions
+  focusWebNode: (id) => set({ focusedWebNodeId: id }),
+
+  navigateWebNode: (id, url) =>
+    set((s) => {
+      const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+      if (!vp) return s
+      const item = vp.items.find(i => i.id === id && i.kind === 'web')
+      if (!item || item.kind !== 'web') return s
+      const webItem = item as WebItem
+      const newUrls = webItem.history.urls.slice(0, webItem.history.index + 1)
+      newUrls.push(url)
+      const newHistory: BrowserHistory = { urls: newUrls, index: newUrls.length - 1 }
+      return {
+        project: {
+          ...s.project,
+          viewports: s.project.viewports.map(v => ({
+            ...v,
+            items: v.items.map(i =>
+              i.id === id ? { ...i, url, history: newHistory, isLoading: true } : i
+            ),
+          })),
+          updated: new Date().toISOString(),
+        },
+      }
+    }),
+
+  webNodeGoBack: (id) =>
+    set((s) => {
+      const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+      if (!vp) return s
+      const item = vp.items.find(i => i.id === id && i.kind === 'web') as WebItem | undefined
+      if (!item || item.history.index <= 0) return s
+      const newIndex = item.history.index - 1
+      const newUrl = item.history.urls[newIndex]
+      return {
+        project: {
+          ...s.project,
+          viewports: s.project.viewports.map(v => ({
+            ...v,
+            items: v.items.map(i =>
+              i.id === id ? { ...i, url: newUrl, history: { ...item.history, index: newIndex }, isLoading: true } : i
+            ),
+          })),
+          updated: new Date().toISOString(),
+        },
+      }
+    }),
+
+  webNodeGoForward: (id) =>
+    set((s) => {
+      const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+      if (!vp) return s
+      const item = vp.items.find(i => i.id === id && i.kind === 'web') as WebItem | undefined
+      if (!item || item.history.index >= item.history.urls.length - 1) return s
+      const newIndex = item.history.index + 1
+      const newUrl = item.history.urls[newIndex]
+      return {
+        project: {
+          ...s.project,
+          viewports: s.project.viewports.map(v => ({
+            ...v,
+            items: v.items.map(i =>
+              i.id === id ? { ...i, url: newUrl, history: { ...item.history, index: newIndex }, isLoading: true } : i
+            ),
+          })),
+          updated: new Date().toISOString(),
+        },
+      }
+    }),
+
+  webNodeReload: (id) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        viewports: s.project.viewports.map(v => ({
+          ...v,
+          items: v.items.map(i =>
+            i.id === id && i.kind === 'web' ? { ...i, isLoading: true } : i
+          ),
+        })),
+      },
+    })),
+
+  closeWebNode: (id) =>
+    set((s) => ({
+      focusedWebNodeId: s.focusedWebNodeId === id ? null : s.focusedWebNodeId,
+      project: {
+        ...s.project,
+        viewports: s.project.viewports.map(v => ({
+          ...v,
+          items: v.items.filter(i => i.id !== id),
+        })),
+        updated: new Date().toISOString(),
+      },
+    })),
+
+  updateWebNode: (id, updates) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        viewports: s.project.viewports.map(v => ({
+          ...v,
+          items: v.items.map(i =>
+            i.id === id && i.kind === 'web' ? { ...i, ...updates } : i
+          ),
+        })),
+        updated: new Date().toISOString(),
+      },
+    })),
+
+  // Typed Connection Actions
+  addTypedConnection: (conn) => {
+    set((s) => ({
+      project: {
+        ...s.project,
+        viewports: s.project.viewports.map(v =>
+          v.id === s.activeViewportId
+            ? { ...v, typedConnections: [...(v.typedConnections || []), conn] }
+            : v
+        ),
+        updated: new Date().toISOString(),
+      },
+    }))
+    get().pushHistory()
+  },
+
+  removeTypedConnection: (fromId, toId) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        viewports: s.project.viewports.map(v => ({
+          ...v,
+          typedConnections: (v.typedConnections || []).filter(
+            c => !(c.fromItemId === fromId && c.toItemId === toId)
+          ),
+        })),
+        updated: new Date().toISOString(),
+      },
+    })),
+
+  updateTypedConnection: (fromId, toId, updates) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        viewports: s.project.viewports.map(v => ({
+          ...v,
+          typedConnections: (v.typedConnections || []).map(c =>
+            c.fromItemId === fromId && c.toItemId === toId ? { ...c, ...updates } : c
+          ),
+        })),
+        updated: new Date().toISOString(),
+      },
+    })),
+
+  // Snapshot Actions
+  loadSnapshots: async () => {
+    try {
+      const { listSnapshots } = await import('@/lib/snapshot')
+      const snapshots = await listSnapshots()
+      set({ snapshots })
+    } catch (e) {
+      console.warn('[MoodBored] loadSnapshots failed:', e)
+    }
+  },
+
+  createSnapshot: async (name, description = '') => {
+    try {
+      const { createSnapshot: create } = await import('@/lib/snapshot')
+      const state = get()
+      await create(state.project, name, description)
+      await state.loadSnapshots()
+      showToast(`Snapshot "${name}" created`, 'success')
+    } catch (e) {
+      console.warn('[MoodBored] createSnapshot failed:', e)
+      showToast('Failed to create snapshot', 'error')
+    }
+  },
+
+  restoreSnapshot: async (id) => {
+    try {
+      const { restoreSnapshot: restore } = await import('@/lib/snapshot')
+      const project = await restore(id)
+      if (project) {
+        get().setProject(project)
+        showToast('Snapshot restored', 'success')
+      }
+    } catch (e) {
+      console.warn('[MoodBored] restoreSnapshot failed:', e)
+      showToast('Failed to restore snapshot', 'error')
+    }
+  },
+
+  deleteSnapshot: async (id) => {
+    try {
+      const { deleteSnapshot: del } = await import('@/lib/snapshot')
+      await del(id)
+      await get().loadSnapshots()
+      showToast('Snapshot deleted', 'success')
+    } catch (e) {
+      console.warn('[MoodBored] deleteSnapshot failed:', e)
+    }
+  },
+
+  forkSnapshot: async (id, name) => {
+    try {
+      const { forkFromSnapshot } = await import('@/lib/snapshot')
+      const project = await forkFromSnapshot(id, name)
+      if (project) {
+        get().setProject(project)
+        showToast('Board forked from snapshot', 'success')
+      }
+    } catch (e) {
+      console.warn('[MoodBored] forkSnapshot failed:', e)
+      showToast('Failed to fork snapshot', 'error')
+    }
+  },
+
+  // Workspace Actions
+  loadWorkspaces: async () => {
+    try {
+      const { listWorkspaces } = await import('@/lib/workspace')
+      const workspaces = await listWorkspaces()
+      set({ workspaces })
+    } catch (e) {
+      console.warn('[MoodBored] loadWorkspaces failed:', e)
+    }
+  },
+
+  saveWorkspace: async (name, description = '') => {
+    try {
+      const { saveWorkspace: save } = await import('@/lib/workspace')
+      const state = get()
+      await save(state.project, name, description)
+      await state.loadWorkspaces()
+      showToast(`Workspace "${name}" saved`, 'success')
+    } catch (e) {
+      console.warn('[MoodBored] saveWorkspace failed:', e)
+      showToast('Failed to save workspace', 'error')
+    }
+  },
+
+  restoreWorkspace: async (id) => {
+    try {
+      const { restoreWorkspace: restore } = await import('@/lib/workspace')
+      const project = await restore(id)
+      if (project) {
+        get().setProject(project)
+        showToast('Workspace restored', 'success')
+      }
+    } catch (e) {
+      console.warn('[MoodBored] restoreWorkspace failed:', e)
+      showToast('Failed to restore workspace', 'error')
+    }
+  },
+
+  deleteWorkspace: async (id) => {
+    try {
+      const { deleteWorkspace: del } = await import('@/lib/workspace')
+      await del(id)
+      await get().loadWorkspaces()
+      showToast('Workspace deleted', 'success')
+    } catch (e) {
+      console.warn('[MoodBored] deleteWorkspace failed:', e)
+    }
+  },
+
+  togglePinWorkspace: async (id) => {
+    try {
+      const { togglePin } = await import('@/lib/workspace')
+      await togglePin(id)
+      await get().loadWorkspaces()
+    } catch (e) {
+      console.warn('[MoodBored] togglePinWorkspace failed:', e)
+    }
+  },
+
   // Settings
   updateSettings: (updates) =>
     set((s) => {
@@ -840,7 +1176,7 @@ export const useStore = create<AppState>()(
 
   // Agent
   executeActions: (actions) => {
-    const { addItem, removeItem, updateItem, addConnection } = get()
+    const { addItem, removeItem, updateItem, addConnection, addTypedConnection, navigateWebNode } = get()
     for (const action of actions) {
       try {
         switch (action.type) {
@@ -856,6 +1192,42 @@ export const useStore = create<AppState>()(
           case 'add_connection':
             if (action.connection) addConnection(action.connection)
             break
+          case 'open_url':
+            if (action.url) {
+              const state = get()
+              const cx = -state.canvas.panX / state.canvas.zoom + 400
+              const cy = -state.canvas.panY / state.canvas.zoom + 300
+              const webItem: WebItem = {
+                kind: 'web',
+                id: crypto.randomUUID(),
+                url: action.url,
+                title: action.url,
+                favicon: '',
+                cardType: 'web',
+                isLoading: true,
+                isFocused: false,
+                history: { urls: [action.url], index: 0 },
+                cookies: '',
+                purpose: 'Opened by AI',
+                importance: 'AI reference',
+                tags: ['ai-opened'],
+                pos: { x: cx, y: cy },
+                size: { w: 300, h: 200 },
+              }
+              addItem(webItem)
+            }
+            break
+          case 'draw_connection':
+            if (action.itemId && action.connection) {
+              addTypedConnection({
+                ...action.connection,
+                connectionType: action.connectionType || 'related',
+                label: '',
+                owner: 'llm',
+                created: new Date().toISOString(),
+              })
+            }
+            break
         }
         agentDiagnostics.actionsExecuted++
       } catch (err) {
@@ -869,6 +1241,112 @@ export const useStore = create<AppState>()(
   exportProject: () => {
     const { project } = get()
     return JSON.stringify(project, null, 2)
+  },
+
+  importChromeTabs: (tabs) => {
+    const { tabsToBoardItems } = require('@/lib/chrome-import')
+    const items = tabsToBoardItems(tabs)
+    set((s) => {
+      const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+      if (!vp) return s
+      return {
+        project: {
+          ...s.project,
+          viewports: s.project.viewports.map(v =>
+            v.id === s.activeViewportId
+              ? { ...v, items: [...v.items, ...items] }
+              : v
+          ),
+          updated: new Date().toISOString(),
+        },
+      }
+    })
+    get().pushHistory()
+    showToast(`Imported ${tabs.length} Chrome tabs`, 'success')
+  },
+
+  createBlankCard: (pos) => {
+    const id = crypto.randomUUID()
+    const webItem: WebItem = {
+      kind: 'web',
+      id,
+      url: '',
+      title: '',
+      favicon: '',
+      cardType: 'blank',
+      isLoading: false,
+      isFocused: false,
+      history: { urls: [], index: -1 },
+      cookies: '',
+      purpose: '',
+      importance: '',
+      tags: [],
+      pos,
+      size: { w: 300, h: 200 },
+    }
+    get().addItem(webItem)
+    return id
+  },
+
+  morphCard: (id, cardType, data = {}) => {
+    set((s) => ({
+      project: {
+        ...s.project,
+        viewports: s.project.viewports.map(v => ({
+          ...v,
+          items: v.items.map(i => {
+            if (i.id !== id || i.kind !== 'web') return i
+            const web = i as WebItem
+            switch (cardType) {
+              case 'web':
+                return {
+                  ...web,
+                  cardType: 'web',
+                  url: data.url || web.url,
+                  title: data.title || web.title,
+                  favicon: data.favicon || web.favicon,
+                  isLoading: true,
+                  history: { urls: [data.url || web.url], index: 0 },
+                }
+              case 'note':
+                return {
+                  ...web,
+                  cardType: 'note',
+                  content: data.content || web.content || '',
+                  title: data.title || 'Note',
+                }
+              case 'search':
+                return {
+                  ...web,
+                  cardType: 'search',
+                  searchText: data.searchText || web.searchText || '',
+                  url: `https://www.google.com/search?q=${encodeURIComponent(data.searchText || web.searchText || '')}`,
+                  isLoading: true,
+                  history: { urls: [`https://www.google.com/search?q=${encodeURIComponent(data.searchText || web.searchText || '')}`], index: 0 },
+                }
+              case 'image':
+                return {
+                  ...web,
+                  cardType: 'image',
+                  url: data.url || web.url,
+                  title: data.title || 'Image',
+                }
+              case 'ai':
+                return {
+                  ...web,
+                  cardType: 'ai',
+                  content: data.content || web.content || '',
+                  title: data.title || 'AI Response',
+                }
+              default:
+                return { ...web, cardType }
+            }
+          }),
+        })),
+        updated: new Date().toISOString(),
+      },
+    }))
+    get().pushHistory()
   },
 
   exportProjectSummary: () => {
@@ -962,7 +1440,7 @@ export const useStore = create<AppState>()(
       typeof v.y === 'number' && Number.isFinite(v.y)
     const validKind = new Set([
       'text', 'image', 'link', 'note', 'video', 'palette', 'gradient',
-      'font', 'swatch', 'sizeguide', 'container', 'connector',
+      'font', 'swatch', 'sizeguide', 'container', 'connector', 'web',
     ])
     try {
       const parsed = JSON.parse(json) as Project
@@ -972,6 +1450,7 @@ export const useStore = create<AppState>()(
         if (!vp.id) vp.id = crypto.randomUUID()
         if (!Array.isArray(vp.items)) vp.items = []
         if (!Array.isArray(vp.connections)) vp.connections = []
+        if (!Array.isArray(vp.typedConnections)) vp.typedConnections = []
         if (!Array.isArray(vp.messages)) vp.messages = []
         if (typeof vp.camX !== 'number' || !Number.isFinite(vp.camX)) vp.camX = 0
         if (typeof vp.camY !== 'number' || !Number.isFinite(vp.camY)) vp.camY = 0
@@ -989,6 +1468,7 @@ export const useStore = create<AppState>()(
         )
       }
       if (!parsed.components) parsed.components = []
+      if (!parsed.snapshots) parsed.snapshots = []
       // Imported settings are untrusted — never carry an API key
       if (parsed.settings) parsed.settings.apiKey = ''
       const activeId = parsed.viewports[0].id!

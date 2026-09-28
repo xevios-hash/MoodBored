@@ -58,6 +58,58 @@ npx tauri build
 
 ## Features
 
+### New Features (Spatial Browser Workspace)
+
+#### Browser Engine Layer
+- **Live web pages on canvas** — each node can host a real embedded browser view via iframes (Tauri WebContentsView on desktop)
+- **Tab lifecycle** — create, focus, navigate, reload, close web nodes
+- **Session persistence** — cookies and login sessions persist per node
+- **Fullscreen focus** — double-click a web node to focus it fullscreen; press Esc or click the back control to return to board view
+- **Pan and zoom** — nodes stay positioned and interactive while panning/zooming the board
+
+#### Spatial Tab Management
+- **Board IS the tab manager** — no native tab strip; nodes are tabs
+- **Typed connections** — draw lines between nodes to represent citations, dependencies, contradictions, or "related to" links
+- **Connection types** — citation, dependency, contradiction, related, MCP, API, custom
+- **Visual edge types** — MCP and REST API connections render as distinct edge types on the board
+
+#### Blank-Card-First, Multimodal Creation
+- **Double-click empty canvas** — creates a blank card (not a note)
+- **Type-to-act** — on an empty card: URL loads the site, search query runs a search, sentence becomes a note
+- **Drag-and-drop** — text, images, files, and URLs materialize cards of the inferred type
+- **Card morphing** — a search result promotes to a full site card on click-through; a note can absorb a dropped link
+
+#### Forward/Back and History
+- **Per-card browser history** — back/forward controls scoped to the focused card
+- **Board-level undo** — Cmd+Z for every meaningful action: node added, moved, connected, morphed, deleted
+
+#### Snapshots, Versioning, Forking
+- **Named snapshots** — save a checkpoint of the entire board state
+- **Fork from snapshot** — create a parallel copy for exploration
+- **Scrubbable timeline** — opt-in version UI with restore and fork actions
+
+#### AI Co-Pilot on the Board
+- **AI can open nodes** — the model can open URLs as live web page cards
+- **AI can draw connections** — the model can create typed connections between items
+- **Summarize across cards** — AI can summarize content across multiple cards
+- **Shared visual context** — the model sees node contents and connections, not just chat text
+
+#### Import from Chrome
+- **One-click import** — every open Chrome tab becomes a node on a fresh board
+- **Domain grouping** — tabs are laid out by domain for instant organization
+- **Chrome DevTools Protocol** — connects to Chrome's debugging port for tab access
+
+#### Data Layer
+- **Local graph store** — IndexedDB (browser) / SQLite (Tauri) for nodes, edges, positions, history, and snapshots
+- **Typed connections** — schema supports citation, dependency, contradiction, related, MCP, API, custom
+- **Multimodal card content** — web, note, search, image, AI, blank card types
+- **Version metadata** — snapshots and workspaces with full state preservation
+
+#### Pin and Restore Workspaces
+- **Named workspaces** — save a board as a named workspace/project
+- **Full restore** — reopening restores sites, notes, connections, and AI context exactly
+- **Pin important workspaces** — keep frequently used workspaces at the top
+
 ### Canvas
 - Infinite pan/zoom with smooth touch gestures (pinch-to-zoom on mobile)
 - Lasso selection, alignment snapping, multi-select
@@ -68,7 +120,7 @@ npx tauri build
 - Video/YouTube background support
 - Eyedropper color picker (Chrome/Edge)
 
-### 11 Item Types
+### 12 Item Types
 | Kind | Description |
 |------|-------------|
 | `note` | Text thoughts, quotes, keywords |
@@ -82,6 +134,7 @@ npx tauri build
 | `sizeguide` | Dimensions and orientation reference |
 | `video` | Video reference with subject and motion description |
 | `container` | Group of items with layout modes (free/grid/stack) |
+| `web` | Live web page with browser controls and navigation history |
 
 ### AI
 - LLM chat with tool-calling (OpenRouter) — structured function invocations
@@ -98,7 +151,7 @@ npx tauri build
 - **Export for Creation** — 8 creation types (image, video, game, web, 3D, audio, document), 3 formats (Markdown, JSON, XML)
 
 ### MCP Server
-- 9 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`
+- 14 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`, `open_url`, `draw_connection`, `create_snapshot`, `list_snapshots`, `summarize_across`
 - Stdio transport (Claude Desktop, Cursor) + SSE transport (OpenCode, web IDEs)
 - `/.well-known/mcp.json` discovery endpoint
 - Connection info page at `/mcp`
@@ -179,8 +232,8 @@ curl "https://your-domain.com/api/board/BOARD_ID/semantic?q=warm+coastal+vibes"
 | `Ctrl+A` | Select all | `Ctrl+Y` | Redo |
 | `Ctrl+C` | Copy | `+` / `-` | Zoom in/out |
 | `Ctrl+V` | Paste | `0` | Reset zoom |
-| `Delete` | Delete selected | `Escape` | Cancel/deselect |
-| Double-click | Create note | Right-click | Context menu |
+| `Delete` | Delete selected | `Escape` | Cancel/deselect/unfocus |
+| Double-click | Create blank card | Right-click | Context menu |
 
 ## License
 

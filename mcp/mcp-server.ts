@@ -164,7 +164,7 @@ server.tool(
   'Add one or more items to the mood board. Items are placed on the canvas automatically.',
   {
     items: z.array(z.object({
-      kind: z.enum(['note', 'text', 'image', 'link', 'palette', 'gradient', 'font', 'swatch', 'sizeguide', 'container', 'video']),
+      kind: z.enum(['note', 'text', 'image', 'link', 'palette', 'gradient', 'font', 'swatch', 'sizeguide', 'container', 'video', 'web']),
       text: z.string().optional(),
       description: z.string().optional(),
       url: z.string().optional(),
@@ -224,6 +224,9 @@ server.tool(
           break
         case 'video':
           item = { kind: 'video', id, source: raw.source || '', subjectDesc: raw.description || '', motionDesc: '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
+          break
+        case 'web':
+          item = { kind: 'web', id, url: raw.url || '', title: raw.label || raw.description || '', favicon: '', cardType: 'web', isLoading: true, isFocused: false, history: { urls: [raw.url || ''], index: 0 }, cookies: '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
           break
       }
 
@@ -412,6 +415,192 @@ server.tool('clear_board', 'Remove all items from the current board', {}, async 
   writeState(state)
   return { content: [{ type: 'text', text: `Cleared ${count} items from the board.` }] }
 })
+
+// ─── Spatial Browser Tools ────────────────────────────────────────────
+
+server.tool(
+  'open_url',
+  'Open a URL as a live web page node on the board. Creates an interactive browser card.',
+  {
+    url: z.string().describe('The URL to open'),
+    title: z.string().optional().describe('Display title for the card'),
+    x: z.number().optional().describe('X position on the board'),
+    y: z.number().optional().describe('Y position on the board'),
+  },
+  async ({ url, title, x, y }) => {
+    const state = readState()
+    const vp = getActiveViewport(state)
+    if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport.' }] }
+
+    const id = uuid()
+    let domain = ''
+    try { domain = new URL(url).hostname.replace('www.', '') } catch {}
+
+    const item = {
+      kind: 'web',
+      id,
+      url,
+      title: title || domain || url,
+      favicon: `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
+      cardType: 'web',
+      isLoading: true,
+      isFocused: false,
+      history: { urls: [url], index: 0 },
+      cookies: '',
+      purpose: 'Opened by AI',
+      importance: 'AI reference',
+      tags: ['ai-opened'],
+      pos: { x: x ?? 80 + Math.random() * 600, y: y ?? 80 + Math.random() * 400 },
+      size: { w: 300, h: 200 },
+    }
+
+    vp.items.push(item)
+    writeState(state)
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Opened ${url} as a web node on the board. Item ID: ${id}`,
+      }],
+    }
+  }
+)
+
+server.tool(
+  'draw_connection',
+  'Draw a typed connection between two items on the board. Supports citation, dependency, contradiction, related, mcp, api, and custom types.',
+  {
+    from_id: z.string().describe('Source item ID'),
+    to_id: z.string().describe('Target item ID'),
+    connection_type: z.enum(['citation', 'dependency', 'contradiction', 'related', 'mcp', 'api', 'custom']).describe('Type of connection'),
+    label: z.string().optional().describe('Optional label for the connection'),
+  },
+  async ({ from_id, to_id, connection_type, label }) => {
+    const state = readState()
+    const vp = getActiveViewport(state)
+    if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport.' }] }
+
+    const fromItem = vp.items.find((i: any) => i.id === from_id)
+    const toItem = vp.items.find((i: any) => i.id === to_id)
+    if (!fromItem) return { content: [{ type: 'text', text: `Source item ${from_id} not found.` }] }
+    if (!toItem) return { content: [{ type: 'text', text: `Target item ${to_id} not found.` }] }
+
+    if (!vp.typedConnections) vp.typedConnections = []
+
+    const conn = {
+      fromItemId: from_id,
+      fromPortId: 'output',
+      toItemId: to_id,
+      toPortId: 'input',
+      connectionType: connection_type,
+      label: label || connection_type,
+      owner: 'llm',
+      created: new Date().toISOString(),
+    }
+
+    vp.typedConnections.push(conn)
+    writeState(state)
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Drew ${connection_type} connection from "${fromItem.text || fromItem.description || fromItem.label || from_id}" to "${toItem.text || toItem.description || toItem.label || to_id}".`,
+      }],
+    }
+  }
+)
+
+server.tool(
+  'create_snapshot',
+  'Create a named snapshot of the current board state for versioning and forking.',
+  {
+    name: z.string().describe('Name for the snapshot'),
+    description: z.string().optional().describe('Description of what this snapshot captures'),
+  },
+  async ({ name, description }) => {
+    const state = readState()
+    if (!state.project) return { content: [{ type: 'text', text: 'Error: No project loaded.' }] }
+
+    const snapshotId = uuid()
+    const snapshot = {
+      id: snapshotId,
+      name,
+      description: description || '',
+      project: JSON.parse(JSON.stringify(state.project)),
+      created: new Date().toISOString(),
+      tags: [],
+    }
+
+    // Save snapshot alongside the board
+    const snapshotPath = join(BOARDS_DIR, `snapshot-${snapshotId}.json`)
+    ensureDir()
+    writeFileSync(snapshotPath, JSON.stringify(snapshot, null, 2))
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Created snapshot "${name}" (ID: ${snapshotId}). Board has ${getItems(state).filter((i: any) => i.kind !== 'connector').length} items.`,
+      }],
+    }
+  }
+)
+
+server.tool(
+  'list_snapshots',
+  'List all saved snapshots of the board.',
+  {},
+  async () => {
+    try {
+      const files = readdirSync(BOARDS_DIR).filter(f => f.startsWith('snapshot-') && f.endsWith('.json'))
+      if (files.length === 0) {
+        return { content: [{ type: 'text', text: 'No snapshots saved yet.' }] }
+      }
+
+      const snapshots = files.map(f => {
+        try {
+          const data = JSON.parse(readFileSync(join(BOARDS_DIR, f), 'utf-8'))
+          return `- "${data.name}" (${data.id}) — ${data.description || 'no description'} — created ${data.created}`
+        } catch {
+          return `- [corrupt] ${f}`
+        }
+      })
+
+      return { content: [{ type: 'text', text: `Found ${snapshots.length} snapshot(s):\n${snapshots.join('\n')}` }] }
+    } catch {
+      return { content: [{ type: 'text', text: 'Error reading snapshots.' }] }
+    }
+  }
+)
+
+server.tool(
+  'summarize_across',
+  'Summarize content across multiple cards on the board. Useful for finding themes, patterns, or generating a coherent narrative from scattered notes.',
+  {
+    item_ids: z.array(z.string()).optional().describe('Specific item IDs to summarize. If omitted, summarizes all text-based items.'),
+    focus: z.string().optional().describe('What to focus the summary on — e.g. "color themes", "brand voice", "key decisions"'),
+  },
+  async ({ item_ids, focus }) => {
+    const state = readState()
+    const items = getItems(state).filter((i: any) => i.kind !== 'connector')
+
+    const targetItems = item_ids
+      ? items.filter((i: any) => item_ids.includes(i.id))
+      : items.filter((i: any) => ['note', 'text', 'link', 'web'].includes(i.kind))
+
+    if (targetItems.length === 0) {
+      return { content: [{ type: 'text', text: 'No items to summarize.' }] }
+    }
+
+    const contents = targetItems.map((item: any) => {
+      const text = item.text || item.raw || item.content || item.description || item.summary || item.title || ''
+      return `[${item.kind}] ${text}`.slice(0, 500)
+    })
+
+    const summary = `Summary of ${targetItems.length} items${focus ? ` (focused on: ${focus})` : ''}:\n\n${contents.join('\n---\n')}`
+
+    return { content: [{ type: 'text', text: summary }] }
+  }
+)
 
 // ─── Start ──────────────────────────────────────────────────────────
 

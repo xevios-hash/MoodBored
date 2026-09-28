@@ -8,6 +8,103 @@ export interface Size {
   h: number
 }
 
+// ─── Browser / Spatial Tab Types ─────────────────────────────────────
+
+export type CardType = 'blank' | 'web' | 'note' | 'search' | 'file' | 'ai' | 'image' | 'link'
+
+export interface BrowserHistory {
+  urls: string[]
+  index: number
+}
+
+export interface WebItem extends ItemBase {
+  kind: 'web'
+  url: string
+  title: string
+  favicon: string
+  cardType: CardType
+  isLoading: boolean
+  isFocused: boolean
+  history: BrowserHistory
+  cookies: string
+  searchText?: string
+  content?: string
+  purpose: string
+  importance: string
+  tags: string[]
+}
+
+// ─── Typed Connections ───────────────────────────────────────────────
+
+export type ConnectionType = 'citation' | 'dependency' | 'contradiction' | 'related' | 'mcp' | 'api' | 'custom'
+
+export interface TypedConnection extends PortConnection {
+  connectionType: ConnectionType
+  label?: string
+  owner: ConnectorOwner
+  created: string
+}
+
+// ─── Snapshots / Versioning ──────────────────────────────────────────
+
+export interface Snapshot {
+  id: string
+  name: string
+  description: string
+  project: Project
+  created: string
+  tags: string[]
+}
+
+export interface SnapshotMeta {
+  id: string
+  name: string
+  description: string
+  created: string
+  tags: string[]
+  itemCount: number
+}
+
+// ─── Workspaces ──────────────────────────────────────────────────────
+
+export interface Workspace {
+  id: string
+  name: string
+  description: string
+  project: Project
+  snapshots: SnapshotMeta[]
+  created: string
+  updated: string
+  pinned: boolean
+}
+
+export interface WorkspaceMeta {
+  id: string
+  name: string
+  description: string
+  created: string
+  updated: string
+  pinned: boolean
+  boardCount: number
+  itemCount: number
+}
+
+// ─── Chrome Import ───────────────────────────────────────────────────
+
+export interface ChromeTab {
+  title: string
+  url: string
+  favIconUrl?: string
+  pinned: boolean
+  index: number
+  windowId: number
+}
+
+export interface ChromeImportResult {
+  tabs: ChromeTab[]
+  grouped: Map<string, ChromeTab[]>
+}
+
 // ─── Node Ports (ComfyUI/Blender-style) ─────────────────────────────
 
 export type PortType = 'data' | 'visual' | 'reference' | 'any'
@@ -194,6 +291,7 @@ export interface ConnectorItem {
   label: string
   style: 'solid' | 'dashed' | 'arrow'
   owner: ConnectorOwner
+  connectionType?: ConnectionType
   purpose: string
   tags: string[]
 }
@@ -213,6 +311,7 @@ export type BoardItem =
   | SizeGuideItem
   | ContainerItem
   | ConnectorItem
+  | WebItem
 
 export type PositionedItem = Exclude<BoardItem, ConnectorItem>
 
@@ -223,6 +322,7 @@ export interface Viewport {
   name: string
   items: BoardItem[]
   connections: PortConnection[]
+  typedConnections: TypedConnection[]
   messages: ChatMessage[]
   camX: number
   camY: number
@@ -248,6 +348,8 @@ export interface Project {
   viewports: Viewport[]
   components: ComponentDef[]
   settings: Settings
+  snapshots: SnapshotMeta[]
+  workspaceId?: string
   created: string
   updated: string
 }
@@ -263,10 +365,12 @@ export interface ChatMessage {
 }
 
 export interface AgentAction {
-  type: 'add_item' | 'remove_item' | 'update_item' | 'add_connection'
+  type: 'add_item' | 'remove_item' | 'update_item' | 'add_connection' | 'open_url' | 'draw_connection'
   item?: BoardItem
   itemId?: string
   connection?: PortConnection
+  url?: string
+  connectionType?: ConnectionType
 }
 
 export interface SearchResult {
@@ -342,6 +446,12 @@ export function getDefaultPorts(kind: string): Port[] {
     case 'sizeguide':
       return [
         { id: 'sz-out', name: 'Dimensions', type: 'data', direction: 'output' },
+      ]
+    case 'web':
+      return [
+        { id: 'web-in', name: 'Context', type: 'reference', direction: 'input' },
+        { id: 'web-out', name: 'Content', type: 'data', direction: 'output' },
+        { id: 'web-ref', name: 'Reference', type: 'reference', direction: 'output' },
       ]
     default:
       return []

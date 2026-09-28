@@ -172,6 +172,33 @@ export function ChatPanel() {
                       } as any)
                     }
                   })
+                } else if (action.type === 'open_url' && (action as any).url) {
+                  // Open URL as web node
+                  const s = useStore.getState()
+                  const cx = -s.canvas.panX / s.canvas.zoom + 400
+                  const cy = -s.canvas.panY / s.canvas.zoom + 300
+                  s.createBlankCard({ x: cx, y: cy })
+                  const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+                  const lastItem = vp?.items[vp.items.length - 1]
+                  if (lastItem && lastItem.kind === 'web') {
+                    s.morphCard(lastItem.id, 'web', { url: (action as any).url, title: (action as any).title || (action as any).url })
+                  }
+                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Opened ${(action as any).url} as web node` })
+                } else if (action.type === 'draw_connection' && (action as any).fromId && (action as any).toId) {
+                  // Draw typed connection
+                  const s = useStore.getState()
+                  const connType = (action as any).connectionType || 'related'
+                  s.addTypedConnection({
+                    fromItemId: (action as any).fromId,
+                    fromPortId: 'output',
+                    toItemId: (action as any).toId,
+                    toPortId: 'input',
+                    connectionType: connType as any,
+                    label: (action as any).label || connType,
+                    owner: 'llm',
+                    created: new Date().toISOString(),
+                  })
+                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Drew ${connType} connection` })
                 } else {
                   results.push({ tool_call_id: toolCalls[0]?.id || '', content: 'Unknown action' })
                 }
