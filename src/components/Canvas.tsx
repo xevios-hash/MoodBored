@@ -253,6 +253,7 @@ export function Canvas() {
   const [addToolbarOpen, setAddToolbarOpen] = useState(false)
   const [expandedLinks, setExpandedLinks] = useState<Set<string>>(new Set())
   const [editingItem, setEditingItem] = useState<{ id: string; field: string; value: string } | null>(null)
+  const [blankCardInput, setBlankCardInput] = useState<{ id: string; x: number; y: number } | null>(null)
 
   const project = useStore((s) => s.project)
   const activeViewportId = useStore((s) => s.activeViewportId)
@@ -786,9 +787,10 @@ export function Canvas() {
     const vp = state.project.viewports.find(v => v.id === state.activeViewportId) ?? state.project.viewports[0]
     const hit = hitTestItem(vp?.items ?? [], wx, wy)
 
-    // Double-click on empty canvas → create a blank card
+    // Double-click on empty canvas → create a blank card with input
     if (!hit) {
-      state.createBlankCard({ x: wx - 150, y: wy - 100 })
+      const id = state.createBlankCard({ x: wx - 150, y: wy - 100 })
+      setBlankCardInput({ id, x: e.clientX, y: e.clientY })
       return
     }
 
@@ -1276,6 +1278,91 @@ export function Canvas() {
               backdropFilter: 'blur(8px)',
             }}
           />
+        )
+      })()}
+
+      {/* Blank card input overlay */}
+      {blankCardInput && (() => {
+        const item = items.find(i => i.id === blankCardInput.id)
+        if (!item || !('pos' in item)) return null
+        const x = item.pos.x * canvas.zoom + canvas.panX + PAD * canvas.zoom
+        const y = item.pos.y * canvas.zoom + canvas.panY + 30 * canvas.zoom
+        const w = ((item.size?.w ?? 300) - PAD * 2) * canvas.zoom
+
+        const handleSubmit = (value: string) => {
+          const trimmed = value.trim()
+          if (!trimmed) {
+            // Empty input - close the blank card
+            useStore.getState().removeItem(blankCardInput.id)
+            setBlankCardInput(null)
+            return
+          }
+
+          // Determine card type based on input
+          const isWebUrl = /^https?:\/\//i.test(trimmed) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(trimmed)
+          const isQuestion = trimmed.endsWith('?') || trimmed.startsWith('how ') || trimmed.startsWith('what ') || trimmed.startsWith('why ') || trimmed.startsWith('when ') || trimmed.startsWith('where ')
+
+          if (isWebUrl) {
+            // URL → web card
+            const url = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`
+            let domain = ''
+            try { domain = new URL(url).hostname.replace('www.', '') } catch {}
+            useStore.getState().morphCard(blankCardInput.id, 'web', {
+              url,
+              title: domain || url,
+              favicon: `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
+            })
+          } else if (isQuestion) {
+            // Question → search card
+            useStore.getState().morphCard(blankCardInput.id, 'search', { searchText: trimmed })
+          } else {
+            // Text → note card
+            useStore.getState().morphCard(blankCardInput.id, 'note', { content: trimmed, title: trimmed.slice(0, 30) })
+          }
+          setBlankCardInput(null)
+        }
+
+        return (
+          <div
+            style={{
+              position: 'absolute', left: x, top: y, width: w,
+              zIndex: 100,
+            }}
+          >
+            <input
+              autoFocus
+              type="text"
+              placeholder="Type a URL, search query, or note..."
+              onBlur={(e) => handleSubmit(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { handleSubmit((e.target as HTMLInputElement).value) }
+                if (e.key === 'Escape') {
+                  useStore.getState().removeItem(blankCardInput.id)
+                  setBlankCardInput(null)
+                  e.stopPropagation()
+                }
+              }}
+              style={{
+                width: '100%',
+                fontSize: 14 * canvas.zoom,
+                fontFamily: 'Inter, sans-serif',
+                background: isDark() ? 'rgba(21,15,36,0.95)' : 'rgba(255,255,255,0.95)',
+                color: isDark() ? '#e8e0f5' : '#1a1028',
+                border: `2px solid ${isDark() ? '#8b7dc8' : '#6a5aae'}`,
+                borderRadius: 8, padding: '8px 12px', outline: 'none',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                backdropFilter: 'blur(8px)',
+              }}
+            />
+            <div style={{
+              fontSize: 11 * canvas.zoom,
+              color: isDark() ? '#8a7aaa' : '#9a8aba',
+              marginTop: 4,
+              fontFamily: 'Inter, sans-serif',
+            }}>
+              URL → website · question → search · text → note
+            </div>
+          </div>
         )
       })()}
 
