@@ -392,21 +392,21 @@ export function Canvas() {
         }
       }
 
-      // Items
+      // Items (skip web items - they are rendered as HTML overlays)
       for (const item of its) {
-        if (item.kind === 'connector' || !('pos' in item)) continue
+        if (item.kind === 'connector' || item.kind === 'web' || !('pos' in item)) continue
         drawItem(ctx, item, sel.has(item.id), c.zoom)
       }
 
-      // Resize handles
+      // Resize handles (skip web items)
       for (const item of its) {
-        if (item.kind === 'connector' || !('pos' in item)) continue
+        if (item.kind === 'connector' || item.kind === 'web' || !('pos' in item)) continue
         if (sel.has(item.id)) drawResizeHandles(ctx, item, c.zoom)
       }
 
-      // Ports
+      // Ports (skip web items)
       for (const item of its) {
-        if (item.kind === 'connector' || !('pos' in item)) continue
+        if (item.kind === 'connector' || item.kind === 'web' || !('pos' in item)) continue
         if ('ports' in item && item.ports) drawPorts(ctx, item, c.zoom)
       }
 
