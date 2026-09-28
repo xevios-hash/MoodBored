@@ -566,6 +566,7 @@ app.get('/api/board/:id/brief', (req, res) => {
 const mcpSessions = new Map()
 
 // SSE endpoint — streams responses, accepts messages via POST
+// Sessions survive connection drops for 5 minutes (Railway kills idle SSE).
 app.get('/mcp/sse', (req, res) => {
   const sessionId = randomUUID()
   const boardId = req.query.board || null
@@ -583,23 +584,54 @@ app.get('/mcp/sse', (req, res) => {
   })
   res.write(`event: endpoint\ndata: ${JSON.stringify({ endpoint: endpointUrl })}\n\n`)
   res.flush?.()
-  mcpSessions.set(sessionId, { res, boardId })
-  const heartbeat = setInterval(() => { try { res.write(':ping\n\n'); res.flush?.() } catch {} }, 15000)
-  req.on('close', () => { clearInterval(heartbeat); mcpSessions.delete(sessionId) })
+
+  // Store session — survives even if this SSE connection drops
+  mcpSessions.set(sessionId, { res, boardId, lastSeen: Date.now() })
+
+  // Heartbeat — if it fails, mark connection as stale but don't delete session
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(':ping\n\n'); res.flush?.()
+      const session = mcpSessions.get(sessionId)
+      if (session) session.lastSeen = Date.now()
+    } catch {
+      clearInterval(heartbeat)
+    }
+  }, 15000)
+
+  req.on('close', () => {
+    clearInterval(heartbeat)
+    // Don't delete session — allow POST /mcp/message to still work
+    // Session will expire after 5 minutes of inactivity
+    const session = mcpSessions.get(sessionId)
+    if (session) session.res = null // mark as disconnected
+  })
 })
+
+// Expire stale sessions every 60s
+setInterval(() => {
+  const now = Date.now()
+  for (const [id, session] of mcpSessions) {
+    if (now - session.lastSeen > 300_000) mcpSessions.delete(id) // 5 min
+  }
+}, 60_000)
 
 app.post('/mcp/message', async (req, res) => {
   const sessionId = req.query.sessionId
   const session = mcpSessions.get(sessionId)
-  if (!session) { res.status(404).json({ error: 'Session not found' }); return }
+  if (!session) { res.status(404).json({ jsonrpc: '2.0', id: req.body?.id, error: { code: -32000, message: 'Session expired — reconnect SSE' } }); return }
+  session.lastSeen = Date.now()
 
   try {
     const response = await handleMcpMessage(req.body, session.boardId)
-    session.res.write(`event: message\ndata: ${JSON.stringify(response)}\n\n`)
-    session.res.flush?.()
-    res.json({ ok: true })
+    // Try to send on SSE stream; if disconnected, return as JSON response
+    if (session.res) {
+      session.res.write(`event: message\ndata: ${JSON.stringify(response)}\n\n`)
+      session.res.flush?.()
+    }
+    res.json(response)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ jsonrpc: '2.0', id: req.body?.id, error: { code: -32603, message: err.message } })
   }
 })
 
