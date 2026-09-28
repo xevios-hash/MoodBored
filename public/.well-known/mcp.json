@@ -7,65 +7,22 @@
     "resources": {}
   },
   "transport": {
-    "type": "sse",
-    "url": "/mcp/sse"
+    "sse": { "url": "/mcp/sse" },
+    "post": { "url": "/mcp" }
   },
   "tools": [
-    {
-      "name": "get_board",
-      "description": "Read the full board state — items, palette, typography, spatial layout, relationships"
-    },
-    {
-      "name": "add_items",
-      "description": "Add one or more items to the board (notes, images, palettes, gradients, fonts, links, videos, containers, etc.)"
-    },
-    {
-      "name": "get_board",
-      "description": "Read the full board state — items, palette, typography, spatial layout, relationships"
-    },
-    {
-      "name": "add_items",
-      "description": "Add items to the board (notes, images, palettes, gradients, fonts, links, videos, containers, etc.)"
-    },
-    {
-      "name": "remove_items",
-      "description": "Remove items from the board by their IDs"
-    },
-    {
-      "name": "update_item",
-      "description": "Update properties of an existing item (text, colors, tags, position, etc.)"
-    },
-    {
-      "name": "search_items",
-      "description": "Search items by text query and/or tag filter"
-    },
-    {
-      "name": "semantic_search",
-      "description": "Search items by meaning — finds related concepts even with different wording"
-    },
-    {
-      "name": "related_items",
-      "description": "Find items semantically related to a given item"
-    },
-    {
-      "name": "arrange_items",
-      "description": "Organize items into a layout (grid, horizontal stack, vertical stack, spiral)"
-    },
-    {
-      "name": "clear_board",
-      "description": "Remove all items from the board"
-    }
+    { "name": "get_board", "description": "Read the full board — items, palette, typography, spatial layout, relationships" },
+    { "name": "add_items", "description": "Add one or more items to the board" },
+    { "name": "remove_items", "description": "Remove items by ID" },
+    { "name": "update_item", "description": "Update item properties" },
+    { "name": "search_items", "description": "Text + tag search" },
+    { "name": "semantic_search", "description": "Meaning-based search" },
+    { "name": "related_items", "description": "Find related items" },
+    { "name": "arrange_items", "description": "Grid, stack, spiral layouts" },
+    { "name": "clear_board", "description": "Remove all items" }
   ],
   "resources": [
-    {
-      "name": "board",
-      "uri": "board://current",
-      "description": "Full board state as JSON"
-    },
-    {
-      "name": "summary",
-      "uri": "board://summary",
-      "description": "Text summary of the board (item counts by type)"
-    }
+    { "name": "board", "uri": "board://current", "description": "Full board state as JSON" },
+    { "name": "summary", "uri": "board://summary", "description": "Text summary of the board" }
   ]
 }

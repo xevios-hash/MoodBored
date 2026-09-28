@@ -565,17 +565,25 @@ app.get('/api/board/:id/brief', (req, res) => {
 
 const mcpSessions = new Map()
 
+// SSE endpoint — streams responses, accepts messages via POST
 app.get('/mcp/sse', (req, res) => {
   const sessionId = randomUUID()
   const boardId = req.query.board || null
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',          // Railway/Cloudflare/Nginx: don't buffer SSE
+    'Access-Control-Allow-Origin': '*', // CORS for cross-origin MCP clients
   })
-  res.write(`data: ${JSON.stringify({ type: 'endpoint', endpoint: `/mcp/message?sessionId=${sessionId}` })}\n\n`)
+  res.write(':ok\n\n')
+  res.flush?.()
+  res.write(`event: endpoint\ndata: ${JSON.stringify({ endpoint: `/mcp/message?sessionId=${sessionId}` })}\n\n`)
+  res.flush?.()
   mcpSessions.set(sessionId, { res, boardId })
-  req.on('close', () => mcpSessions.delete(sessionId))
+  // Heartbeat every 15s to keep Railway from killing idle connections
+  const heartbeat = setInterval(() => { try { res.write(':ping\n\n'); res.flush?.() } catch {} }, 15000)
+  req.on('close', () => { clearInterval(heartbeat); mcpSessions.delete(sessionId) })
 })
 
 app.post('/mcp/message', async (req, res) => {
@@ -585,10 +593,27 @@ app.post('/mcp/message', async (req, res) => {
 
   try {
     const response = await handleMcpMessage(req.body, session.boardId)
-    session.res.write(`data: ${JSON.stringify(response)}\n\n`)
+    session.res.write(`event: message\ndata: ${JSON.stringify(response)}\n\n`)
+    session.res.flush?.()
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
+  }
+})
+
+// Simple POST-only MCP endpoint — for clients that can't do SSE
+// Single request → single JSON-RPC response (no streaming, no session).
+app.post('/mcp', async (req, res) => {
+  try {
+    const body = req.body
+    // If it's a notification (no id), just ack
+    if (!body.id) { res.json({ jsonrpc: '2.0' }); return }
+    // Determine board from query param or most recent
+    const boardId = req.query.board || null
+    const response = await handleMcpMessage(body, boardId)
+    res.json(response)
+  } catch (err) {
+    res.status(500).json({ jsonrpc: '2.0', id: req.body?.id, error: { code: -32603, message: err.message } })
   }
 })
 
@@ -788,8 +813,17 @@ a{color:#7c6cbf}li{margin:4px 0}ul{padding-left:20px}</style></head>
 <h2>Available Boards</h2>
 <ul>${boardList}</ul>
 
-<h2>Connect via SSE (OpenCode, web-based IDEs)</h2>
-<pre>${origin}/mcp/sse?board=BOARD_ID</pre>
+<h2>Connect via POST (simplest — works everywhere)</h2>
+<pre>POST ${origin}/mcp?board=BOARD_ID
+
+curl -X POST "${origin}/mcp?board=BOARD_ID" \\
+  -H "Content-Type: application/json" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_board","arguments":{}}}'</pre>
+<p>Single request → single JSON-RPC response. No sessions, no SSE. Works with any HTTP client.</p>
+
+<h2>Connect via SSE (OpenCode, Cursor, Claude Desktop)</h2>
+<pre>GET ${origin}/mcp/sse?board=BOARD_ID</pre>
+<p>SSE stream with heartbeat. Messages via <code>POST /mcp/message?sessionId=...</code></p>
 
 <h2>Connect via stdio (Claude Desktop, Cursor)</h2>
 <pre>{
