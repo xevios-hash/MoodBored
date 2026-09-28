@@ -641,7 +641,7 @@ app.post('/mcp', async (req, res) => {
   try {
     const body = req.body
     // If it's a notification (no id), just ack
-    if (!body.id) { res.json({ jsonrpc: '2.0' }); return }
+    if (body.id === undefined || body.id === null) { res.json({ jsonrpc: '2.0' }); return }
     // Determine board from query param or most recent
     const boardId = req.query.board || null
     const response = await handleMcpMessage(body, boardId)
@@ -656,6 +656,17 @@ function getActiveViewport(state) {
 }
 
 async function handleMcpMessage(message, sessionBoardId) {
+  if (message.method === 'initialize') {
+    return {
+      jsonrpc: '2.0', id: message.id,
+      result: {
+        protocolVersion: '2024-11-05',
+        capabilities: { tools: {}, resources: {} },
+        serverInfo: { name: 'moodbored', version: '1.0.0' },
+      },
+    }
+  }
+
   if (message.method === 'tools/list') {
     return {
       jsonrpc: '2.0', id: message.id,
