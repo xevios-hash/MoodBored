@@ -574,6 +574,9 @@ app.get('/mcp/sse', (req, res) => {
   const origin = process.env.PUBLIC_URL || `${proto}://${host}`
   const endpointUrl = `${origin}/mcp/message?sessionId=${sessionId}`
 
+  // Debug: log origin resolution
+  console.log(`[SSE] proto=${proto} host=${host} origin=${origin} endpoint=${endpointUrl}`)
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
