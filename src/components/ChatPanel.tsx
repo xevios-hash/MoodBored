@@ -136,81 +136,78 @@ export function ChatPanel() {
           },
           (toolCalls) => {
             // Execute tool calls and return results
-            const actions = processToolCalls(toolCalls)
+            const groupedResults = processToolCalls(toolCalls)
             const results: { tool_call_id: string; content: string }[] = []
 
-            for (let i = 0; i < actions.length; i++) {
-              const action = actions[i]
-              const toolCallId = toolCalls[i]?.id || toolCalls[0]?.id || ''
-              try {
-                if (action.type === 'add_item' && action.item) {
-                  pendingActions.push({ type: 'add_item', item: action.item })
-                  results.push({ tool_call_id: toolCallId, content: `Added ${action.item.kind} item` })
-                } else if (action.type === 'remove_item' && action.itemId) {
-                  pendingActions.push({ type: 'remove_item', itemId: action.itemId })
-                  results.push({ tool_call_id: toolCallId, content: `Removed item ${action.itemId}` })
-                } else if (action.type === 'update_item' && action.itemId) {
-                  pendingActions.push({ type: 'update_item', itemId: action.itemId, item: action.updates })
-                  results.push({ tool_call_id: toolCallId, content: `Updated item ${action.itemId}` })
-                } else if (action.type === 'group_items') {
-                  useStore.getState().groupSelected(action.label || 'Group')
-                  results.push({ tool_call_id: toolCallId, content: `Grouped items into "${action.label}"` })
-                } else if (action.type === 'arrange_items') {
-                  const s = useStore.getState()
-                  if (action.layout === 'grid') s.arrangeGrid(action.cols || 4, action.gap || 20)
-                  else if (action.layout === 'stack-h') s.arrangeStack('h', action.gap || 20)
-                  else if (action.layout === 'stack-v') s.arrangeStack('v', action.gap || 20)
-                  else if (action.layout === 'spiral') s.arrangeSpiral(action.gap || 30)
-                  results.push({ tool_call_id: toolCallId, content: `Arranged items in ${action.layout} layout` })
-                } else if (action.type === 'generate_image') {
-                  // Generate image asynchronously, add to board when ready
-                  results.push({ tool_call_id: toolCallId, content: 'Generating image...' })
-                  const imgPrompt = action.prompt || 'A beautiful image'
-                  generateImage(imgPrompt, settings.apiKey).then((url) => {
-                    if (url) {
-                      useStore.getState().addItem({
-                        kind: 'image', id: crypto.randomUUID(),
-                        thumbnail: url, fullSource: url,
-                        description: action.description || action.prompt,
-                        source: 'generated', purpose: action.purpose || 'AI generated',
-                        importance: 'Generated reference', tags: action.tags || ['generated'],
-                        pos: { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 },
-                        size: { w: 300, h: 300 },
-                      } as any)
+            for (const group of groupedResults) {
+              for (const action of group.actions) {
+                try {
+                  if (action.type === 'add_item' && action.item) {
+                    pendingActions.push({ type: 'add_item', item: action.item })
+                    results.push({ tool_call_id: group.toolCallId, content: `Added ${action.item.kind} item` })
+                  } else if (action.type === 'remove_item' && action.itemId) {
+                    pendingActions.push({ type: 'remove_item', itemId: action.itemId })
+                    results.push({ tool_call_id: group.toolCallId, content: `Removed item ${action.itemId}` })
+                  } else if (action.type === 'update_item' && action.itemId) {
+                    pendingActions.push({ type: 'update_item', itemId: action.itemId, item: action.updates })
+                    results.push({ tool_call_id: group.toolCallId, content: `Updated item ${action.itemId}` })
+                  } else if (action.type === 'group_items') {
+                    useStore.getState().groupSelected(action.label || 'Group')
+                    results.push({ tool_call_id: group.toolCallId, content: `Grouped items into "${action.label}"` })
+                  } else if (action.type === 'arrange_items') {
+                    const s = useStore.getState()
+                    if (action.layout === 'grid') s.arrangeGrid(action.cols || 4, action.gap || 20)
+                    else if (action.layout === 'stack-h') s.arrangeStack('h', action.gap || 20)
+                    else if (action.layout === 'stack-v') s.arrangeStack('v', action.gap || 20)
+                    else if (action.layout === 'spiral') s.arrangeSpiral(action.gap || 30)
+                    results.push({ tool_call_id: group.toolCallId, content: `Arranged items in ${action.layout} layout` })
+                  } else if (action.type === 'generate_image') {
+                    results.push({ tool_call_id: group.toolCallId, content: 'Generating image...' })
+                    const imgPrompt = action.prompt || 'A beautiful image'
+                    generateImage(imgPrompt, settings.apiKey).then((url) => {
+                      if (url) {
+                        useStore.getState().addItem({
+                          kind: 'image', id: crypto.randomUUID(),
+                          thumbnail: url, fullSource: url,
+                          description: action.description || action.prompt,
+                          source: 'generated', purpose: action.purpose || 'AI generated',
+                          importance: 'Generated reference', tags: action.tags || ['generated'],
+                          pos: { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 },
+                          size: { w: 300, h: 300 },
+                        } as any)
+                      }
+                    })
+                  } else if (action.type === 'open_url' && (action as any).url) {
+                    const s = useStore.getState()
+                    const cx = -s.canvas.panX / s.canvas.zoom + 400
+                    const cy = -s.canvas.panY / s.canvas.zoom + 300
+                    s.createBlankCard({ x: cx, y: cy })
+                    const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+                    const lastItem = vp?.items[vp.items.length - 1]
+                    if (lastItem && lastItem.kind === 'web') {
+                      s.morphCard(lastItem.id, 'web', { url: (action as any).url, title: (action as any).title || (action as any).url })
                     }
-                  })
-                } else if (action.type === 'open_url' && (action as any).url) {
-                  // Open URL as web node
-                  const s = useStore.getState()
-                  const cx = -s.canvas.panX / s.canvas.zoom + 400
-                  const cy = -s.canvas.panY / s.canvas.zoom + 300
-                  s.createBlankCard({ x: cx, y: cy })
-                  const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
-                  const lastItem = vp?.items[vp.items.length - 1]
-                  if (lastItem && lastItem.kind === 'web') {
-                    s.morphCard(lastItem.id, 'web', { url: (action as any).url, title: (action as any).title || (action as any).url })
+                    results.push({ tool_call_id: group.toolCallId, content: `Opened ${(action as any).url} as web node` })
+                  } else if (action.type === 'draw_connection' && (action as any).fromId && (action as any).toId) {
+                    const s = useStore.getState()
+                    const connType = (action as any).connectionType || 'related'
+                    s.addTypedConnection({
+                      fromItemId: (action as any).fromId,
+                      fromPortId: 'output',
+                      toItemId: (action as any).toId,
+                      toPortId: 'input',
+                      connectionType: connType as any,
+                      label: (action as any).label || connType,
+                      owner: 'llm',
+                      created: new Date().toISOString(),
+                    })
+                    results.push({ tool_call_id: group.toolCallId, content: `Drew ${connType} connection` })
+                  } else {
+                    results.push({ tool_call_id: group.toolCallId, content: 'Unknown action' })
                   }
-                  results.push({ tool_call_id: toolCallId, content: `Opened ${(action as any).url} as web node` })
-                } else if (action.type === 'draw_connection' && (action as any).fromId && (action as any).toId) {
-                  // Draw typed connection
-                  const s = useStore.getState()
-                  const connType = (action as any).connectionType || 'related'
-                  s.addTypedConnection({
-                    fromItemId: (action as any).fromId,
-                    fromPortId: 'output',
-                    toItemId: (action as any).toId,
-                    toPortId: 'input',
-                    connectionType: connType as any,
-                    label: (action as any).label || connType,
-                    owner: 'llm',
-                    created: new Date().toISOString(),
-                  })
-                  results.push({ tool_call_id: toolCallId, content: `Drew ${connType} connection` })
-                } else {
-                  results.push({ tool_call_id: toolCallId, content: 'Unknown action' })
+                } catch (err) {
+                  results.push({ tool_call_id: group.toolCallId, content: `Error: ${err}` })
                 }
-              } catch (err) {
-                results.push({ tool_call_id: toolCallId, content: `Error: ${err}` })
               }
             }
 
