@@ -148,9 +148,10 @@ describe('web items / spatial tabs', () => {
     const id = useStore.getState().createBlankCard({ x: 100, y: 100 })
     useStore.getState().morphCard(id, 'note', { content: 'Hello world' })
     const items = useStore.getState().project.viewports[0].items
-    const card = items.find(i => i.id === id) as WebItem
-    expect(card.cardType).toBe('note')
-    expect(card.content).toBe('Hello world')
+    // Note morphing converts to old-style note item
+    const note = items.find(i => i.kind === 'note')
+    expect(note).toBeTruthy()
+    expect((note as any).text).toBe('Hello world')
   })
 
   it('morphCard transforms blank card to search card', () => {

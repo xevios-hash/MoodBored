@@ -1304,6 +1304,39 @@ export const useStore = create<AppState>()(
   },
 
   morphCard: (id, cardType, data = {}) => {
+    const state = get()
+    const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
+    const item = vp?.items.find(i => i.id === id)
+    if (!item) return
+
+    // If morphing to note, convert to old-style note item
+    if (cardType === 'note') {
+      const pos = 'pos' in item ? item.pos : { x: 100, y: 100 }
+      const noteItem = {
+        kind: 'note' as const,
+        id: crypto.randomUUID(),
+        text: data.content || '',
+        purpose: '',
+        importance: '',
+        tags: [],
+        pos,
+      }
+      // Replace the web item with a note item
+      set((s) => ({
+        project: {
+          ...s.project,
+          viewports: s.project.viewports.map(v => ({
+            ...v,
+            items: v.items.map(i => i.id === id ? noteItem : i),
+          })),
+          updated: new Date().toISOString(),
+        },
+      }))
+      get().pushHistory()
+      return
+    }
+
+    // For web/search/image/ai, keep as web item
     set((s) => ({
       project: {
         ...s.project,
@@ -1322,13 +1355,6 @@ export const useStore = create<AppState>()(
                   favicon: data.favicon || web.favicon,
                   isLoading: true,
                   history: { urls: [data.url || web.url], index: 0 },
-                }
-              case 'note':
-                return {
-                  ...web,
-                  cardType: 'note',
-                  content: data.content || web.content || '',
-                  title: data.title || 'Note',
                 }
               case 'search':
                 return {

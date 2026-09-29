@@ -13,7 +13,7 @@ body {
   height: 100vh;
   width: 100vw;
   background-color: #f8f5ff;
-  color: #1a1028;
+  color: #0f0a1a;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -21,8 +21,12 @@ body {
 
 body.dark {
   background-color: #0c0814;
-  color: #ede5f8;
+  color: #f5f0ff;
 }
+
+body.dark .text-text-primary { color: #f5f0ff !important; }
+body.dark .text-text-secondary { color: #d0c8e8 !important; }
+body.dark .text-text-muted { color: #a898c0 !important; }
 
 #root { height: 100%; width: 100%; }
 

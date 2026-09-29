@@ -1016,9 +1016,10 @@ export function Canvas() {
           <iframe
             src={ytEmbed}
             style={{ position: 'absolute', top: '50%', left: '50%', width: '120vw', height: '120vh', transform: 'translate(-50%, -50%)', border: 'none', pointerEvents: 'none' }}
-            allow="autoplay; encrypted-media; accelerometer; gyroscope; picture-in-picture"
-            allowFullScreen={false}
+            allow="autoplay; encrypted-media; accelerometer; gyroscope; picture-in-picture; fullscreen"
+            allowFullScreen={true}
             key={bgVideo}
+            referrerPolicy="origin"
           />
         </div>
       )}
