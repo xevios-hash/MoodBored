@@ -14,8 +14,12 @@ interface WebNodeProps {
 
 export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, isFocused }: WebNodeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(!!item.url)
   const [loadError, setLoadError] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
   const store = useStore()
 
   // Reset loading when URL changes
@@ -82,6 +86,67 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
   const handleUnfocus = useCallback(() => {
     store.focusWebNode(null)
   }, [])
+
+  // Drag handling
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setIsDragging(true)
+    const startX = e.clientX
+    const startY = e.clientY
+    const startPos = { ...item.pos }
+
+    const handleDragMove = (e: MouseEvent) => {
+      const dx = (e.clientX - startX) / canvasZoom
+      const dy = (e.clientY - startY) / canvasZoom
+      store.moveItem(item.id, {
+        x: startPos.x + dx,
+        y: startPos.y + dy,
+      })
+    }
+
+    const handleDragEnd = () => {
+      setIsDragging(false)
+      window.removeEventListener('mousemove', handleDragMove)
+      window.removeEventListener('mouseup', handleDragEnd)
+    }
+
+    window.addEventListener('mousemove', handleDragMove)
+    window.addEventListener('mouseup', handleDragEnd)
+  }, [item.id, item.pos, canvasZoom, store])
+
+  // Resize handling
+  const handleResizeStart = useCallback((e: React.MouseEvent, handle: string) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setIsResizing(true)
+    const startX = e.clientX
+    const startY = e.clientY
+    const startSize = { ...(item.size || { w: 640, h: 480 }) }
+
+    const handleResizeMove = (e: MouseEvent) => {
+      const dx = (e.clientX - startX) / canvasZoom
+      const dy = (e.clientY - startY) / canvasZoom
+      let newW = startSize.w
+      let newH = startSize.h
+
+      if (handle.includes('e')) newW = Math.max(200, startSize.w + dx)
+      if (handle.includes('w')) newW = Math.max(200, startSize.w - dx)
+      if (handle.includes('s')) newH = Math.max(150, startSize.h + dy)
+      if (handle.includes('n')) newH = Math.max(150, startSize.h - dy)
+
+      store.updateItem(item.id, { size: { w: newW, h: newH } })
+    }
+
+    const handleResizeEnd = () => {
+      setIsResizing(false)
+      window.removeEventListener('mousemove', handleResizeMove)
+      window.removeEventListener('mouseup', handleResizeEnd)
+    }
+
+    window.addEventListener('mousemove', handleResizeMove)
+    window.addEventListener('mouseup', handleResizeEnd)
+  }, [item.id, item.size, canvasZoom, store])
 
   // BLANK CARD - truly blank square with centered text input
   if (item.cardType === 'blank') {
@@ -198,7 +263,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             className="w-full h-full border-none"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             referrerPolicy="origin"
-            style={{ pointerEvents: isFocused ? 'auto' : 'none', opacity: isLoading ? 0 : 1, transition: 'opacity 0.2s' }}
+            style={{ opacity: isLoading ? 0 : 1, transition: 'opacity 0.2s' }}
           />
         )}
       </>
@@ -208,7 +273,8 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
   // WEB/SEARCH/IMAGE/AI cards - with browser chrome
   return (
     <div
-      className="absolute overflow-hidden"
+      ref={containerRef}
+      className="absolute overflow-hidden group"
       style={{
         left: x,
         top: y,
@@ -217,9 +283,12 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
         borderRadius: 10,
         zIndex: isFocused ? 1000 : isSelected ? 100 : 50,
         border: isSelected ? '2px solid #6a5aae' : '1px solid rgba(0,0,0,0.12)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+        boxShadow: isFocused ? '0 8px 32px rgba(0,0,0,0.2)' : '0 2px 12px rgba(0,0,0,0.08)',
         background: 'white',
+        cursor: isDragging ? 'grabbing' : 'default',
       }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onClick={(e) => {
         e.stopPropagation()
         store.selectItem(item.id)
@@ -229,23 +298,119 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
         handleFocus()
       }}
     >
-      {/* Browser Chrome */}
-      <BrowserChrome
-        item={item}
-        isLoading={isLoading}
-        onBack={handleBack}
-        onForward={handleForward}
-        onReload={handleReload}
-        onClose={handleClose}
-        onNavigate={handleNavigate}
-        onFocus={handleFocus}
-        isFocused={isFocused}
-      />
+      {/* Browser Chrome - draggable area */}
+      <div
+        onMouseDown={handleDragStart}
+        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      >
+        <BrowserChrome
+          item={item}
+          isLoading={isLoading}
+          onBack={handleBack}
+          onForward={handleForward}
+          onReload={handleReload}
+          onClose={handleClose}
+          onNavigate={handleNavigate}
+          onFocus={handleFocus}
+          isFocused={isFocused}
+        />
+      </div>
 
       {/* Content Area */}
       <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100% - 36px)', background: 'white' }}>
         {renderContent()}
       </div>
+
+      {/* Resize handles */}
+      {(isHovered || isSelected || isResizing) && (
+        <>
+          {/* Corner handles */}
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'nw')}
+            className="absolute"
+            style={{
+              top: -4, left: -4, width: 12, height: 12,
+              cursor: 'nwse-resize', zIndex: 200,
+              background: 'transparent',
+            }}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'ne')}
+            className="absolute"
+            style={{
+              top: -4, right: -4, width: 12, height: 12,
+              cursor: 'nesw-resize', zIndex: 200,
+              background: 'transparent',
+            }}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'sw')}
+            className="absolute"
+            style={{
+              bottom: -4, left: -4, width: 12, height: 12,
+              cursor: 'nesw-resize', zIndex: 200,
+              background: 'transparent',
+            }}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'se')}
+            className="absolute"
+            style={{
+              bottom: -4, right: -4, width: 12, height: 12,
+              cursor: 'nwse-resize', zIndex: 200,
+              background: 'transparent',
+            }}
+          />
+          {/* Edge handles */}
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'n')}
+            className="absolute"
+            style={{
+              top: -2, left: 12, right: 12, height: 6,
+              cursor: 'ns-resize', zIndex: 200,
+              background: 'transparent',
+            }}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 's')}
+            className="absolute"
+            style={{
+              bottom: -2, left: 12, right: 12, height: 6,
+              cursor: 'ns-resize', zIndex: 200,
+              background: 'transparent',
+            }}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'w')}
+            className="absolute"
+            style={{
+              left: -2, top: 12, bottom: 12, width: 6,
+              cursor: 'ew-resize', zIndex: 200,
+              background: 'transparent',
+            }}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'e')}
+            className="absolute"
+            style={{
+              right: -2, top: 12, bottom: 12, width: 6,
+              cursor: 'ew-resize', zIndex: 200,
+              background: 'transparent',
+            }}
+          />
+          {/* Visual corner indicator */}
+          <div
+            className="absolute"
+            style={{
+              bottom: 4, right: 4, width: 8, height: 8,
+              borderRight: '2px solid #6a5aae',
+              borderBottom: '2px solid #6a5aae',
+              borderRadius: '0 0 2px 0',
+              pointerEvents: 'none',
+            }}
+          />
+        </>
+      )}
 
       {/* Focus overlay - click to unfocus (only on content area) */}
       {isFocused && (
