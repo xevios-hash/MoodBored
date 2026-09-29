@@ -191,6 +191,9 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
 
     const isBlocked = isLikelyBlocked(item.url)
 
+    // Always use iframe as fallback if Tauri WebView fails or isn't available
+    const shouldUseIframe = !useTauriWebView || loadError
+
     return (
       <>
         {isLoading && !isBlocked && (
@@ -232,7 +235,8 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             </div>
           </div>
         )}
-        {!useTauriWebView && !isBlocked && (
+        {/* Use iframe as primary/fallback */}
+        {shouldUseIframe && !isBlocked && (
           <iframe
             ref={iframeRef}
             src={item.url}
@@ -244,7 +248,8 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             style={{ pointerEvents: isFocused ? 'auto' : 'none' }}
           />
         )}
-        {useTauriWebView && !isBlocked && (
+        {/* Tauri WebContentsView */}
+        {useTauriWebView && !isBlocked && !loadError && (
           <div
             ref={containerRef}
             className="w-full h-full"
