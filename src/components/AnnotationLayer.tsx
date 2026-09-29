@@ -14,6 +14,8 @@ interface AnnotationLayerProps {
   scrollTop?: number
   scrollLeft?: number
   isInteractive: boolean
+  // When true, this layer is for free canvas annotations (not attached to a card)
+  isCanvasLayer?: boolean
 }
 
 const ANNOTATION_COLORS = [
@@ -22,7 +24,7 @@ const ANNOTATION_COLORS = [
 
 const STROKE_WIDTHS = [1, 2, 3, 5, 8]
 
-export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scrollTop = 0, scrollLeft = 0, isInteractive }: AnnotationLayerProps) {
+export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scrollTop = 0, scrollLeft = 0, isInteractive, isCanvasLayer = false }: AnnotationLayerProps) {
   const annotations = useStore((s) => s.annotations)
   const activeTool = useStore((s) => s.activeAnnotationTool)
   const selectedAnnotationId = useStore((s) => s.selectedAnnotationId)
@@ -39,14 +41,34 @@ export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scroll
   const [editingTextId, setEditingTextId] = useState<string | null>(null)
   const [color, setColor] = useState('#ff4444')
   const [strokeWidth, setStrokeWidth] = useState(2)
+  const [isAnnotating, setIsAnnotating] = useState(false) // Hold Shift to activate
 
   // Filter annotations for this layer
   const layerAnnotations = annotations.filter(a => {
+    if (isCanvasLayer) {
+      // Canvas layer shows free-floating annotations (no itemId, no url)
+      return !a.itemId && !a.url
+    }
     if (itemId && a.itemId === itemId) return true
     if (url && a.url === url) return true
-    if (!itemId && !url && !a.itemId && !a.url) return true // Free-floating
     return false
   })
+
+  // Hold Shift to enter annotation mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsAnnotating(true)
+    }
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsAnnotating(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [])
 
   const getRelativePos = useCallback((e: React.MouseEvent) => {
     const rect = layerRef.current?.getBoundingClientRect()
@@ -60,6 +82,8 @@ export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scroll
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!isInteractive) return
     if (activeTool === 'select' || activeTool === 'pan') return
+    // Only draw when holding Shift (or for canvas layer when tool is selected)
+    if (!isCanvasLayer && !isAnnotating) return
 
     e.stopPropagation()
     e.preventDefault()
@@ -68,7 +92,7 @@ export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scroll
     setDrawStart(pos)
     setDrawEnd(pos)
     setIsDrawing(true)
-  }, [isInteractive, activeTool, getRelativePos])
+  }, [isInteractive, activeTool, isCanvasLayer, isAnnotating, getRelativePos])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDrawing) return
@@ -467,7 +491,7 @@ export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scroll
 
   return (
     <>
-      {/* Annotation layer - captures drawing events */}
+      {/* Annotation layer - only captures events when Shift is held (or canvas layer is active) */}
       <div
         ref={layerRef}
         style={{
@@ -476,9 +500,10 @@ export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scroll
           top: 0,
           width: '100%',
           height: '100%',
-          pointerEvents: isInteractive && activeTool !== 'select' && activeTool !== 'pan' ? 'auto' : 'none',
-          cursor: activeTool !== 'select' && activeTool !== 'pan' ? 'crosshair' : 'default',
-          zIndex: 100,
+          // Only capture events when: actively annotating OR drawing OR canvas layer with tool selected
+          pointerEvents: (isAnnotating || isDrawing || (isCanvasLayer && activeTool !== 'select' && activeTool !== 'pan')) ? 'auto' : 'none',
+          cursor: isAnnotating && activeTool !== 'select' && activeTool !== 'pan' ? 'crosshair' : 'default',
+          zIndex: isAnnotating ? 100 : 10,
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -552,8 +577,8 @@ export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scroll
         )}
       </div>
 
-      {/* Annotation toolbar - floating at bottom center */}
-      {isInteractive && (
+      {/* Annotation toolbar - only shows when holding Shift or canvas layer is active */}
+      {(isAnnotating || isCanvasLayer) && (
         <AnnotationToolbar
           activeTool={activeTool}
           color={color}
@@ -567,6 +592,7 @@ export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scroll
             }
           }}
           hasSelection={!!selectedAnnotationId}
+          isCanvas={isCanvasLayer}
         />
       )}
     </>
@@ -584,9 +610,10 @@ interface AnnotationToolbarProps {
   onStrokeWidthChange: (width: number) => void
   onDelete: () => void
   hasSelection: boolean
+  isCanvas?: boolean
 }
 
-function AnnotationToolbar({ activeTool, color, strokeWidth, onToolChange, onColorChange, onStrokeWidthChange, onDelete, hasSelection }: AnnotationToolbarProps) {
+function AnnotationToolbar({ activeTool, color, strokeWidth, onToolChange, onColorChange, onStrokeWidthChange, onDelete, hasSelection, isCanvas }: AnnotationToolbarProps) {
   const [showColorPicker, setShowColorPicker] = useState(false)
 
   const tools: { tool: AnnotationTool; icon: string; label: string }[] = [
@@ -602,7 +629,7 @@ function AnnotationToolbar({ activeTool, color, strokeWidth, onToolChange, onCol
     <div
       className="absolute"
       style={{
-        bottom: 60,
+        bottom: isCanvas ? 80 : 60,
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
@@ -616,6 +643,12 @@ function AnnotationToolbar({ activeTool, color, strokeWidth, onToolChange, onCol
         zIndex: 200,
       }}
     >
+      {/* Shift hint for card annotations */}
+      {!isCanvas && (
+        <div style={{ fontSize: 10, color: '#666', marginRight: 8, whiteSpace: 'nowrap' }}>
+          Hold <b>Shift</b> + draw
+        </div>
+      )}
       {tools.map(({ tool, icon, label }) => (
         <button
           key={tool}

@@ -4,6 +4,7 @@ import { hitTestItem } from '@/lib/layout'
 import { loadFont } from '@/lib/fonts'
 import { showToast } from '@/lib/toasts'
 import { WebNode } from '@/components/WebNode'
+import { AnnotationLayer } from '@/components/AnnotationLayer'
 import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner, WebItem, ConnectionType } from '@/types'
 
 // ─── Item Creation Defaults ─────────────────────────────────────────
@@ -1171,6 +1172,17 @@ export function Canvas() {
           />
         )
       })}
+
+      {/* Canvas-level annotation layer - free-floating annotations */}
+      <AnnotationLayer
+        x={0}
+        y={0}
+        width={2000}
+        height={2000}
+        zoom={canvas.zoom}
+        isInteractive={true}
+        isCanvasLayer={true}
+      />
 
       {/* Typed connection overlays */}
       {(viewport?.typedConnections || []).map((conn, idx) => {
