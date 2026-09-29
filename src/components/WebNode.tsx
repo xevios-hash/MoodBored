@@ -255,16 +255,23 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
           </div>
         )}
         {!isBlocked && (
-          <iframe
-            ref={iframeRef}
-            src={item.url}
-            onLoad={handleLoad}
-            onError={handleError}
-            className="w-full h-full border-none"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-            referrerPolicy="origin"
-            style={{ opacity: isLoading ? 0 : 1, transition: 'opacity 0.2s' }}
-          />
+          <div
+            className="w-full h-full"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            style={{ pointerEvents: isHovered ? 'auto' : 'none' }}
+          >
+            <iframe
+              ref={iframeRef}
+              src={item.url}
+              onLoad={handleLoad}
+              onError={handleError}
+              className="w-full h-full border-none"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              referrerPolicy="origin"
+              style={{ opacity: isLoading ? 0 : 1, transition: 'opacity 0.2s' }}
+            />
+          </div>
         )}
       </>
     )
@@ -274,16 +281,16 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
   return (
     <div
       ref={containerRef}
-      className="absolute overflow-hidden group"
+      className="absolute overflow-hidden"
       style={{
         left: x,
         top: y,
         width: w,
         height: h,
         borderRadius: 10,
-        zIndex: isFocused ? 1000 : isSelected ? 100 : 50,
+        zIndex: isHovered ? 1000 : isFocused ? 900 : isSelected ? 100 : 50,
         border: isSelected ? '2px solid #6a5aae' : '1px solid rgba(0,0,0,0.12)',
-        boxShadow: isFocused ? '0 8px 32px rgba(0,0,0,0.2)' : '0 2px 12px rgba(0,0,0,0.08)',
+        boxShadow: isFocused ? '0 8px 32px rgba(0,0,0,0.2)' : isHovered ? '0 4px 16px rgba(0,0,0,0.12)' : '0 2px 12px rgba(0,0,0,0.08)',
         background: 'white',
         cursor: isDragging ? 'grabbing' : 'default',
       }}
@@ -673,6 +680,7 @@ function NoteCardContent({ item, onUpdate }: { item: WebItem; onUpdate: (content
 
 function SearchCardContent({ item, onNavigate }: { item: WebItem; onNavigate: (url: string) => void }) {
   const [query, setQuery] = useState(item.searchText || '')
+  const [isIframeHovered, setIsIframeHovered] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -694,12 +702,19 @@ function SearchCardContent({ item, onNavigate }: { item: WebItem; onNavigate: (u
         />
       </form>
       {item.url && !isLikelyBlocked(item.url) && (
-        <iframe
-          src={item.url}
-          className="flex-1 w-full border-none"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-          onLoad={() => {}}
-        />
+        <div
+          className="flex-1"
+          onMouseEnter={() => setIsIframeHovered(true)}
+          onMouseLeave={() => setIsIframeHovered(false)}
+          style={{ pointerEvents: isIframeHovered ? 'auto' : 'none' }}
+        >
+          <iframe
+            src={item.url}
+            className="w-full h-full border-none"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            onLoad={() => {}}
+          />
+        </div>
       )}
       {item.url && isLikelyBlocked(item.url) && (
         <div className="flex-1 flex items-center justify-center">
