@@ -1038,40 +1038,11 @@ export function Canvas() {
         onClick={onClick} onDoubleClick={onDoubleClick} onWheel={onWheel} onContextMenu={onContextMenu}
         onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} />
 
-      {/* Status bar */}
-      <div className="status-bar" style={{ position: 'absolute', bottom: 12, left: 12, zIndex: 10 }}>
-        <button className="status-bar-btn" onClick={() => { useStore.getState().setZoom(canvas.zoom * 0.8); needsRedraw.current = true }}>−</button>
-        <span style={{ minWidth: 36, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(canvas.zoom * 100)}%</span>
-        <button className="status-bar-btn" onClick={() => { useStore.getState().setZoom(canvas.zoom * 1.25); needsRedraw.current = true }}>+</button>
-        <div className="status-divider" />
-        <span>{itemCount} items</span>
-        <div className="status-divider" />
-        <button className="status-bar-btn" onClick={handleEyedropper} title="Pick color from screen">🎨</button>
-        <button className="status-bar-btn" onClick={() => {
-          const s = useStore.getState()
-          const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
-          if (!vp) return
-          const pos = vp.items.filter(i => i.kind !== 'connector' && 'pos' in i) as any[]
-          if (pos.length === 0) return
-          const minX = Math.min(...pos.map(i => i.pos.x))
-          const maxX = Math.max(...pos.map(i => i.pos.x + (i.size?.w ?? 250)))
-          const minY = Math.min(...pos.map(i => i.pos.y))
-          const maxY = Math.max(...pos.map(i => i.pos.y + (i.size?.h ?? 150)))
-          const r = canvasRef.current?.getBoundingClientRect()
-          if (!r) return
-          const pad = 80
-          const z = Math.min((r.width - pad * 2) / (maxX - minX), (r.height - pad * 2) / (maxY - minY), 2)
-          s.setZoom(z)
-          s.setPan(r.width / 2 - ((minX + maxX) / 2) * z, r.height / 2 - ((minY + maxY) / 2) * z)
-        }} style={{ color: '#00fff0', fontWeight: 600 }}>Fit All</button>
-        <button onClick={() => {
-          const cvs = canvasRef.current
-          if (!cvs) return
-          const a = document.createElement('a')
-          a.download = 'moodboard.png'
-          a.href = cvs.toDataURL('image/png')
-          a.click()
-        }} className="status-bar-btn" style={{ color: '#00fff0', fontWeight: 600 }}>Export PNG</button>
+      {/* Zoom controls - minimal */}
+      <div className="flex items-center gap-1 px-2 py-1 rounded-lg shadow-sm" style={{ position: 'absolute', bottom: 12, left: 12, zIndex: 10, background: 'var(--bg-surface-1)', border: '1px solid var(--border-color)' }}>
+        <button className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { useStore.getState().setZoom(canvas.zoom * 0.8); needsRedraw.current = true }}>−</button>
+        <span className="text-xs tabular-nums min-w-[32px] text-center">{Math.round(canvas.zoom * 100)}%</span>
+        <button className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { useStore.getState().setZoom(canvas.zoom * 1.25); needsRedraw.current = true }}>+</button>
       </div>
 
       {/* Floating Add Toolbar — bottom-right */}
@@ -1369,21 +1340,11 @@ export function Canvas() {
         )
       })()}
 
-      {itemCount > 0 && (
-        <div className="badge badge-accent" style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
-          {itemCount} items on board
-        </div>
-      )}
-
-      {/* Minimap */}
-      {itemCount > 0 && (
-        <Minimap items={items} canvas={canvas} canvasRef={canvasRef} />
-      )}
-
       {/* Layers panel toggle */}
       <button
         onClick={() => setShowLayers(!showLayers)}
-        style={{ position: 'absolute', top: 12, left: 12, fontSize: 10, color: '#6b7280', background: 'rgba(255,255,255,0.9)', padding: '4px 8px', borderRadius: 4, border: 'none', cursor: 'pointer', backdropFilter: 'blur(8px)', zIndex: 10 }}
+        className="text-xs px-2 py-1 rounded-md shadow-sm"
+        style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, background: 'var(--bg-surface-1)', border: '1px solid var(--border-color)' }}
         title="Toggle layers"
       >
         Layers

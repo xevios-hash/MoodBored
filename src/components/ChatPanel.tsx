@@ -225,7 +225,6 @@ export function ChatPanel() {
           },
           () => {
             if (pendingActions.length > 0) {
-              addMessage({ id: uuid(), role: 'system', content: `[debug] executed ${pendingActions.length} actions. Items on board: ${currentViewportItems().length}`, timestamp: new Date().toISOString() })
               showToast(`Added ${pendingActions.length} item${pendingActions.length > 1 ? 's' : ''}`, 'success')
             }
             setStreaming(false)
@@ -289,14 +288,10 @@ export function ChatPanel() {
     useStore.getState().project.viewports.find(v => v.id === useStore.getState().activeViewportId)?.items ?? []
 
   // Agent execution — runs once per completed response against the whole batch.
-  // Jev gate is disabled until proven stable; direct execution for debugging.
   const gateAndExecute = async (actions: AgentAction[], retriesLeft: number, assistantMsg: ChatMessage, allowFormatRetry: boolean = true) => {
-    addMessage({ id: uuid(), role: 'system', content: `[debug] actions parsed: ${actions.length}`, timestamp: new Date().toISOString() })
-
     if (actions.length === 0) {
       // Model drifted into prose without emitting json blocks — retry once.
       if (retriesLeft > 0 && allowFormatRetry) {
-        addMessage({ id: uuid(), role: 'system', content: 'No items parsed — asking AI to reformat as json blocks.', timestamp: new Date().toISOString() })
         await requestCompletion(['Your previous response contained NO ```json blocks, so nothing was added to the board. Re-emit ALL items now as one or more ```json blocks per the ITEM TYPES spec. Do not write markdown lists or headings; put that content inside the json objects.'], retriesLeft, false)
         return
       }
@@ -304,9 +299,7 @@ export function ChatPanel() {
       return
     }
 
-    // Direct execution — no Jev gate in the way while we debug
     executeActions(actions)
-    addMessage({ id: uuid(), role: 'system', content: `[debug] executed ${actions.length} actions. Items on board: ${currentViewportItems().length}`, timestamp: new Date().toISOString() })
     showToast(`Added ${actions.length} item${actions.length > 1 ? 's' : ''}`, 'success')
   }
 
@@ -315,24 +308,13 @@ export function ChatPanel() {
     if (confirm('Clear all chat messages?')) { saveMessages([]); resetJevCounter(); showToast('Chat cleared', 'info') }
   }
 
-  const showDiagnostics = () => {
-    const d = getAgentDiagnostics()
-    const summary = `chunks ${d.chunksSeen} · blocks ${d.jsonBlockMatches} · parsed ${d.actionsParsed} · executed ${d.actionsExecuted}${d.lastError ? ` · last error: ${d.lastError}` : ''}\n\n${d.timeline.slice(-6).join('\n')}`
-    showToast(summary || 'No agent activity yet', d.lastError ? 'error' : 'info', 8000)
-  }
-
   return (
     <div className="h-full glass-panel border-l border-surface-4 flex flex-col">
       <div className="p-3 border-b border-surface-4 flex items-center justify-between">
         <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Chat</h2>
-        <div className="flex items-center gap-1">
-          <button onClick={showDiagnostics} className="text-text-muted hover:text-text-primary p-1" aria-label="Show agent diagnostics" title="Pipeline diagnostics">
-            <Activity size={14} />
-          </button>
-          <button onClick={handleClear} className="btn p-1 text-text-muted hover:text-danger hover:bg-danger-light rounded" aria-label="Clear chat">
-            <Trash2 size={14} />
-          </button>
-        </div>
+        <button onClick={handleClear} className="p-1 text-text-muted hover:text-danger hover:bg-danger-light rounded" aria-label="Clear chat">
+          <Trash2 size={14} />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
@@ -377,9 +359,8 @@ export function ChatPanel() {
 
       <div className="p-3 border-t border-surface-4">
         {!settings.apiKey && (
-          <div className="mb-2 p-2 rounded-lg flex items-center gap-2 text-xs cursor-pointer animate-glow" onClick={toggleSettings} style={{ background: 'rgba(255,230,0,0.08)', border: '1px solid rgba(255,230,0,0.2)' }}>
-            <span className="insert-token">INSERT TOKEN</span>
-            <span className="text-2xs" style={{ color: '#8a7aaa' }}>— click to open Settings</span>
+          <div className="mb-2 px-3 py-1.5 rounded-md text-xs cursor-pointer" onClick={toggleSettings} style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+            Add API key in Settings to use AI
           </div>
         )}
         <div className="flex gap-2">

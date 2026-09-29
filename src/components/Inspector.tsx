@@ -55,7 +55,7 @@ export function Inspector() {
       <div className="p-3 border-b border-white/[0.06] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-accent uppercase">{selectedItem.kind}</span>
-          <span className="text-2xs text-text-muted font-mono">#{selectedItem.id.slice(0, 8)}</span>
+          <span className="text-2xs text-text-muted">{selectedItem.kind}</span>
         </div>
         <div className="flex items-center gap-1">
           <button
