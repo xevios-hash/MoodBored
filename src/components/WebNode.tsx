@@ -1,33 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useStore } from '@/stores/useStore'
 import type { WebItem, CardType } from '@/types'
-import { isWebUrl, isSearchQuery, normalizeUrl, getFaviconUrl, getDomain } from '@/lib/browser-engine'
-
-// Sites known to block iframe embedding via X-Frame-Options
-const BLOCKED_SITES = [
-  'google.com', 'www.google.com', 'accounts.google.com',
-  'facebook.com', 'www.facebook.com',
-  'twitter.com', 'x.com', 'www.twitter.com',
-  'youtube.com', 'www.youtube.com',
-  'instagram.com', 'www.instagram.com',
-  'linkedin.com', 'www.linkedin.com',
-  'github.com', 'www.github.com',
-  'amazon.com', 'www.amazon.com',
-  'netflix.com', 'www.netflix.com',
-  'apple.com', 'www.apple.com',
-  'microsoft.com', 'www.microsoft.com',
-  'reddit.com', 'www.reddit.com',
-  'stackoverflow.com', 'www.stackoverflow.com',
-]
-
-function isLikelyBlocked(url: string): boolean {
-  try {
-    const domain = new URL(url).hostname
-    return BLOCKED_SITES.includes(domain)
-  } catch {
-    return false
-  }
-}
+import { isWebUrl, isSearchQuery, normalizeUrl, getFaviconUrl, getDomain, isTauriMode, isLikelyBlocked, getBrowserEngine } from '@/lib/browser-engine'
 
 interface WebNodeProps {
   item: WebItem
@@ -40,40 +14,66 @@ interface WebNodeProps {
 
 export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, isFocused }: WebNodeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(item.isLoading)
   const [loadError, setLoadError] = useState(false)
+  const [useTauriWebView, setUseTauriWebView] = useState(false)
   const store = useStore()
 
-  // Timeout for iframe loading - show error if site doesn't respond
+  // Detect Tauri mode on mount
   useEffect(() => {
-    if (item.isLoading && item.url) {
-      const timer = setTimeout(() => {
+    setUseTauriWebView(isTauriMode())
+  }, [])
+
+  // Tauri WebContentsView lifecycle
+  useEffect(() => {
+    if (!useTauriWebView || !item.url) return
+
+    const engine = getBrowserEngine()
+    let mounted = true
+
+    const setupWebView = async () => {
+      await engine.createWebView(item.id, item.url)
+      if (mounted) {
+        await engine.setVisible(item.id, true)
         setIsLoading(false)
-        setLoadError(true)
-      }, 15000) // 15 second timeout
-      return () => clearTimeout(timer)
+      }
     }
-  }, [item.isLoading, item.url])
+
+    setupWebView()
+
+    return () => {
+      mounted = false
+      if (useTauriWebView) {
+        engine.close(item.id)
+      }
+    }
+  }, [useTauriWebView, item.id, item.url])
+
+  // Update Tauri WebContentsView bounds when position/size changes
+  useEffect(() => {
+    if (!useTauriWebView || !containerRef.current) return
+
+    const engine = getBrowserEngine()
+    const rect = containerRef.current.getBoundingClientRect()
+
+    // Use requestAnimationFrame for smooth updates
+    const raf = requestAnimationFrame(() => {
+      engine.setBounds(item.id, rect.left, rect.top, rect.width, rect.height)
+    })
+
+    return () => cancelAnimationFrame(raf)
+  }, [useTauriWebView, item.id, canvasZoom, canvasPanX, canvasPanY, item.pos, item.size])
 
   const x = item.pos.x * canvasZoom + canvasPanX
   const y = item.pos.y * canvasZoom + canvasPanY
-  const w = (item.size?.w ?? 300) * canvasZoom
-  const h = (item.size?.h ?? 200) * canvasZoom
+  const w = (item.size?.w ?? 640) * canvasZoom
+  const h = (item.size?.h ?? 480) * canvasZoom
 
   const handleLoad = useCallback(() => {
     setIsLoading(false)
     setLoadError(false)
     store.updateWebNode(item.id, { isLoading: false })
-    // Check if the iframe actually loaded content (not an error page)
-    try {
-      const iframe = iframeRef.current
-      if (iframe && iframe.contentDocument) {
-        // Cross-origin iframes will throw here, which means they loaded successfully
-      }
-    } catch {
-      // Cross-origin access error = iframe loaded successfully
-      setLoadError(false)
-    }
   }, [item.id])
 
   const handleError = useCallback(() => {
@@ -86,23 +86,40 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
     store.navigateWebNode(item.id, normalized)
     setIsLoading(true)
     setLoadError(false)
-  }, [item.id])
+
+    // Update Tauri WebContentsView if active
+    if (useTauriWebView) {
+      const engine = getBrowserEngine()
+      engine.navigate(item.id, normalized)
+    }
+  }, [item.id, useTauriWebView])
 
   const handleBack = useCallback(() => {
     store.webNodeGoBack(item.id)
-  }, [item.id])
+    if (useTauriWebView) {
+      const engine = getBrowserEngine()
+      engine.goBack(item.id)
+    }
+  }, [item.id, useTauriWebView])
 
   const handleForward = useCallback(() => {
     store.webNodeGoForward(item.id)
-  }, [item.id])
+    if (useTauriWebView) {
+      const engine = getBrowserEngine()
+      engine.goForward(item.id)
+    }
+  }, [item.id, useTauriWebView])
 
   const handleReload = useCallback(() => {
     store.webNodeReload(item.id)
     setIsLoading(true)
-    if (iframeRef.current) {
+    if (useTauriWebView) {
+      const engine = getBrowserEngine()
+      engine.reload(item.id)
+    } else if (iframeRef.current) {
       iframeRef.current.src = iframeRef.current.src
     }
-  }, [item.id])
+  }, [item.id, useTauriWebView])
 
   const handleClose = useCallback(() => {
     store.closeWebNode(item.id)
@@ -110,11 +127,19 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
 
   const handleFocus = useCallback(() => {
     store.focusWebNode(item.id)
-  }, [item.id])
+    if (useTauriWebView) {
+      const engine = getBrowserEngine()
+      engine.focus(item.id)
+    }
+  }, [item.id, useTauriWebView])
 
   const handleUnfocus = useCallback(() => {
     store.focusWebNode(null)
-  }, [])
+    if (useTauriWebView) {
+      const engine = getBrowserEngine()
+      engine.unfocus(item.id)
+    }
+  }, [item.id, useTauriWebView])
 
   // Determine what to render based on card type
   const renderContent = () => {
@@ -138,9 +163,11 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
   const renderWebContent = () => {
     if (!item.url) return <EmptyCardContent item={item} onNavigate={handleNavigate} />
 
-    // Check if site is known to block embedding
+    // Check if site is known to block embedding (web mode only)
     const isBlocked = isLikelyBlocked(item.url)
 
+    // In Tauri mode, we use WebContentsView (no iframe restrictions)
+    // In web mode, we use iframes with fallback for blocked sites
     return (
       <>
         {isLoading && !isBlocked && (
@@ -148,7 +175,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             <div className="animate-spin w-6 h-6 border-2 border-accent border-t-transparent rounded-full" />
           </div>
         )}
-        {(loadError || isBlocked) && (
+        {(loadError || (isBlocked && !useTauriWebView)) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-0/95 z-10 gap-3 p-4">
             <div className="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-warning">
@@ -183,7 +210,8 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             </div>
           </div>
         )}
-        {!isBlocked && (
+        {/* Web mode: iframe (with fallback for blocked sites) */}
+        {!useTauriWebView && !isBlocked && (
           <iframe
             ref={iframeRef}
             src={item.url}
@@ -193,6 +221,14 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation-by-user-activation"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             referrerPolicy="origin"
+            style={{ pointerEvents: isFocused ? 'auto' : 'none' }}
+          />
+        )}
+        {/* Tauri mode: WebContentsView is managed externally */}
+        {useTauriWebView && !isBlocked && (
+          <div
+            ref={containerRef}
+            className="w-full h-full"
             style={{ pointerEvents: isFocused ? 'auto' : 'none' }}
           />
         )}
