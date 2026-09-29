@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { useStore } from '@/stores/useStore'
 import type { WebItem, CardType } from '@/types'
 import { isWebUrl, isSearchQuery, normalizeUrl, getFaviconUrl, getDomain, isLikelyBlocked } from '@/lib/browser-engine'
+import { AnnotationLayer } from './AnnotationLayer'
 
 interface WebNodeProps {
   item: WebItem
@@ -326,6 +327,17 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
       {/* Content Area */}
       <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100% - 36px)', background: 'white' }}>
         {renderContent()}
+        {/* Annotation Layer - on top of web content */}
+        <AnnotationLayer
+          itemId={item.id}
+          url={item.url}
+          x={x}
+          y={y + 36}
+          width={w}
+          height={h - 36}
+          zoom={canvasZoom}
+          isInteractive={isHovered || isFocused}
+        />
       </div>
 
       {/* Resize handles */}

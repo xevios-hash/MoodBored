@@ -22,6 +22,8 @@ import type {
   SnapshotMeta,
   WorkspaceMeta,
   BrowserHistory,
+  Annotation,
+  AnnotationTool,
 } from '@/types'
 
 interface CanvasState {
@@ -84,6 +86,18 @@ interface AppState {
   restoreWorkspace: (id: string) => Promise<void>
   deleteWorkspace: (id: string) => Promise<void>
   togglePinWorkspace: (id: string) => Promise<void>
+
+  // Annotations
+  annotations: Annotation[]
+  activeAnnotationTool: AnnotationTool
+  selectedAnnotationId: string | null
+  setAnnotationTool: (tool: AnnotationTool) => void
+  addAnnotation: (annotation: Annotation) => void
+  updateAnnotation: (id: string, updates: Partial<Annotation>) => void
+  removeAnnotation: (id: string) => void
+  selectAnnotation: (id: string | null) => void
+  getAnnotationsForItem: (itemId: string) => Annotation[]
+  getAnnotationsForUrl: (url: string) => Annotation[]
 
   // History (undo/redo)
   history: Project[]
@@ -255,6 +269,11 @@ export const useStore = create<AppState>()(
   // Snapshots & Workspaces
   snapshots: [],
   workspaces: [],
+
+  // Annotations
+  annotations: [],
+  activeAnnotationTool: 'select',
+  selectedAnnotationId: null,
 
   // Project
   setProject: (p) => {
@@ -1159,6 +1178,39 @@ export const useStore = create<AppState>()(
     } catch (e) {
       console.warn('[MoodBored] togglePinWorkspace failed:', e)
     }
+  },
+
+  // Annotation Actions
+  setAnnotationTool: (tool) => set({ activeAnnotationTool: tool, selectedAnnotationId: null }),
+
+  addAnnotation: (annotation) => {
+    set((s) => ({
+      annotations: [...s.annotations, annotation],
+    }))
+    get().pushHistory()
+  },
+
+  updateAnnotation: (id, updates) =>
+    set((s) => ({
+      annotations: s.annotations.map(a => a.id === id ? { ...a, ...updates } as Annotation : a),
+    })),
+
+  removeAnnotation: (id) => {
+    set((s) => ({
+      annotations: s.annotations.filter(a => a.id !== id),
+      selectedAnnotationId: s.selectedAnnotationId === id ? null : s.selectedAnnotationId,
+    }))
+    get().pushHistory()
+  },
+
+  selectAnnotation: (id) => set({ selectedAnnotationId: id }),
+
+  getAnnotationsForItem: (itemId) => {
+    return get().annotations.filter(a => a.itemId === itemId)
+  },
+
+  getAnnotationsForUrl: (url) => {
+    return get().annotations.filter(a => a.url === url)
   },
 
   // Settings
