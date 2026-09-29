@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useStore } from '@/stores/useStore'
 import type { WebItem, CardType } from '@/types'
-import { isWebUrl, isSearchQuery, normalizeUrl, getFaviconUrl, getDomain, isTauriMode, isLikelyBlocked, getBrowserEngine } from '@/lib/browser-engine'
+import { isWebUrl, isSearchQuery, normalizeUrl, getFaviconUrl, getDomain, isLikelyBlocked } from '@/lib/browser-engine'
 
 interface WebNodeProps {
   item: WebItem
@@ -14,54 +14,22 @@ interface WebNodeProps {
 
 export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, isFocused }: WebNodeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [isLoading, setIsLoading] = useState(item.isLoading)
+  const [isLoading, setIsLoading] = useState(!!item.url)
   const [loadError, setLoadError] = useState(false)
-  const [useTauriWebView, setUseTauriWebView] = useState(false)
   const store = useStore()
 
+  // Reset loading when URL changes
   useEffect(() => {
-    setUseTauriWebView(isTauriMode())
-  }, [])
-
-  // Tauri WebContentsView lifecycle
-  useEffect(() => {
-    if (!useTauriWebView || !item.url || item.cardType === 'blank') return
-
-    const engine = getBrowserEngine()
-    let mounted = true
-
-    const setupWebView = async () => {
-      await engine.createWebView(item.id, item.url)
-      if (mounted) {
-        await engine.setVisible(item.id, true)
+    if (item.url) {
+      setIsLoading(true)
+      setLoadError(false)
+      const timer = setTimeout(() => {
+        // After 8 seconds, consider it loaded (iframes don't always fire onLoad)
         setIsLoading(false)
-      }
+      }, 8000)
+      return () => clearTimeout(timer)
     }
-
-    setupWebView()
-
-    return () => {
-      mounted = false
-      if (useTauriWebView) {
-        engine.close(item.id)
-      }
-    }
-  }, [useTauriWebView, item.id, item.url, item.cardType])
-
-  // Update Tauri WebContentsView bounds when position/size changes
-  useEffect(() => {
-    if (!useTauriWebView || !containerRef.current || item.cardType === 'blank') return
-
-    const engine = getBrowserEngine()
-    const rect = containerRef.current.getBoundingClientRect()
-
-    const raf = requestAnimationFrame(() => {
-      engine.setBounds(item.id, rect.left, rect.top, rect.width, rect.height)
-    })
-
-    return () => cancelAnimationFrame(raf)
-  }, [useTauriWebView, item.id, item.cardType, canvasZoom, canvasPanX, canvasPanY, item.pos, item.size])
+  }, [item.url])
 
   const x = item.pos.x * canvasZoom + canvasPanX
   const y = item.pos.y * canvasZoom + canvasPanY
@@ -84,39 +52,24 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
     store.navigateWebNode(item.id, normalized)
     setIsLoading(true)
     setLoadError(false)
-
-    if (useTauriWebView) {
-      const engine = getBrowserEngine()
-      engine.navigate(item.id, normalized)
-    }
-  }, [item.id, useTauriWebView])
+  }, [item.id])
 
   const handleBack = useCallback(() => {
     store.webNodeGoBack(item.id)
-    if (useTauriWebView) {
-      const engine = getBrowserEngine()
-      engine.goBack(item.id)
-    }
-  }, [item.id, useTauriWebView])
+  }, [item.id])
 
   const handleForward = useCallback(() => {
     store.webNodeGoForward(item.id)
-    if (useTauriWebView) {
-      const engine = getBrowserEngine()
-      engine.goForward(item.id)
-    }
-  }, [item.id, useTauriWebView])
+  }, [item.id])
 
   const handleReload = useCallback(() => {
     store.webNodeReload(item.id)
     setIsLoading(true)
-    if (useTauriWebView) {
-      const engine = getBrowserEngine()
-      engine.reload(item.id)
-    } else if (iframeRef.current) {
-      iframeRef.current.src = iframeRef.current.src
+    setLoadError(false)
+    if (iframeRef.current) {
+      iframeRef.current.src = item.url
     }
-  }, [item.id, useTauriWebView])
+  }, [item.id, item.url])
 
   const handleClose = useCallback(() => {
     store.closeWebNode(item.id)
@@ -124,19 +77,11 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
 
   const handleFocus = useCallback(() => {
     store.focusWebNode(item.id)
-    if (useTauriWebView) {
-      const engine = getBrowserEngine()
-      engine.focus(item.id)
-    }
-  }, [item.id, useTauriWebView])
+  }, [item.id])
 
   const handleUnfocus = useCallback(() => {
     store.focusWebNode(null)
-    if (useTauriWebView) {
-      const engine = getBrowserEngine()
-      engine.unfocus(item.id)
-    }
-  }, [item.id, useTauriWebView])
+  }, [])
 
   // BLANK CARD - truly blank square with centered text input
   if (item.cardType === 'blank') {
@@ -191,9 +136,6 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
 
     const isBlocked = isLikelyBlocked(item.url)
 
-    // Always use iframe as fallback if Tauri WebView fails or isn't available
-    const shouldUseIframe = !useTauriWebView || loadError
-
     return (
       <>
         {isLoading && !isBlocked && (
@@ -201,7 +143,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             <div className="animate-spin w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full" />
           </div>
         )}
-        {(loadError || (isBlocked && !useTauriWebView)) && (
+        {(loadError || isBlocked) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 z-10 gap-3 p-4">
             <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-600">
@@ -211,9 +153,13 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
               </svg>
             </div>
             <div className="text-center">
-              <div className="text-sm font-semibold text-gray-900">Can't embed this site</div>
+              <div className="text-sm font-semibold text-gray-900">
+                {isBlocked ? "Can't embed this site" : 'Failed to load'}
+              </div>
               <div className="text-xs text-gray-600 mt-1 max-w-[250px]">
-                {getDomain(item.url) || 'This site'} blocks embedding for security reasons.
+                {isBlocked
+                  ? `${getDomain(item.url) || 'This site'} blocks embedding for security reasons.`
+                  : 'Something went wrong loading this page.'}
               </div>
             </div>
             <div className="flex gap-2">
@@ -226,6 +172,14 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
               >
                 Open in tab <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
               </a>
+              {!isBlocked && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleReload() }}
+                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Retry
+                </button>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); handleClose() }}
                 className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50"
@@ -235,8 +189,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             </div>
           </div>
         )}
-        {/* Use iframe as primary/fallback */}
-        {shouldUseIframe && !isBlocked && (
+        {!isBlocked && (
           <iframe
             ref={iframeRef}
             src={item.url}
@@ -245,15 +198,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             className="w-full h-full border-none"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             referrerPolicy="origin"
-            style={{ pointerEvents: isFocused ? 'auto' : 'none' }}
-          />
-        )}
-        {/* Tauri WebContentsView */}
-        {useTauriWebView && !isBlocked && !loadError && (
-          <div
-            ref={containerRef}
-            className="w-full h-full"
-            style={{ pointerEvents: isFocused ? 'auto' : 'none' }}
+            style={{ pointerEvents: isFocused ? 'auto' : 'none', opacity: isLoading ? 0 : 1, transition: 'opacity 0.2s' }}
           />
         )}
       </>
@@ -329,17 +274,14 @@ function BlankCardInput({ item, canvasZoom }: { item: WebItem; canvasZoom: numbe
     if (!text) return
 
     if (isWebUrl(text)) {
-      // URL → browser card
       store.morphCard(item.id, 'web', {
         url: normalizeUrl(text),
         title: getDomain(text) || text,
         favicon: getFaviconUrl(text),
       })
     } else if (isSearchQuery(text) && (text.endsWith('?') || text.startsWith('how ') || text.startsWith('what ') || text.startsWith('why ') || text.startsWith('when ') || text.startsWith('where '))) {
-      // Question → search card
       store.morphCard(item.id, 'search', { searchText: text })
     } else {
-      // Text → note card (old style)
       store.morphCard(item.id, 'note', { content: text })
     }
   }
@@ -381,7 +323,6 @@ function BlankCardInput({ item, canvasZoom }: { item: WebItem; canvasZoom: numbe
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        onSubmit={handleSubmit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()
@@ -459,7 +400,6 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
         borderBottom: '1px solid rgba(0,0,0,0.1)',
       }}
     >
-      {/* Navigation buttons */}
       <button
         onClick={onBack}
         disabled={!canGoBack}
@@ -491,7 +431,6 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
         </svg>
       </button>
 
-      {/* URL Bar */}
       <form onSubmit={handleSubmit} className="flex-1 mx-1">
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white border border-gray-200 hover:border-gray-300 transition-colors">
           {item.favicon && (
@@ -520,7 +459,6 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
         </div>
       </form>
 
-      {/* Focus/Close buttons */}
       {!isFocused && (
         <button
           onClick={onFocus}
@@ -590,12 +528,23 @@ function SearchCardContent({ item, onNavigate }: { item: WebItem; onNavigate: (u
           style={{ color: '#1a1a2e' }}
         />
       </form>
-      {item.url && (
+      {item.url && !isLikelyBlocked(item.url) && (
         <iframe
           src={item.url}
           className="flex-1 w-full border-none"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          onLoad={() => {}}
         />
+      )}
+      {item.url && isLikelyBlocked(item.url) && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-xs text-gray-500">
+            <div>Google Search blocks embedding</div>
+            <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-purple-600 underline mt-1 inline-block">
+              Open search in new tab
+            </a>
+          </div>
+        </div>
       )}
     </div>
   )
