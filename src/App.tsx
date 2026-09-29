@@ -247,6 +247,7 @@ export default function App() {
   const handleSnapshotTimeline = useCallback(() => setSnapshotTimelineOpen(true), [])
   const handleWorkspaceManager = useCallback(() => setWorkspaceManagerOpen(true), [])
   const handleChromeImport = useCallback(() => setChromeImportOpen(true), [])
+  const handleGoHome = useCallback(() => setPhase('start'), [])
 
   const canEdit = isEmbed ? !EMBED_READONLY : (collab.role === 'editor' || !collab.shareToken)
 
@@ -358,7 +359,7 @@ export default function App() {
           <Sidebar />
         </div>
         <main className="flex flex-col flex-1 min-w-0">
-          <TopBar onExportForCreation={handleExportForCreation} onUnsplashSearch={handleUnsplashSearch} onShare={handleShareOpen} onColorPicker={handleColorPickerOpen} onSnapshotTimeline={handleSnapshotTimeline} onWorkspaceManager={handleWorkspaceManager} onChromeImport={handleChromeImport} presenceBar={<PresenceBar users={remoteUsers} isConnected={collab.isConnected} />} />
+          <TopBar onExportForCreation={handleExportForCreation} onUnsplashSearch={handleUnsplashSearch} onShare={handleShareOpen} onColorPicker={handleColorPickerOpen} onSnapshotTimeline={handleSnapshotTimeline} onWorkspaceManager={handleWorkspaceManager} onChromeImport={handleChromeImport} onGoHome={handleGoHome} presenceBar={<PresenceBar users={remoteUsers} isConnected={collab.isConnected} />} />
           <div className="flex flex-1 min-h-0 relative">
             <Canvas />
             <RemoteCursors users={remoteUsers} canvasPanX={canvas.panX} canvasPanY={canvas.panY} canvasZoom={canvas.zoom} />

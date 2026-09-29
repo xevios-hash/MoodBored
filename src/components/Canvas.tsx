@@ -683,15 +683,39 @@ export function Canvas() {
     dragRef.current = null
   }
 
+  // Native wheel listener (non-passive) to prevent browser zoom
+  useEffect(() => {
+    const cvs = canvasRef.current
+    if (!cvs) return
+    
+    const handleWheelNative = (e: WheelEvent) => {
+      // Prevent browser zoom on Ctrl/Cmd + scroll (trackpad pinch)
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault()
+        const state = useStore.getState()
+        state.zoomAt(e.clientX - cvs.getBoundingClientRect().left, e.clientY - cvs.getBoundingClientRect().top, e.deltaY)
+        needsRedraw.current = true
+      }
+    }
+    
+    cvs.addEventListener('wheel', handleWheelNative, { passive: false })
+    return () => cvs.removeEventListener('wheel', handleWheelNative)
+  }, [])
+
   const onWheel = (e: React.WheelEvent) => {
     const state = useStore.getState()
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect) return
     needsRedraw.current = true
-    // Ctrl/Cmd/Alt + scroll = zoom (trackpad pinch sends ctrlKey)
-    if (e.ctrlKey || e.metaKey || e.altKey) {
+    // Ctrl/Cmd + scroll = zoom (handled by native listener above)
+    if (e.ctrlKey || e.metaKey) {
+      return // Already handled by native listener
+    }
+    // Alt + scroll = zoom
+    if (e.altKey) {
       state.zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY)
     } else {
+      // Regular scroll = pan
       state.setPan(state.canvas.panX - e.deltaX, state.canvas.panY - e.deltaY)
     }
   }
@@ -888,15 +912,31 @@ export function Canvas() {
     const state = useStore.getState()
     if (!contextMenu) return
     switch (action) {
-      case 'delete':
-        for (const id of state.selectedIds) state.removeItem(id)
+      case 'delete': {
+        const ids = [...state.selectedIds]
+        if (ids.length > 0) state.removeItems(ids)
         break
+      }
       case 'duplicate':
         state.copySelected(); state.paste({ x: 30, y: 30 })
+        break
+      case 'copy':
+        state.copySelected()
+        showToast('Copied', 'success')
+        break
+      case 'paste':
+        state.paste({ x: contextMenu.wx, y: contextMenu.wy })
+        break
+      case 'edit':
+        if (contextMenu.itemId) {
+          state.selectItem(contextMenu.itemId)
+          state.toggleInspector()
+        }
         break
       case 'bring-front': {
         const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
         if (!vp) break
+        state.pushHistory()
         const selected = vp.items.filter(i => state.selectedIds.has(i.id))
         const rest = vp.items.filter(i => !state.selectedIds.has(i.id))
         useStore.setState((s) => ({
@@ -906,9 +946,46 @@ export function Canvas() {
         }))
         break
       }
+      case 'bring-forward': {
+        const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
+        if (!vp) break
+        state.pushHistory()
+        const items = [...vp.items]
+        for (const id of state.selectedIds) {
+          const idx = items.findIndex(i => i.id === id)
+          if (idx < items.length - 1 && idx >= 0) {
+            [items[idx], items[idx + 1]] = [items[idx + 1], items[idx]]
+          }
+        }
+        useStore.setState((s) => ({
+          project: { ...s.project, viewports: s.project.viewports.map(v =>
+            v.id === s.activeViewportId ? { ...v, items } : v
+          )},
+        }))
+        break
+      }
+      case 'send-backward': {
+        const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
+        if (!vp) break
+        state.pushHistory()
+        const items = [...vp.items]
+        for (const id of state.selectedIds) {
+          const idx = items.findIndex(i => i.id === id)
+          if (idx > 0) {
+            [items[idx], items[idx - 1]] = [items[idx - 1], items[idx]]
+          }
+        }
+        useStore.setState((s) => ({
+          project: { ...s.project, viewports: s.project.viewports.map(v =>
+            v.id === s.activeViewportId ? { ...v, items } : v
+          )},
+        }))
+        break
+      }
       case 'send-back': {
         const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
         if (!vp) break
+        state.pushHistory()
         const selected = vp.items.filter(i => state.selectedIds.has(i.id))
         const rest = vp.items.filter(i => !state.selectedIds.has(i.id))
         useStore.setState((s) => ({
@@ -921,6 +998,71 @@ export function Canvas() {
       case 'select-all':
         state.selectAll()
         break
+      case 'fit-all': {
+        const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
+        if (!vp) break
+        const positioned = vp.items.filter(i => i.kind !== 'connector' && 'pos' in i) as any[]
+        if (positioned.length === 0) break
+        const minX = Math.min(...positioned.map(i => i.pos.x))
+        const maxX = Math.max(...positioned.map(i => i.pos.x + (i.size?.w ?? 250)))
+        const minY = Math.min(...positioned.map(i => i.pos.y))
+        const maxY = Math.max(...positioned.map(i => i.pos.y + (i.size?.h ?? 150)))
+        const r = canvasRef.current?.getBoundingClientRect()
+        if (!r) break
+        const pad = 80
+        const z = Math.min((r.width - pad * 2) / (maxX - minX), (r.height - pad * 2) / (maxY - minY), 2)
+        state.setZoom(z)
+        state.setPan(r.width / 2 - ((minX + maxX) / 2) * z, r.height / 2 - ((minY + maxY) / 2) * z)
+        break
+      }
+      case 'group': {
+        const name = prompt('Group name:')
+        if (name) state.groupSelected(name)
+        break
+      }
+      case 'lock': {
+        // Toggle lock on selected items
+        for (const id of state.selectedIds) {
+          const item = state.project.viewports.find(v => v.id === state.activeViewportId)?.items.find(i => i.id === id)
+          if (item) {
+            state.updateItem(id, { locked: !(item as any).locked })
+          }
+        }
+        showToast('Toggled lock', 'success')
+        break
+      }
+      case 'annotate': {
+        state.setAnnotationTool('text')
+        showToast('Annotation tool active - click to add text', 'info')
+        break
+      }
+      case 'connect': {
+        if (contextMenu.itemId) {
+          state.startConnect(contextMenu.itemId, 'out')
+          showToast('Click another item to connect', 'info')
+        }
+        break
+      }
+      case 'export-png': {
+        try {
+          const cvs = canvasRef.current
+          if (!cvs) break
+          const a = document.createElement('a')
+          a.download = 'item.png'
+          a.href = cvs.toDataURL('image/png')
+          a.click()
+        } catch {
+          showToast('Export failed - cross-origin images', 'error')
+        }
+        break
+      }
+      case 'copy-json': {
+        const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
+        const items = vp?.items.filter(i => state.selectedIds.has(i.id)) || []
+        navigator.clipboard.writeText(JSON.stringify(items, null, 2))
+        showToast('Copied as JSON', 'success')
+        break
+      }
       case 'new-note':
         state.addItem({ kind: 'note', id: crypto.randomUUID(), text: '', purpose: '', importance: '', tags: [], pos: { x: contextMenu.wx - 125, y: contextMenu.wy - 75 } })
         break
@@ -1297,38 +1439,74 @@ export function Canvas() {
       {contextMenu && (
         <div
           className="glass-card"
-          style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 100, padding: 4, minWidth: 180 }}
+          style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 100, padding: 4, minWidth: 200 }}
           onMouseLeave={() => setContextMenu(null)}
         >
           {/* Add item section */}
           <div className="px-2 py-1 text-2xs font-semibold text-text-muted uppercase tracking-wider">Add Item</div>
-          {ITEM_TYPES.map(({ kind, icon, label }) => (
-            <CtxItem
-              key={kind}
-              label={`${icon}  ${label}`}
-              onClick={() => {
-                const state = useStore.getState()
-                state.addItem(createDefaultItem(kind, { x: contextMenu.wx, y: contextMenu.wy }))
-                setContextMenu(null)
-              }}
-            />
-          ))}
+          <div className="grid grid-cols-2 gap-1 px-1">
+            {ITEM_TYPES.map(({ kind, icon, label }) => (
+              <CtxItem
+                key={kind}
+                label={`${icon}  ${label}`}
+                onClick={() => {
+                  const state = useStore.getState()
+                  state.addItem(createDefaultItem(kind, { x: contextMenu.wx, y: contextMenu.wy }))
+                  setContextMenu(null)
+                }}
+                small
+              />
+            ))}
+          </div>
+
+          <div className="status-divider" style={{ margin: '4px 0' }} />
+
+          {/* Canvas actions (always available) */}
+          <CtxItem label="📋  Paste" shortcut="⌘V" onClick={() => handleContextAction('paste')} />
+          <CtxItem label="🔍  Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
+          <CtxItem label="📐  Fit All to View" onClick={() => handleContextAction('fit-all')} />
+
           {contextMenu.itemId && (
             <>
               <div className="status-divider" style={{ margin: '4px 0' }} />
-              <div className="px-2 py-1 text-2xs font-semibold text-text-muted uppercase tracking-wider">Actions</div>
-              <CtxItem label="Duplicate" shortcut="⌘C ⌘V" onClick={() => handleContextAction('duplicate')} />
-              <CtxItem label="Bring to Front" onClick={() => handleContextAction('bring-front')} />
-              <CtxItem label="Send to Back" onClick={() => handleContextAction('send-back')} />
+              <div className="px-2 py-1 text-2xs font-semibold text-text-muted uppercase tracking-wider">Item Actions</div>
+              
+              {/* Edit & Copy */}
+              <CtxItem label="✏️  Edit" onClick={() => handleContextAction('edit')} />
+              <CtxItem label="📋  Copy" shortcut="⌘C" onClick={() => handleContextAction('copy')} />
+              <CtxItem label="📑  Duplicate" shortcut="⌘D" onClick={() => handleContextAction('duplicate')} />
+              
               <div className="status-divider" style={{ margin: '4px 0' }} />
-              <CtxItem label="Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
-              <CtxItem label="Delete" shortcut="⌫" onClick={() => handleContextAction('delete')} danger />
-            </>
-          )}
-          {!contextMenu.itemId && (
-            <>
+              
+              {/* Layer order */}
+              <div className="px-2 py-1 text-2xs font-semibold text-text-muted uppercase tracking-wider">Layer</div>
+              <CtxItem label="⬆️  Bring to Front" shortcut="]" onClick={() => handleContextAction('bring-front')} />
+              <CtxItem label="↗️  Bring Forward" shortcut="⇧]" onClick={() => handleContextAction('bring-forward')} />
+              <CtxItem label="↘️  Send Backward" shortcut="⇧[" onClick={() => handleContextAction('send-backward')} />
+              <CtxItem label="⬇️  Send to Back" shortcut="[" onClick={() => handleContextAction('send-back')} />
+              
               <div className="status-divider" style={{ margin: '4px 0' }} />
-              <CtxItem label="Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
+              
+              {/* Organization */}
+              <CtxItem label="📦  Group Selected" shortcut="⌘G" onClick={() => handleContextAction('group')} />
+              <CtxItem label="📌  Lock Position" onClick={() => handleContextAction('lock')} />
+              
+              <div className="status-divider" style={{ margin: '4px 0' }} />
+              
+              {/* Annotations & Connections */}
+              <CtxItem label="🖍️  Add Annotation" onClick={() => handleContextAction('annotate')} />
+              <CtxItem label="🔗  Connect to..." onClick={() => handleContextAction('connect')} />
+              
+              <div className="status-divider" style={{ margin: '4px 0' }} />
+              
+              {/* Export */}
+              <CtxItem label="📤  Export as PNG" onClick={() => handleContextAction('export-png')} />
+              <CtxItem label="📋  Copy as JSON" onClick={() => handleContextAction('copy-json')} />
+              
+              <div className="status-divider" style={{ margin: '4px 0' }} />
+              
+              {/* Danger zone */}
+              <CtxItem label="🗑️  Delete" shortcut="⌫" onClick={() => handleContextAction('delete')} danger />
             </>
           )}
         </div>
@@ -1339,16 +1517,16 @@ export function Canvas() {
 
 // ─── Context Menu Item ──────────────────────────────────────────────
 
-function CtxItem({ label, shortcut, onClick, danger }: { label: string; shortcut?: string; onClick: () => void; danger?: boolean }) {
+function CtxItem({ label, shortcut, onClick, danger, small }: { label: string; shortcut?: string; onClick: () => void; danger?: boolean; small?: boolean }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex justify-between items-center px-3 py-1.5 rounded text-xs text-left transition-fast ${
+      className={`w-full flex justify-between items-center px-2 ${small ? 'py-1' : 'py-1.5'} rounded text-xs text-left transition-fast ${
         danger ? 'text-danger hover:bg-danger-light' : 'text-text-primary hover:bg-surface-2'
       }`}
     >
       <span>{label}</span>
-      {shortcut && <span className="text-2xs text-text-muted ml-4">{shortcut}</span>}
+      {shortcut && <span className="text-2xs text-text-muted ml-2">{shortcut}</span>}
     </button>
   )
 }
