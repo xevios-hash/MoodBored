@@ -5,8 +5,11 @@ import { ChatPanel } from '@/components/ChatPanel'
 import { Inspector } from '@/components/Inspector'
 import { SearchOverlay } from '@/components/SearchOverlay'
 import { SettingsModal } from '@/components/SettingsModal'
+import { SnapshotTimeline } from '@/components/SnapshotTimeline'
+import { WorkspaceManager } from '@/components/WorkspaceManager'
 import {
-  MessageSquare, Layers, Settings, Search, Grid3X3, Plus,
+  MessageSquare, Layers, Settings, Search, Grid3X3, Plus, MoreVertical,
+  Download, Upload, Share2, Camera, FolderOpen,
 } from 'lucide-react'
 
 type Tab = 'canvas' | 'chat' | 'inspector'
@@ -27,12 +30,16 @@ const ITEM_TYPES = [
 export function MobileLayout({ showSplash }: { showSplash: boolean }) {
   const [activeTab, setActiveTab] = useState<Tab>('canvas')
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [showSnapshots, setShowSnapshots] = useState(false)
+  const [showWorkspaces, setShowWorkspaces] = useState(false)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const searchOpen = useStore((s) => s.searchOpen)
   const toggleSettings = useStore((s) => s.toggleSettings)
   const toggleSearch = useStore((s) => s.toggleSearch)
   const addItem = useStore((s) => s.addItem)
   const canvas = useStore((s) => s.canvas)
+  const exportProject = useStore((s) => s.exportProject)
 
   // Trigger canvas redraw when switching back to canvas tab
   useEffect(() => {
@@ -130,12 +137,62 @@ export function MobileLayout({ showSplash }: { showSplash: boolean }) {
           <Search size={18} />
         </button>
         <button
+          onClick={() => setShowMoreMenu(!showMoreMenu)}
+          style={{ background: 'none', border: 'none', color: '#8b7dc8', padding: 6, borderRadius: 8, cursor: 'pointer', display: 'flex' }}
+        >
+          <MoreVertical size={18} />
+        </button>
+        <button
           onClick={toggleSettings}
           style={{ background: 'none', border: 'none', color: '#8b7dc8', padding: 6, borderRadius: 8, cursor: 'pointer', display: 'flex' }}
         >
           <Settings size={18} />
         </button>
       </div>
+
+      {/* Overflow menu */}
+      {showMoreMenu && (
+        <div style={{
+          position: 'absolute',
+          bottom: 60,
+          right: 8,
+          background: 'var(--bg-surface-1)',
+          borderRadius: 12,
+          border: '1px solid var(--border-color)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          zIndex: 100,
+          overflow: 'hidden',
+          minWidth: 160,
+        }}>
+          {[
+            { icon: <Download size={16} />, label: 'Export JSON', action: () => { const json = exportProject(); const blob = new Blob([json], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'board.json'; a.click(); URL.revokeObjectURL(url); setShowMoreMenu(false) } },
+            { icon: <Camera size={16} />, label: 'Snapshots', action: () => { setShowSnapshots(true); setShowMoreMenu(false) } },
+            { icon: <FolderOpen size={16} />, label: 'Workspaces', action: () => { setShowWorkspaces(true); setShowMoreMenu(false) } },
+            { icon: <Share2 size={16} />, label: 'Share', action: () => { /* TODO: Share modal */ setShowMoreMenu(false) } },
+          ].map((item, i) => (
+            <button
+              key={i}
+              onClick={item.action}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 12px',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Project name bar — only on canvas tab */}
       {activeTab === 'canvas' && (
@@ -241,6 +298,8 @@ export function MobileLayout({ showSplash }: { showSplash: boolean }) {
       {/* Modals */}
       {settingsOpen && <SettingsModal />}
       {searchOpen && <SearchOverlay />}
+      {showSnapshots && <SnapshotTimeline onClose={() => setShowSnapshots(false)} />}
+      {showWorkspaces && <WorkspaceManager onClose={() => setShowWorkspaces(false)} />}
     </div>
   )
 }

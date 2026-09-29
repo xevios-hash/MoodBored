@@ -161,7 +161,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
           height: h,
           borderRadius: 10,
           zIndex: 50,
-          background: 'white',
+          background: 'var(--bg-surface-1)',
           border: isSelected ? '2px solid #6a5aae' : '1px solid rgba(0,0,0,0.12)',
           boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
           display: 'flex',
@@ -292,7 +292,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
         zIndex: isHovered ? 1000 : isFocused ? 900 : isSelected ? 100 : 50,
         border: isSelected ? '2px solid #6a5aae' : '1px solid rgba(0,0,0,0.12)',
         boxShadow: isFocused ? '0 8px 32px rgba(0,0,0,0.2)' : isHovered ? '0 4px 16px rgba(0,0,0,0.12)' : '0 2px 12px rgba(0,0,0,0.08)',
-        background: 'white',
+        background: 'var(--bg-surface-1)',
         cursor: isDragging ? 'grabbing' : 'default',
       }}
       onMouseEnter={() => setIsHovered(true)}
@@ -325,7 +325,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100% - 36px)', background: 'white' }}>
+      <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100% - 36px)', background: 'var(--bg-surface-1)' }}>
         {renderContent()}
         {/* Annotation Layer - on top of web content */}
         <AnnotationLayer
@@ -528,7 +528,7 @@ function BlankCardInput({ item, canvasZoom }: { item: WebItem; canvasZoom: numbe
           outline: 'none',
           textAlign: 'center',
           background: 'rgba(0,0,0,0.03)',
-          color: '#1a1a2e',
+          color: 'var(--text-primary)',
         }}
         autoFocus
       />
@@ -580,7 +580,7 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
       className="flex items-center gap-1.5 px-2 h-9"
       style={{
         cursor: 'default',
-        background: '#f5f5f7',
+        background: 'var(--bg-surface-2)',
         borderBottom: '1px solid rgba(0,0,0,0.1)',
       }}
     >
@@ -590,7 +590,7 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
         className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-colors"
         title="Back"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2">
           <path d="M19 12H5M12 19l-7-7 7-7" />
         </svg>
       </button>
@@ -600,7 +600,7 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
         className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-colors"
         title="Forward"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2">
           <path d="M5 12h14M12 5l7 7-7 7" />
         </svg>
       </button>
@@ -609,7 +609,7 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
         className="p-1 rounded hover:bg-gray-200 transition-colors"
         title="Reload"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2">
           <path d="M1 4v6h6M23 20v-6h-6" />
           <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
         </svg>
@@ -628,13 +628,13 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
               onBlur={() => setIsEditing(false)}
               autoFocus
               className="flex-1 text-xs bg-transparent outline-none"
-              style={{ color: '#1a1a2e' }}
+              style={{ color: 'var(--text-primary)' }}
               placeholder="Enter URL..."
             />
           ) : (
             <div
               className="flex-1 text-xs truncate cursor-text"
-              style={{ color: '#333' }}
+              style={{ color: 'var(--text-primary)' }}
               onClick={() => setIsEditing(true)}
             >
               {domain || item.title || 'New Tab'}
@@ -649,7 +649,7 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
           className="p-1 rounded hover:bg-gray-200 transition-colors"
           title="Focus fullscreen"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2">
             <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
           </svg>
         </button>
@@ -659,7 +659,7 @@ function BrowserChrome({ item, isLoading, onBack, onForward, onReload, onClose, 
         className="p-1 rounded hover:bg-red-100 hover:text-red-600 transition-colors"
         title="Close"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2">
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </button>
@@ -677,14 +677,14 @@ function NoteCardContent({ item, onUpdate }: { item: WebItem; onUpdate: (content
   }
 
   return (
-    <div className="h-full p-3" style={{ background: 'white' }}>
+    <div className="h-full p-3" style={{ background: 'var(--bg-surface-1)' }}>
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
         onBlur={handleBlur}
         placeholder="Write your note..."
         className="w-full h-full resize-none outline-none"
-        style={{ color: '#1a1a2e', fontSize: 14, lineHeight: 1.6 }}
+        style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.6 }}
       />
     </div>
   )
@@ -702,7 +702,7 @@ function SearchCardContent({ item, onNavigate }: { item: WebItem; onNavigate: (u
   }
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'white' }}>
+    <div className="flex flex-col h-full" style={{ background: 'var(--bg-surface-1)' }}>
       <form onSubmit={handleSubmit} className="p-2 border-b border-gray-200">
         <input
           type="text"
@@ -710,7 +710,7 @@ function SearchCardContent({ item, onNavigate }: { item: WebItem; onNavigate: (u
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search..."
           className="w-full px-2 py-1 text-sm rounded border border-gray-300 focus:border-purple-500 focus:outline-none"
-          style={{ color: '#1a1a2e' }}
+          style={{ color: 'var(--text-primary)' }}
         />
       </form>
       {item.url && !isLikelyBlocked(item.url) && (
@@ -744,9 +744,9 @@ function SearchCardContent({ item, onNavigate }: { item: WebItem; onNavigate: (u
 
 function AICardContent({ item }: { item: WebItem }) {
   return (
-    <div className="h-full p-3 overflow-auto" style={{ background: 'white' }}>
+    <div className="h-full p-3 overflow-auto" style={{ background: 'var(--bg-surface-1)' }}>
       <div className="text-xs font-semibold mb-2" style={{ color: '#6a5aae' }}>AI Response</div>
-      <div className="text-sm whitespace-pre-wrap" style={{ color: '#1a1a2e' }}>{item.content || 'No content yet...'}</div>
+      <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{item.content || 'No content yet...'}</div>
     </div>
   )
 }
@@ -762,7 +762,7 @@ function EmptyCardContent({ item, onNavigate }: { item: WebItem; onNavigate: (ur
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-full p-4 gap-3" style={{ background: 'white' }}>
+    <div className="flex flex-col items-center justify-center h-full p-4 gap-3" style={{ background: 'var(--bg-surface-1)' }}>
       <form onSubmit={handleSubmit} className="w-full max-w-xs">
         <input
           type="text"
@@ -770,7 +770,7 @@ function EmptyCardContent({ item, onNavigate }: { item: WebItem; onNavigate: (ur
           onChange={(e) => setInput(e.target.value)}
           placeholder="Enter URL..."
           className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:border-purple-500 focus:outline-none"
-          style={{ color: '#1a1a2e' }}
+          style={{ color: 'var(--text-primary)' }}
           autoFocus
         />
       </form>
