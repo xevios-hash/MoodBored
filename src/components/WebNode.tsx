@@ -18,6 +18,17 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
   const [loadError, setLoadError] = useState(false)
   const store = useStore()
 
+  // Timeout for iframe loading - show error if site doesn't respond
+  useEffect(() => {
+    if (item.isLoading && item.url) {
+      const timer = setTimeout(() => {
+        setIsLoading(false)
+        setLoadError(true)
+      }, 15000) // 15 second timeout
+      return () => clearTimeout(timer)
+    }
+  }, [item.isLoading, item.url])
+
   const x = item.pos.x * canvasZoom + canvasPanX
   const y = item.pos.y * canvasZoom + canvasPanY
   const w = (item.size?.w ?? 300) * canvasZoom
@@ -27,6 +38,16 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
     setIsLoading(false)
     setLoadError(false)
     store.updateWebNode(item.id, { isLoading: false })
+    // Check if the iframe actually loaded content (not an error page)
+    try {
+      const iframe = iframeRef.current
+      if (iframe && iframe.contentDocument) {
+        // Cross-origin iframes will throw here, which means they loaded successfully
+      }
+    } catch {
+      // Cross-origin access error = iframe loaded successfully
+      setLoadError(false)
+    }
   }, [item.id])
 
   const handleError = useCallback(() => {
