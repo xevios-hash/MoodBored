@@ -1,8 +1,9 @@
 // MoodBored Service Worker — caches the app shell for offline use.
 // The app works offline once loaded — board data is in IndexedDB.
 
-const CACHE_NAME = 'moodbored-v1'
-const SHELL = ['/', '/index.html', '/logo.png', '/manifest.json']
+// Cache version is auto-generated at build time to force updates
+const CACHE_NAME = 'moodbored-' + (self.location.search.match(/v=([^&]+)/)?.[1] || 'dev')
+const SHELL = ['/', '/index.html', '/manifest.json']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
