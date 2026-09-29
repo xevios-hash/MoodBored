@@ -465,33 +465,27 @@ body.dark .status-bar {
 }
 
 .add-toolbar-trigger {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  background: linear-gradient(135deg, #8b7dc8 0%, #9b8ce0 100%);
-  color: #ffffff;
-  font-size: 22px;
-  font-weight: 700;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface-1);
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 12px rgba(139,125,200,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: background-color 150ms ease;
 }
 .add-toolbar-trigger:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 20px rgba(139,125,200,0.5), inset 0 1px 0 rgba(255,255,255,0.3);
+  background: var(--bg-surface-2);
 }
 .add-toolbar-trigger.open {
-  background: linear-gradient(135deg, #ff7eb3 0%, #e86a9e 100%);
-  box-shadow: 0 2px 12px rgba(255,126,179,0.4);
+  background: var(--bg-surface-2);
   transform: rotate(45deg);
-}
-.add-toolbar-trigger.open:hover {
-  box-shadow: 0 4px 20px rgba(255,126,179,0.5);
-  transform: rotate(45deg) scale(1.1);
 }
 
 .add-toolbar-items {
@@ -500,35 +494,31 @@ body.dark .status-bar {
   gap: 4px;
   justify-content: center;
   max-width: 200px;
-  padding: 8px;
-  border-radius: 12px;
-  background: rgba(12,8,20,0.92);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(139,125,200,0.1);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  animation: scaleIn 150ms ease-out;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  animation: fadeIn 150ms ease-out;
 }
 
 .add-toolbar-item {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid rgba(139,125,200,0.1);
-  background: rgba(139,125,200,0.05);
-  color: #b8a8d8;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  transition: all 120ms ease;
+  font-size: 14px;
+  transition: background-color 120ms ease;
 }
 .add-toolbar-item:hover {
-  background: rgba(139,125,200,0.15);
-  color: #ede5f8;
-  border-color: rgba(139,125,200,0.25);
-  box-shadow: 0 0 12px rgba(139,125,200,0.12);
-  transform: translateY(-2px);
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
 }
 
 /* ─── Reduced Motion ────────────────────────────────────────────── */
