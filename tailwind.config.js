@@ -60,10 +60,10 @@ export default {
         },
         // Text
         text: {
-          primary: '#ede5f8',
-          secondary: '#b8a8d8',
-          muted: '#8a7aaa',
-          disabled: '#5a4a7a',
+          primary: '#0f0a1a',
+          secondary: '#3d3555',
+          muted: '#5a5070',
+          disabled: '#8a8098',
         },
         // Danger
         danger: {
