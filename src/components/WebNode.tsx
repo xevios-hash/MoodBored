@@ -25,6 +25,19 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
     setUseTauriWebView(isTauriMode())
   }, [])
 
+  // Timeout for iframe loading - show error if site doesn't respond
+  useEffect(() => {
+    if (item.isLoading && item.url && !useTauriWebView) {
+      console.log(`[WebNode] starting load timer for: ${item.url}`)
+      const timer = setTimeout(() => {
+        console.warn(`[WebNode] load timeout: ${item.url}`)
+        setIsLoading(false)
+        setLoadError(true)
+      }, 10000) // 10 second timeout
+      return () => clearTimeout(timer)
+    }
+  }, [item.isLoading, item.url, useTauriWebView])
+
   // Tauri WebContentsView lifecycle
   useEffect(() => {
     if (!useTauriWebView || !item.url) return
@@ -71,15 +84,17 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
   const h = (item.size?.h ?? 480) * canvasZoom
 
   const handleLoad = useCallback(() => {
+    console.log(`[WebNode] iframe loaded: ${item.url}`)
     setIsLoading(false)
     setLoadError(false)
     store.updateWebNode(item.id, { isLoading: false })
-  }, [item.id])
+  }, [item.id, item.url])
 
   const handleError = useCallback(() => {
+    console.warn(`[WebNode] iframe error: ${item.url}`)
     setIsLoading(false)
     setLoadError(true)
-  }, [])
+  }, [item.id, item.url])
 
   const handleNavigate = useCallback((url: string) => {
     const normalized = normalizeUrl(url)
@@ -218,7 +233,6 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
             onLoad={handleLoad}
             onError={handleError}
             className="w-full h-full border-none"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation-by-user-activation"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             referrerPolicy="origin"
             style={{ pointerEvents: isFocused ? 'auto' : 'none' }}
