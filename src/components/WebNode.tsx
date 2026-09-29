@@ -3,6 +3,32 @@ import { useStore } from '@/stores/useStore'
 import type { WebItem, CardType } from '@/types'
 import { isWebUrl, isSearchQuery, normalizeUrl, getFaviconUrl, getDomain } from '@/lib/browser-engine'
 
+// Sites known to block iframe embedding via X-Frame-Options
+const BLOCKED_SITES = [
+  'google.com', 'www.google.com', 'accounts.google.com',
+  'facebook.com', 'www.facebook.com',
+  'twitter.com', 'x.com', 'www.twitter.com',
+  'youtube.com', 'www.youtube.com',
+  'instagram.com', 'www.instagram.com',
+  'linkedin.com', 'www.linkedin.com',
+  'github.com', 'www.github.com',
+  'amazon.com', 'www.amazon.com',
+  'netflix.com', 'www.netflix.com',
+  'apple.com', 'www.apple.com',
+  'microsoft.com', 'www.microsoft.com',
+  'reddit.com', 'www.reddit.com',
+  'stackoverflow.com', 'www.stackoverflow.com',
+]
+
+function isLikelyBlocked(url: string): boolean {
+  try {
+    const domain = new URL(url).hostname
+    return BLOCKED_SITES.includes(domain)
+  } catch {
+    return false
+  }
+}
+
 interface WebNodeProps {
   item: WebItem
   canvasZoom: number
@@ -112,38 +138,64 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
   const renderWebContent = () => {
     if (!item.url) return <EmptyCardContent item={item} onNavigate={handleNavigate} />
 
+    // Check if site is known to block embedding
+    const isBlocked = isLikelyBlocked(item.url)
+
     return (
       <>
-        {isLoading && (
+        {isLoading && !isBlocked && (
           <div className="absolute inset-0 flex items-center justify-center bg-surface-0/80 z-10">
             <div className="animate-spin w-6 h-6 border-2 border-accent border-t-transparent rounded-full" />
           </div>
         )}
-        {loadError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-0/90 z-10 gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-text-muted">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <span className="text-xs text-text-secondary">This site can't be embedded</span>
+        {(loadError || isBlocked) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-0/95 z-10 gap-3 p-4">
+            <div className="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-warning">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-medium text-text-primary">Can't embed this site</div>
+              <div className="text-xs text-text-muted mt-1 max-w-[250px]">
+                {getDomain(item.url) || 'This site'} blocks embedding for security reasons.
+                You can still open it in a new tab.
+              </div>
+            </div>
             <div className="flex gap-2">
-              <button onClick={handleReload} className="btn btn-ghost text-xs px-2 py-1">Retry</button>
-              <a href={item.url} target="_blank" rel="noopener noreferrer" className="btn btn-accent text-xs px-2 py-1">Open in tab ↗</a>
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-accent text-xs px-3 py-1.5 flex items-center gap-1"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Open in tab <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleClose() }}
+                className="btn btn-ghost text-xs px-3 py-1.5"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}
-        <iframe
-          ref={iframeRef}
-          src={item.url}
-          onLoad={handleLoad}
-          onError={handleError}
-          className="w-full h-full border-none"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation-by-user-activation"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-          referrerPolicy="origin"
-          style={{ pointerEvents: isFocused ? 'auto' : 'none' }}
-        />
+        {!isBlocked && (
+          <iframe
+            ref={iframeRef}
+            src={item.url}
+            onLoad={handleLoad}
+            onError={handleError}
+            className="w-full h-full border-none"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation-by-user-activation"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            referrerPolicy="origin"
+            style={{ pointerEvents: isFocused ? 'auto' : 'none' }}
+          />
+        )}
       </>
     )
   }
