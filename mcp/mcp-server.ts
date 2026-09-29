@@ -226,7 +226,7 @@ server.tool(
           item = { kind: 'video', id, source: raw.source || '', subjectDesc: raw.description || '', motionDesc: '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
           break
         case 'web':
-          item = { kind: 'web', id, url: raw.url || '', title: raw.label || raw.description || '', favicon: '', cardType: 'web', isLoading: true, isFocused: false, history: { urls: [raw.url || ''], index: 0 }, cookies: '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
+          item = { kind: 'web', id, url: raw.url || '', title: raw.label || raw.description || '', favicon: '', cardType: 'web', isLoading: true, isFocused: false, history: { urls: [raw.url || ''], index: 0 }, cookies: '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 640, h: 480 } }
           break
       }
 
@@ -451,7 +451,7 @@ server.tool(
       importance: 'AI reference',
       tags: ['ai-opened'],
       pos: { x: x ?? 80 + Math.random() * 600, y: y ?? 80 + Math.random() * 400 },
-      size: { w: 300, h: 200 },
+      size: { w: 640, h: 480 },
     }
 
     vp.items.push(item)

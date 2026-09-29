@@ -10,7 +10,7 @@ function webItem(id: string, url = 'https://example.com'): WebItem {
   return {
     kind: 'web', id, url, title: 'Test', favicon: '', cardType: 'web',
     isLoading: false, isFocused: false, history: { urls: [url], index: 0 },
-    cookies: '', purpose: '', importance: '', tags: [], pos: { x: 0, y: 0 }, size: { w: 300, h: 200 },
+    cookies: '', purpose: '', importance: '', tags: [], pos: { x: 0, y: 0 }, size: { w: 640, h: 480 },
   } as any
 }
 
