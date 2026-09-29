@@ -105,6 +105,74 @@ export interface ChromeImportResult {
   grouped: Map<string, ChromeTab[]>
 }
 
+// ─── Annotations ─────────────────────────────────────────────────────
+
+export type AnnotationType = 'text' | 'arrow' | 'box' | 'circle' | 'highlight'
+
+export interface AnnotationBase {
+  id: string
+  type: AnnotationType
+  // Position relative to the card/page (not canvas)
+  x: number
+  y: number
+  color: string
+  strokeWidth: number
+  opacity: number
+  // For web card annotations - stores scroll offset when created
+  scrollTop?: number
+  scrollLeft?: number
+  url?: string // For page-persistent annotations
+  itemId?: string // Parent card ID (null for free-floating)
+  created: string
+}
+
+export interface TextAnnotation extends AnnotationBase {
+  type: 'text'
+  text: string
+  fontSize: number
+  fontWeight: number
+}
+
+export interface ArrowAnnotation extends AnnotationBase {
+  type: 'arrow'
+  // Arrow endpoints (relative to card)
+  x2: number
+  y2: number
+  arrowHead: 'none' | 'arrow' | 'dot'
+}
+
+export interface BoxAnnotation extends AnnotationBase {
+  type: 'box'
+  width: number
+  height: number
+  fill: boolean
+  fillColor?: string
+  cornerRadius: number
+}
+
+export interface CircleAnnotation extends AnnotationBase {
+  type: 'circle'
+  radiusX: number
+  radiusY: number
+  fill: boolean
+  fillColor?: string
+}
+
+export interface HighlightAnnotation extends AnnotationBase {
+  type: 'highlight'
+  width: number
+  height: number
+}
+
+export type Annotation =
+  | TextAnnotation
+  | ArrowAnnotation
+  | BoxAnnotation
+  | CircleAnnotation
+  | HighlightAnnotation
+
+export type AnnotationTool = 'select' | 'text' | 'arrow' | 'box' | 'circle' | 'highlight' | 'pan'
+
 // ─── Node Ports (ComfyUI/Blender-style) ─────────────────────────────
 
 export type PortType = 'data' | 'visual' | 'reference' | 'any'
