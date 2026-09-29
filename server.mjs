@@ -8,6 +8,8 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import morgan from 'morgan'
+import compression from 'compression'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, renameSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -203,6 +205,14 @@ function notifyBoardChange(boardId, state) {
 
 const app = express()
 app.set('trust proxy', true) // Railway, Cloudflare, etc. set X-Forwarded-Proto
+// Request logging
+app.use(morgan('combined', {
+  skip: (req) => req.url === '/api/board/health' && req.method === 'GET',
+}))
+
+// Compression
+app.use(compression())
+
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: false, // Disabled for now - needs proper config for Tauri
@@ -1107,6 +1117,22 @@ app.get('/{*splat}', (_req, res) => {
 // ─── Start ──────────────────────────────────────────────────────────
 
 ensureDir(BOARDS_DIR)
+
+// Error handling middleware
+app.use((err, req, res, _next) => {
+  console.error('[MoodBored] Unhandled error:', err)
+  res.status(500).json({ error: 'Internal server error' })
+})
+
+// Process error handlers
+process.on('uncaughtException', (err) => {
+  console.error('[MoodBored] Uncaught exception:', err)
+  // Don't exit - let the server continue running
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[MoodBored] Unhandled rejection at:', promise, 'reason:', reason)
+})
 
 // Restore boards from Supabase if local filesystem is empty
 await loadFromSupabase().catch(() => {})

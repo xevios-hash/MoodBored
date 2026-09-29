@@ -12,7 +12,7 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
     return () => { clearTimeout(timer); clearTimeout(done) }
   }, [onComplete])
 
-  const videoSrc = isDark ? '/sky-night.mp4' : '/sky-day.mp4'
+  const videoSrc = '/sky-day.mp4'  // sky-night.mp4 doesn't exist
 
   return (
     <div
