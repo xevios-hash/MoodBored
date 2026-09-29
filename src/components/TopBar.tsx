@@ -114,11 +114,12 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
   }
 
   return (
-    <header className="h-11 flex items-center px-3 gap-2 shrink-0" style={{ zIndex: 20, background: 'var(--bg-surface-1)', borderBottom: '1px solid var(--border-color)' }}>
+    <header className="h-11 flex items-center px-3 gap-2 shrink-0" style={{ zIndex: 20, background: 'var(--bg-surface-1)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
       {/* Left: Sidebar toggle + project name */}
       <button
         onClick={toggleSidebar}
         className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+        style={{ color: 'var(--text-primary)' }}
         title="Toggle sidebar"
       >
         <PanelLeft size={16} />
@@ -128,6 +129,7 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
         value={project.name}
         onChange={(e) => updateProjectName(e.target.value)}
         className="bg-transparent text-sm font-medium border-none outline-none px-2 py-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 focus:bg-black/5 dark:focus:bg-white/10 transition-colors min-w-0 max-w-[200px]"
+        style={{ color: 'var(--text-primary)' }}
         spellCheck={false}
       />
 
@@ -140,6 +142,7 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
         <button
           onClick={toggleSearch}
           className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+          style={{ color: 'var(--text-primary)' }}
           title="Search (Ctrl+K)"
         >
           <Search size={16} />
@@ -147,6 +150,7 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
         <button
           onClick={toggleInspector}
           className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+          style={{ color: 'var(--text-primary)' }}
           title="Inspector"
         >
           <Keyboard size={16} />
@@ -154,6 +158,7 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
         <button
           onClick={toggleChat}
           className={`p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${chatOpen ? 'bg-black/5 dark:bg-white/10' : ''}`}
+          style={{ color: 'var(--text-primary)' }}
           title="Chat"
         >
           <MessageSquare size={16} />
@@ -164,35 +169,37 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
           <button
             onClick={() => setShowMenu(!showMenu)}
             className={`p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${showMenu ? 'bg-black/5 dark:bg-white/10' : ''}`}
+            style={{ color: 'var(--text-primary)' }}
             title="More options"
           >
             <MoreVertical size={16} />
           </button>
 
           {showMenu && (
-            <div className="absolute right-0 top-full mt-1 w-52 rounded-lg shadow-lg border py-1 animate-fadeIn" style={{ background: 'var(--bg-surface-1)', borderColor: 'var(--border-color)', zIndex: 100 }}>
+            <div className="absolute right-0 top-full mt-1 w-52 rounded-lg shadow-lg border py-1 animate-fadeIn" style={{ background: 'var(--bg-surface-1)', borderColor: 'var(--border-color)', zIndex: 100, color: 'var(--text-primary)' }}>
               {/* Export submenu */}
               <div className="relative">
                 <button
                   onClick={() => { setShowExportMenu(!showExportMenu); setShowArrangeMenu(false) }}
                   className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   <Download size={14} /> Export
                 </button>
                 {showExportMenu && (
-                  <div className="absolute left-full top-0 ml-1 w-44 rounded-lg shadow-lg border py-1" style={{ background: 'var(--bg-surface-1)', borderColor: 'var(--border-color)', zIndex: 101 }}>
-                    <button onClick={handleExportJSON} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">JSON</button>
-                    <button onClick={handleExportMarkdown} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">Markdown</button>
-                    <button onClick={handleExportPNG} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">PNG Image</button>
-                    <button onClick={() => { onExportForCreation?.(); setShowMenu(false); setShowExportMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">Creative Brief</button>
+                  <div className="absolute left-full top-0 ml-1 w-44 rounded-lg shadow-lg border py-1" style={{ background: 'var(--bg-surface-1)', borderColor: 'var(--border-color)', zIndex: 101, color: 'var(--text-primary)' }}>
+                    <button onClick={handleExportJSON} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>JSON</button>
+                    <button onClick={handleExportMarkdown} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>Markdown</button>
+                    <button onClick={handleExportPNG} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>PNG Image</button>
+                    <button onClick={() => { onExportForCreation?.(); setShowMenu(false); setShowExportMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>Creative Brief</button>
                   </div>
                 )}
               </div>
 
-              <button onClick={handleImport} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2">
+              <button onClick={handleImport} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Upload size={14} /> Import Project
               </button>
-              <button onClick={() => { onChromeImport?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2">
+              <button onClick={() => { onChromeImport?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Globe size={14} /> Import Chrome Tabs
               </button>
 
@@ -203,18 +210,19 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
                 <button
                   onClick={() => { setShowArrangeMenu(!showArrangeMenu); setShowExportMenu(false) }}
                   className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   <LayoutGrid size={14} /> Arrange
                 </button>
                 {showArrangeMenu && (
-                  <div className="absolute left-full top-0 ml-1 w-44 rounded-lg shadow-lg border py-1" style={{ background: 'var(--bg-surface-1)', borderColor: 'var(--border-color)', zIndex: 101 }}>
-                    <button onClick={() => { arrangeGrid(4, 20); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">Grid</button>
-                    <button onClick={() => { arrangeStack('h', 20); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">Horizontal Stack</button>
-                    <button onClick={() => { arrangeStack('v', 20); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">Vertical Stack</button>
-                    <button onClick={() => { arrangeSpiral(30); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">Spiral</button>
-                    <button onClick={() => { sortByProperty('kind', 'asc'); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">Sort by Kind</button>
+                  <div className="absolute left-full top-0 ml-1 w-44 rounded-lg shadow-lg border py-1" style={{ background: 'var(--bg-surface-1)', borderColor: 'var(--border-color)', zIndex: 101, color: 'var(--text-primary)' }}>
+                    <button onClick={() => { arrangeGrid(4, 20); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>Grid</button>
+                    <button onClick={() => { arrangeStack('h', 20); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>Horizontal Stack</button>
+                    <button onClick={() => { arrangeStack('v', 20); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>Vertical Stack</button>
+                    <button onClick={() => { arrangeSpiral(30); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>Spiral</button>
+                    <button onClick={() => { sortByProperty('kind', 'asc'); setShowMenu(false); setShowArrangeMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>Sort by Kind</button>
                     {selectedIds.size >= 2 && (
-                      <button onClick={() => { const name = prompt('Group name:'); if (name) { groupSelected(name); setShowMenu(false); setShowArrangeMenu(false) } }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10">Group Selected ({selectedIds.size})</button>
+                      <button onClick={() => { const name = prompt('Group name:'); if (name) { groupSelected(name); setShowMenu(false); setShowArrangeMenu(false) } }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10" style={{ color: 'var(--text-primary)' }}>Group Selected ({selectedIds.size})</button>
                     )}
                   </div>
                 )}
@@ -222,28 +230,28 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
 
               <div className="h-px my-1" style={{ background: 'var(--border-color)' }} />
 
-              <button onClick={() => { onSnapshotTimeline?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2">
+              <button onClick={() => { onSnapshotTimeline?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Camera size={14} /> Snapshots
               </button>
-              <button onClick={() => { onWorkspaceManager?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2">
+              <button onClick={() => { onWorkspaceManager?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <FolderOpen size={14} /> Workspaces
               </button>
-              <button onClick={() => { onUnsplashSearch?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2">
+              <button onClick={() => { onUnsplashSearch?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <ImageIcon size={14} /> Search Unsplash
               </button>
-              <button onClick={() => { onColorPicker?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2">
+              <button onClick={() => { onColorPicker?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Palette size={14} /> Color Picker
               </button>
-              <button onClick={() => { onShare?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2">
+              <button onClick={() => { onShare?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Share2 size={14} /> Share Board
               </button>
 
               <div className="h-px my-1" style={{ background: 'var(--border-color)' }} />
 
-              <button onClick={() => { onExportForCreation?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2">
+              <button onClick={() => { onExportForCreation?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Sparkles size={14} /> Export for AI
               </button>
-              <button onClick={toggleSettings} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2">
+              <button onClick={toggleSettings} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Settings size={14} /> Settings
               </button>
             </div>
