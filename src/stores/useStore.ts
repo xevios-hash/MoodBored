@@ -222,11 +222,11 @@ export const useStore = create<AppState>()(
   project: defaultProject,
   activeViewportId: defaultViewport.id,
 
-  chatOpen: true,
+  chatOpen: false,
   settingsOpen: false,
   inspectorOpen: false,
   searchOpen: false,
-  sidebarOpen: true,
+  sidebarOpen: false,
   searchQuery: '',
   searchTag: '',
 
