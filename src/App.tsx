@@ -271,7 +271,18 @@ export default function App() {
       onUserLeave: (userId) => setRemoteUsers((prev) => prev.filter(u => u.id !== userId)),
       onCursorMove: (userId, cursor) => setRemoteUsers((prev) => prev.map(u => u.id === userId ? { ...u, cursor } : u)),
       onSelectionChange: (userId, itemId) => setRemoteUsers((prev) => prev.map(u => u.id === userId ? { ...u, selectedItemId: itemId } : u)),
-      onBoardChange: () => {},
+      onBoardChange: (data: any) => {
+        // Apply remote mutations from other users
+        if (data && data.project) {
+          const store = useStore.getState()
+          const currentUpdated = store.project.updated
+          const remoteUpdated = data.project.updated
+          // Only apply if remote is newer
+          if (remoteUpdated && remoteUpdated > currentUpdated) {
+            store.setProject(data.project)
+          }
+        }
+      },
     })
     channelRef.current = channel
     setCollab((prev) => ({ ...prev, channel, isConnected: true }))

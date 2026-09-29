@@ -6,7 +6,9 @@
 
 import express from 'express'
 import cors from 'cors'
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, renameSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
@@ -38,13 +40,42 @@ function boardPath(id) {
 function readBoard(id) {
   const p = boardPath(id)
   if (!existsSync(p)) return null
-  try { return JSON.parse(readFileSync(p, 'utf-8')) } catch { return null }
+  try { return JSON.parse(readFileSync(p, 'utf-8')) } catch {
+    // Corrupt file - try to recover from backup
+    const backupPath = p + '.backup'
+    if (existsSync(backupPath)) {
+      try {
+        const backup = JSON.parse(readFileSync(backupPath, 'utf-8'))
+        console.warn(`[MoodBored] Recovered board ${id} from backup`)
+        return backup
+      } catch {}
+    }
+    return null
+  }
 }
 
 function writeBoard(id, state) {
   ensureDir(BOARDS_DIR)
   state.lastModified = new Date().toISOString()
-  writeFileSync(boardPath(id), JSON.stringify(state, null, 2))
+  const targetPath = boardPath(id)
+  const tmpPath = targetPath + '.tmp'
+  const backupPath = targetPath + '.backup'
+  
+  // Atomic write: write to temp file, then rename
+  try {
+    writeFileSync(tmpPath, JSON.stringify(state, null, 2))
+    // Keep backup of previous version
+    if (existsSync(targetPath)) {
+      try { renameSync(targetPath, backupPath) } catch {}
+    }
+    renameSync(tmpPath, targetPath)
+  } catch (err) {
+    console.error(`[MoodBored] Failed to write board ${id}:`, err)
+    // Clean up temp file if it exists
+    try { if (existsSync(tmpPath)) unlinkSync(tmpPath) } catch {}
+    throw err
+  }
+  
   notifyBoardChange(id, state)
   // Also persist to Supabase if configured (survives Railway redeploy)
   syncToSupabase(id, state).catch(() => {})
@@ -172,7 +203,43 @@ function notifyBoardChange(boardId, state) {
 
 const app = express()
 app.set('trust proxy', true) // Railway, Cloudflare, etc. set X-Forwarded-Proto
-app.use(cors())
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled for now - needs proper config for Tauri
+  crossOriginEmbedderPolicy: false,
+}))
+
+// CORS - restrict to known origins
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:3000', 'http://localhost:1420', 'https://moodbored-production.up.railway.app']
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(null, false) // Don't throw, just don't set CORS headers
+    }
+  },
+  credentials: true,
+}))
+
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+})
+app.use('/api/', apiLimiter)
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many auth attempts' },
+})
+
 app.use(express.json({ limit: '10mb' }))
 
 // ─── Board API ──────────────────────────────────────────────────────
@@ -688,7 +755,7 @@ async function handleMcpMessage(message, sessionBoardId) {
           { name: 'arrange_items', description: 'Arrange items into a layout', inputSchema: { type: 'object', properties: { layout: { type: 'string', enum: ['grid', 'stack-h', 'stack-v', 'spiral'] }, cols: { type: 'number' }, gap: { type: 'number' } }, required: ['layout'] } },
           { name: 'clear_board', description: 'Remove all items', inputSchema: { type: 'object', properties: {} } },
           { name: 'export_brief', description: 'Export board as a creative brief', inputSchema: { type: 'object', properties: { creation_type: { type: 'string' }, format: { type: 'string' } } } },
-          { name: 'export_to_folder', description: 'Export the board JSON to a file path (for saving to a project folder)', inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'Absolute file path to write the board JSON' } }, required: ['path'] } },
+          // SECURITY: export_to_folder tool removed — arbitrary file write vulnerability
         ],
       },
     }
@@ -720,17 +787,7 @@ async function executeTool(name, args, sessionBoardId) {
     if (!state) return `Board ${id} not found`
     return JSON.stringify({ id, name: state.project?.name, viewportCount: state.project?.viewports?.length, itemCount: state.project?.viewports?.[0]?.items?.length, created: state.project?.created, updated: state.project?.updated }, null, 2)
   }
-  if (name === 'export_to_folder') {
-    if (!args.path) return 'Error: path is required'
-    if (!sessionBoardId) return 'Error: no session board bound'
-    const state = readBoard(sessionBoardId)
-    if (!state) return 'Error: session board not found'
-    try {
-      ensureDir(dirname(args.path))
-      writeFileSync(args.path, JSON.stringify(state.project, null, 2))
-      return `Exported board to ${args.path}`
-    } catch (err) { return `Error: ${err.message}` }
-  }
+  // SECURITY: export_to_folder removed — arbitrary file write vulnerability
 
   // Board content tools — require a board
   if (!sessionBoardId) return 'Error: no board bound to this MCP session. Use create_project first.'
@@ -956,9 +1013,93 @@ app.get('/mcp.json', (_req, res) => {
   res.status(404).json({ error: 'MCP manifest not found' })
 })
 
+// ─── API Proxy (keeps keys server-side) ──────────────────────────────
+
+// Proxy OpenRouter chat completions
+app.post('/api/ai/chat', async (req, res) => {
+  const apiKey = process.env.OPENROUTER_API_KEY || ''
+  if (!apiKey) {
+    res.status(501).json({ error: 'AI features require OPENROUTER_API_KEY on the server' })
+    return
+  }
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': req.headers.origin || 'https://moodbored.app',
+        'X-Title': 'MoodBored',
+      },
+      body: JSON.stringify(req.body),
+    })
+    const data = await response.json()
+    res.status(response.status).json(data)
+  } catch (err) {
+    res.status(502).json({ error: `AI proxy error: ${err.message}` })
+  }
+})
+
+// Proxy OpenRouter image generation
+app.post('/api/ai/generate-image', async (req, res) => {
+  const apiKey = process.env.OPENROUTER_API_KEY || ''
+  if (!apiKey) {
+    res.status(501).json({ error: 'Image generation requires OPENROUTER_API_KEY on the server' })
+    return
+  }
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(req.body),
+    })
+    const data = await response.json()
+    res.status(response.status).json(data)
+  } catch (err) {
+    res.status(502).json({ error: `Image generation error: ${err.message}` })
+  }
+})
+
+// Proxy Unsplash search
+app.get('/api/unsplash/search', async (req, res) => {
+  const accessKey = process.env.UNSPLASH_ACCESS_KEY || ''
+  if (!accessKey) {
+    res.status(501).json({ error: 'Unsplash search requires UNSPLASH_ACCESS_KEY on the server' })
+    return
+  }
+  try {
+    const { q = '', per_page = 20, page = 1 } = req.query
+    const response = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=${per_page}&page=${page}`,
+      { headers: { 'Authorization': `Client-ID ${accessKey}` } }
+    )
+    const data = await response.json()
+    res.status(response.status).json(data)
+  } catch (err) {
+    res.status(502).json({ error: `Unsplash error: ${err.message}` })
+  }
+})
+
 // ─── SPA Fallback (catch-all, last) ─────────────────────────────────
 
-app.use(express.static(join(__dirname, 'dist'), { maxAge: '1y', immutable: true }))
+// Serve static files with proper caching
+// index.html should NOT be cached (always get fresh version)
+app.use(express.static(join(__dirname, 'dist'), {
+  maxAge: '1y',
+  immutable: true,
+  index: false, // Don't serve index.html from static
+}))
+
+// Serve index.html with no-cache headers
+app.get(['/', '/index.html'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  res.sendFile(join(__dirname, 'dist', 'index.html'))
+})
 app.get('/{*splat}', (_req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'))
 })
