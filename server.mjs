@@ -187,6 +187,11 @@ app.post('/api/boards', (req, res) => {
   res.json(board)
 })
 
+// Health check route - must be before :id routes
+app.get('/api/board/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
 app.get('/api/board/:id', (req, res) => {
   const state = readBoard(req.params.id)
   if (!state) { res.status(404).json({ error: 'Board not found' }); return }

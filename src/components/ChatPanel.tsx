@@ -45,7 +45,12 @@ export function ChatPanel() {
     }))
   }
 
-  const addMessage = (msg: ChatMessage) => { saveMessages([...messages, msg]) }
+  const addMessage = (msg: ChatMessage) => {
+    // Get fresh messages from store to avoid stale closure
+    const currentMessages = useStore.getState().project.viewports
+      .find(v => v.id === useStore.getState().activeViewportId)?.messages ?? []
+    saveMessages([...currentMessages, msg])
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -134,30 +139,32 @@ export function ChatPanel() {
             const actions = processToolCalls(toolCalls)
             const results: { tool_call_id: string; content: string }[] = []
 
-            for (const action of actions) {
+            for (let i = 0; i < actions.length; i++) {
+              const action = actions[i]
+              const toolCallId = toolCalls[i]?.id || toolCalls[0]?.id || ''
               try {
                 if (action.type === 'add_item' && action.item) {
                   pendingActions.push({ type: 'add_item', item: action.item })
-                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Added ${action.item.kind} item` })
+                  results.push({ tool_call_id: toolCallId, content: `Added ${action.item.kind} item` })
                 } else if (action.type === 'remove_item' && action.itemId) {
                   pendingActions.push({ type: 'remove_item', itemId: action.itemId })
-                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Removed item ${action.itemId}` })
+                  results.push({ tool_call_id: toolCallId, content: `Removed item ${action.itemId}` })
                 } else if (action.type === 'update_item' && action.itemId) {
                   pendingActions.push({ type: 'update_item', itemId: action.itemId, item: action.updates })
-                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Updated item ${action.itemId}` })
+                  results.push({ tool_call_id: toolCallId, content: `Updated item ${action.itemId}` })
                 } else if (action.type === 'group_items') {
                   useStore.getState().groupSelected(action.label || 'Group')
-                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Grouped items into "${action.label}"` })
+                  results.push({ tool_call_id: toolCallId, content: `Grouped items into "${action.label}"` })
                 } else if (action.type === 'arrange_items') {
                   const s = useStore.getState()
                   if (action.layout === 'grid') s.arrangeGrid(action.cols || 4, action.gap || 20)
                   else if (action.layout === 'stack-h') s.arrangeStack('h', action.gap || 20)
                   else if (action.layout === 'stack-v') s.arrangeStack('v', action.gap || 20)
                   else if (action.layout === 'spiral') s.arrangeSpiral(action.gap || 30)
-                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Arranged items in ${action.layout} layout` })
+                  results.push({ tool_call_id: toolCallId, content: `Arranged items in ${action.layout} layout` })
                 } else if (action.type === 'generate_image') {
                   // Generate image asynchronously, add to board when ready
-                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: 'Generating image...' })
+                  results.push({ tool_call_id: toolCallId, content: 'Generating image...' })
                   const imgPrompt = action.prompt || 'A beautiful image'
                   generateImage(imgPrompt, settings.apiKey).then((url) => {
                     if (url) {
@@ -183,7 +190,7 @@ export function ChatPanel() {
                   if (lastItem && lastItem.kind === 'web') {
                     s.morphCard(lastItem.id, 'web', { url: (action as any).url, title: (action as any).title || (action as any).url })
                   }
-                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Opened ${(action as any).url} as web node` })
+                  results.push({ tool_call_id: toolCallId, content: `Opened ${(action as any).url} as web node` })
                 } else if (action.type === 'draw_connection' && (action as any).fromId && (action as any).toId) {
                   // Draw typed connection
                   const s = useStore.getState()
@@ -198,12 +205,12 @@ export function ChatPanel() {
                     owner: 'llm',
                     created: new Date().toISOString(),
                   })
-                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Drew ${connType} connection` })
+                  results.push({ tool_call_id: toolCallId, content: `Drew ${connType} connection` })
                 } else {
-                  results.push({ tool_call_id: toolCalls[0]?.id || '', content: 'Unknown action' })
+                  results.push({ tool_call_id: toolCallId, content: 'Unknown action' })
                 }
               } catch (err) {
-                results.push({ tool_call_id: toolCalls[0]?.id || '', content: `Error: ${err}` })
+                results.push({ tool_call_id: toolCallId, content: `Error: ${err}` })
               }
             }
 
@@ -211,6 +218,7 @@ export function ChatPanel() {
             if (pendingActions.length > 0) {
               executeActions(pendingActions)
               agentDiagnostics.actionsExecuted += pendingActions.length
+              pendingActions.length = 0 // Clear to prevent duplicates
             }
 
             return results
