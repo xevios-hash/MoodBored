@@ -84,7 +84,7 @@ function getImage(url: string): HTMLImageElement | null {
   if (!imageCache.has(url)) {
     try {
       const img = new Image()
-      img.crossOrigin = 'anonymous'
+      // Don't force crossOrigin - let images load from any source
       img.onload = () => {
         imageCache.set(url, img)
         needsRedrawGlobal = true
@@ -258,6 +258,8 @@ export function Canvas() {
   const project = useStore((s) => s.project)
   const activeViewportId = useStore((s) => s.activeViewportId)
   const canvas = useStore((s) => s.canvas)
+  const selectedIds = useStore((s) => s.selectedIds)
+  const focusedWebNodeId = useStore((s) => s.focusedWebNodeId)
   const viewport = project.viewports.find(v => v.id === activeViewportId) ?? project.viewports[0]
   const items = viewport?.items ?? []
 
@@ -1133,8 +1135,8 @@ export function Canvas() {
         const y = item.pos.y * canvas.zoom + canvas.panY
         const w = (item.size?.w ?? 250) * canvas.zoom
         const h = (item.size?.h ?? 150) * canvas.zoom
-        if (item.kind === 'video') return <video key={item.id} src={item.source || item.sourceUrl} autoPlay loop muted playsInline style={{ position: 'absolute', left: x, top: y, width: w, height: h, objectFit: 'cover', borderRadius: 10, pointerEvents: 'none' }} />
-        if (item.kind === 'image') return <img key={item.id} src={item.thumbnail || item.fullSource} alt={item.description} style={{ position: 'absolute', left: x, top: y, width: w, height: h, objectFit: 'cover', borderRadius: 10, pointerEvents: 'none' }} />
+        if (item.kind === 'video') return <video key={item.id} src={item.source || item.sourceUrl} autoPlay loop muted playsInline style={{ position: 'absolute', left: x, top: y, width: w, height: h, objectFit: 'cover', borderRadius: 10, pointerEvents: 'none', zIndex: 2 }} />
+        if (item.kind === 'image') return <img key={item.id} src={item.thumbnail || item.fullSource} alt={item.description} style={{ position: 'absolute', left: x, top: y, width: w, height: h, objectFit: 'cover', borderRadius: 10, pointerEvents: 'none', zIndex: 2 }} />
         return null
       })}
 
@@ -1183,8 +1185,8 @@ export function Canvas() {
       {items.filter(i => i.kind === 'web').map(item => {
         if (!('pos' in item) || item.kind !== 'web') return null
         const webItem = item as WebItem
-        const isSelected = useStore.getState().selectedIds.has(item.id)
-        const isFocused = useStore.getState().focusedWebNodeId === item.id
+        const isSelected = selectedIds.has(item.id)
+        const isFocused = focusedWebNodeId === item.id
         return (
           <WebNode
             key={item.id}

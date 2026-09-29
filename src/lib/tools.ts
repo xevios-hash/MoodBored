@@ -272,7 +272,15 @@ export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove
     switch (fn.name) {
       case 'add_items':
         for (const raw of (args.items || [])) {
-          actions.push({ type: 'add_item', item: raw })
+          // Ensure item has required fields
+          const item = {
+            ...raw,
+            id: raw.id || crypto.randomUUID(),
+            pos: raw.pos || { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 },
+            size: raw.size || { w: 300, h: 200 },
+            tags: raw.tags || [],
+          }
+          actions.push({ type: 'add_item', item })
         }
         break
       case 'remove_items':

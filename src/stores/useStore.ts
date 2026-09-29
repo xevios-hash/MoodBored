@@ -348,7 +348,8 @@ export const useStore = create<AppState>()(
     get().pushHistory()
   },
 
-  updateItem: (id, updates) =>
+  updateItem: (id, updates) => {
+    get().pushHistory()
     set((s) => ({
       project: {
         ...s.project,
@@ -358,9 +359,11 @@ export const useStore = create<AppState>()(
         })),
         updated: new Date().toISOString(),
       },
-    })),
+    }))
+  },
 
-  moveItem: (id, pos) =>
+  moveItem: (id, pos) => {
+    // Don't push history for every move - only on drag start
     set((s) => ({
       project: {
         ...s.project,
@@ -369,7 +372,8 @@ export const useStore = create<AppState>()(
           items: v.items.map((i) => (i.id === id ? { ...i, pos } : i)),
         })),
       },
-    })),
+    }))
+  },
 
   // Organization
   arrangeGrid: (cols, gap) => {
@@ -601,10 +605,16 @@ export const useStore = create<AppState>()(
 
   // Clipboard — snapshots are recorded AFTER each mutation,
   // so history[historyIndex] always equals the current project state.
+  // Push history BEFORE mutation to save pre-mutation state
   pushHistory: () =>
     set((s) => {
+      // Only push if there's a meaningful change (compare with last history entry)
+      const current = JSON.stringify(s.project)
+      const last = s.history[s.historyIndex]
+      if (last && JSON.stringify(last) === current) return s // No change, skip
+      
       const newHistory = s.history.slice(0, s.historyIndex + 1)
-      newHistory.push(JSON.parse(JSON.stringify(s.project)))
+      newHistory.push(JSON.parse(current))
       if (newHistory.length > 50) newHistory.shift()
       return { history: newHistory, historyIndex: newHistory.length - 1 }
     }),
@@ -1240,12 +1250,17 @@ export const useStore = create<AppState>()(
   // Export/Import
   exportProject: () => {
     const { project } = get()
-    return JSON.stringify(project, null, 2)
+    // Strip API key from export
+    const exportData = {
+      ...project,
+      settings: { ...project.settings, apiKey: '' }
+    }
+    return JSON.stringify(exportData, null, 2)
   },
 
-  importChromeTabs: (tabs) => {
-    const { tabsToBoardItems } = require('@/lib/chrome-import')
-    const items = tabsToBoardItems(tabs)
+  importChromeTabs: async (tabs: any[]) => {
+    const { tabsToBoardItems } = await import('@/lib/chrome-import')
+    const items = tabsToBoardItems(tabs as any)
     set((s) => {
       const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
       if (!vp) return s
@@ -1469,6 +1484,22 @@ export const useStore = create<AppState>()(
       }
       if (!parsed.components) parsed.components = []
       if (!parsed.snapshots) parsed.snapshots = []
+      // Backfill settings if missing or partial
+      const defaultSettings = {
+        apiKey: '',
+        defaultModel: 'anthropic/claude-sonnet-4',
+        jevThreshold: 0.2,
+        multiAgent: false,
+        theme: 'light' as const,
+        canvasBg: '#e0f2fe',
+        canvasBgType: 'color' as const,
+        canvasBgVideo: '',
+        customBgUrls: [],
+        customBgLabels: {},
+      }
+      parsed.settings = { ...defaultSettings, ...(parsed.settings || {}) }
+      // Never carry an API key from import
+      parsed.settings.apiKey = ''
       // Imported settings are untrusted — never carry an API key
       if (parsed.settings) parsed.settings.apiKey = ''
       const activeId = parsed.viewports[0].id!

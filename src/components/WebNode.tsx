@@ -180,6 +180,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
 
     // Check if site is known to block embedding (web mode only)
     const isBlocked = isLikelyBlocked(item.url)
+    console.log(`[WebNode] renderWebContent: url=${item.url}, isBlocked=${isBlocked}, useTauriWebView=${useTauriWebView}`)
 
     // In Tauri mode, we use WebContentsView (no iframe restrictions)
     // In web mode, we use iframes with fallback for blocked sites
@@ -261,7 +262,7 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
         borderRadius: 10,
         zIndex: isFocused ? 1000 : isSelected ? 100 : 10,
         border: isSelected ? '2px solid var(--accent)' : '1px solid var(--border)',
-        transition: isFocused ? 'none' : 'all 0.2s ease',
+        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
       }}
       onClick={(e) => {
         e.stopPropagation()
@@ -290,11 +291,11 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
         {renderContent()}
       </div>
 
-      {/* Focus overlay - click to unfocus */}
+      {/* Focus overlay - click to unfocus (only on content area, not chrome) */}
       {isFocused && (
         <div
-          className="absolute top-0 left-0 right-0 h-9 z-20"
-          style={{ cursor: 'default' }}
+          className="absolute bottom-0 left-0 right-0 z-20"
+          style={{ cursor: 'default', top: 36 }}
           onClick={(e) => {
             e.stopPropagation()
             handleUnfocus()
