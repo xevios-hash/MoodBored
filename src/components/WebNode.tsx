@@ -100,8 +100,16 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
         )}
         {loadError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-0/90 z-10 gap-2">
-            <span className="text-sm text-text-secondary">Failed to load</span>
-            <button onClick={handleReload} className="btn btn-ghost text-xs">Retry</button>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-text-muted">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span className="text-xs text-text-secondary">This site can't be embedded</span>
+            <div className="flex gap-2">
+              <button onClick={handleReload} className="btn btn-ghost text-xs px-2 py-1">Retry</button>
+              <a href={item.url} target="_blank" rel="noopener noreferrer" className="btn btn-accent text-xs px-2 py-1">Open in tab ↗</a>
+            </div>
           </div>
         )}
         <iframe
@@ -110,8 +118,9 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
           onLoad={handleLoad}
           onError={handleError}
           className="w-full h-full border-none"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation-by-user-activation"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          referrerPolicy="origin"
           style={{ pointerEvents: isFocused ? 'auto' : 'none' }}
         />
       </>

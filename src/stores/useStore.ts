@@ -1212,7 +1212,7 @@ export const useStore = create<AppState>()(
                 importance: 'AI reference',
                 tags: ['ai-opened'],
                 pos: { x: cx, y: cy },
-                size: { w: 300, h: 200 },
+                size: { w: 640, h: 480 },
               }
               addItem(webItem)
             }
@@ -1282,7 +1282,7 @@ export const useStore = create<AppState>()(
       importance: '',
       tags: [],
       pos,
-      size: { w: 300, h: 200 },
+      size: { w: 640, h: 480 },
     }
     get().addItem(webItem)
     return id
