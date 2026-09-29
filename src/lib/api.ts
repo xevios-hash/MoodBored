@@ -3,7 +3,7 @@ import { getDefaultPorts } from '@/types'
 import { v4 as uuid } from 'uuid'
 import { findFreePosition } from './layout'
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+const OPENROUTER_URL = '/api/ai/chat'  // Proxied through server to keep API key server-side
 
 // ─── Streaming ──────────────────────────────────────────────────────
 
@@ -227,17 +227,16 @@ export async function streamChatWithTools(
   onDone()
 }
 
-// ─── Stable Diffusion via OpenRouter ────────────────────────────────
+// ─── Stable Diffusion via server proxy (keeps API key server-side) ──
 
 export async function generateImage(
   prompt: string,
   apiKey: string,
 ): Promise<string | null> {
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/images/generations', {
+    const res = await fetch('/api/ai/generate-image', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

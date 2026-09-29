@@ -351,7 +351,6 @@ export const useStore = create<AppState>()(
   },
 
   removeItem: (id) => {
-    get().pushHistory()
     set((s) => ({
       project: {
         ...s.project,
@@ -369,11 +368,11 @@ export const useStore = create<AppState>()(
       },
       selectedIds: new Set([...s.selectedIds].filter((i) => i !== id)),
     }))
+    get().pushHistory()
   },
 
   removeItems: (ids) => {
     if (ids.length === 0) return
-    get().pushHistory()
     set((s) => {
       const idSet = new Set(ids)
       return {
@@ -394,10 +393,10 @@ export const useStore = create<AppState>()(
         selectedIds: new Set(),
       }
     })
+    get().pushHistory()
   },
 
   updateItem: (id, updates) => {
-    get().pushHistory()
     set((s) => ({
       project: {
         ...s.project,
@@ -408,6 +407,7 @@ export const useStore = create<AppState>()(
         updated: new Date().toISOString(),
       },
     }))
+    get().pushHistory()
   },
 
   updateItemNoHistory: (id, updates) =>
@@ -668,13 +668,8 @@ export const useStore = create<AppState>()(
   // Push history BEFORE mutation to save pre-mutation state
   pushHistory: () =>
     set((s) => {
-      // Only push if there's a meaningful change (compare with last history entry)
-      const current = JSON.stringify(s.project)
-      const last = s.history[s.historyIndex]
-      if (last && JSON.stringify(last) === current) return s // No change, skip
-      
       const newHistory = s.history.slice(0, s.historyIndex + 1)
-      newHistory.push(JSON.parse(current))
+      newHistory.push(JSON.parse(JSON.stringify(s.project)))
       if (newHistory.length > 50) newHistory.shift()
       return { history: newHistory, historyIndex: newHistory.length - 1 }
     }),
