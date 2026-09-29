@@ -56,7 +56,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
               </div>
               <p className="text-2xs text-text-muted mt-1">
                 Get your key at{' '}
-                <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-[#00fff0] hover:underline">
+                <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-[#6a5aae] hover:underline">
                   openrouter.ai/keys
                 </a>
               </p>
@@ -70,9 +70,9 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
           </Section>
 
           <Section title="Agent — Jev Quality Gate">
-            <div className="p-3 rgba(0,255,240,0.06) rounded-lg border rgba(0,255,240,0.15)">
+            <div className="p-3 rounded-lg border border-accent/15 bg-accent/5">
               <div className="flex items-center gap-2 mb-2">
-                <Shield size={16} className="text-[#00fff0]" />
+                <Shield size={16} className="text-[#6a5aae]" />
                 <span className="text-sm font-medium text-text-primary">Jev Quality Control</span>
               </div>
               <p className="text-xs text-text-muted mb-3">
@@ -109,7 +109,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
           </Section>
 
           <Section title="Multi-Agent Mode">
-            <div className="p-3 rgba(0,255,240,0.06) rounded-lg border rgba(0,255,240,0.15)">
+            <div className="p-3 rounded-lg border border-accent/15 bg-accent/5">
               <p className="text-xs text-text-muted mb-2">
                 Enable multiple specialized AI agents (Color Theorist, Typographer, Spatial Designer, etc.)
                 working together on your board. Default is single-agent mode.
@@ -127,7 +127,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
           </Section>
 
           <Section title="MCP Server (connect to Claude Desktop, Cursor, etc.)">
-            <div className="p-3 rgba(0,255,240,0.06) rounded-lg border rgba(0,255,240,0.15)">
+            <div className="p-3 rounded-lg border border-accent/15 bg-accent/5">
               <p className="text-xs text-text-muted mb-2">
                 MoodBored exposes an MCP server that lets other LLMs read and write to your board.
                 Add the config below to Claude Desktop or any MCP client to connect.
@@ -167,7 +167,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                   onClick={() => updateSettings({ theme: 'light' })}
                   className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-fast border ${
                     settings.theme === 'light'
-                      ? 'bg-white border-accent text-[#00fff0]'
+                      ? 'bg-white border-accent text-[#6a5aae]'
                       : 'bg-surface-2 border-surface-4 text-text-secondary hover:text-text-primary'
                   }`}
                 >
@@ -177,7 +177,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                   onClick={() => updateSettings({ theme: 'dark' })}
                   className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-fast border ${
                     settings.theme === 'dark'
-                      ? 'bg-surface-2 border-accent text-[#00fff0]'
+                      ? 'bg-surface-2 border-accent text-[#6a5aae]'
                       : 'bg-surface-2 border-surface-4 text-text-secondary hover:text-text-primary'
                   }`}
                 >

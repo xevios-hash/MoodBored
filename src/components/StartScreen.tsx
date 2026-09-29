@@ -242,7 +242,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     transition: 'all 150ms ease',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8b7dc8'; e.currentTarget.style.background = '#1a0040' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8b7dc8'; e.currentTarget.style.background = '#f0ecfa' }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#ffffff' }}
                 >
                   <div>

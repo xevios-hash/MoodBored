@@ -20,7 +20,7 @@ import { SnapshotTimeline } from '@/components/SnapshotTimeline'
 import { WorkspaceManager } from '@/components/WorkspaceManager'
 import { ChromeImport } from '@/components/ChromeImport'
 import { PresenceBar, RemoteCursors } from '@/components/Presence'
-import { joinBoard, getShareByToken, broadcastCursor, broadcastSelection, type PresenceUser, type ShareRole, type CollaborationState } from '@/lib/collaboration'
+import { joinBoard, getShareByToken, broadcastCursor, broadcastSelection, broadcastMutation, type PresenceUser, type ShareRole, type CollaborationState } from '@/lib/collaboration'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 // ─── URL Params (read once, before React renders) ───────────────────
@@ -294,6 +294,20 @@ export default function App() {
   useEffect(() => {
     if (!isEmbed) broadcastSelection(channelRef.current, [...selectedIds][0] ?? null)
   }, [selectedIds, isEmbed])
+
+  // Broadcast mutations to other users
+  useEffect(() => {
+    if (isEmbed || !collab.isConnected || !channelRef.current) return
+    const unsub = useStore.subscribe((state, prevState) => {
+      if (state.project !== prevState.project) {
+        broadcastMutation(channelRef.current, {
+          type: 'board_update',
+          payload: { project: state.project },
+        })
+      }
+    })
+    return unsub
+  }, [isEmbed, collab.isConnected])
 
   // ─── Embed mode: canvas only + background settings ───
   if (isEmbed) {
