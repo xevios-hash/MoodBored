@@ -4,6 +4,7 @@ import {
   Search, PanelLeft, MessageSquare, Settings, MoreVertical,
   Download, Upload, FileText, Camera, FolderOpen, Globe,
   ImageIcon, Share2, Palette, Sparkles, LayoutGrid, Keyboard,
+  Home,
 } from 'lucide-react'
 
 interface Props {
@@ -14,10 +15,11 @@ interface Props {
   onSnapshotTimeline?: () => void
   onWorkspaceManager?: () => void
   onChromeImport?: () => void
+  onGoHome?: () => void
   presenceBar?: React.ReactNode
 }
 
-export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColorPicker, onSnapshotTimeline, onWorkspaceManager, onChromeImport, presenceBar }: Props) {
+export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColorPicker, onSnapshotTimeline, onWorkspaceManager, onChromeImport, onGoHome, presenceBar }: Props) {
   const project = useStore((s) => s.project)
   const [showMenu, setShowMenu] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -257,6 +259,12 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
               </button>
               <button onClick={toggleSettings} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Settings size={14} /> Settings
+              </button>
+
+              <div className="h-px my-1" style={{ background: 'var(--border-color)' }} />
+
+              <button onClick={() => { onGoHome?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Home size={14} /> Projects
               </button>
             </div>
           )}
