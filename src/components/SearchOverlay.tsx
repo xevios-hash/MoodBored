@@ -36,6 +36,19 @@ export function SearchOverlay() {
     for (const vp of state.project.viewports) {
       if (vp.items.some((i) => i.id === item.id)) {
         setActiveViewport(vp.id)
+        // Pan/zoom to the item
+        if ('pos' in item && item.pos) {
+          const canvasEl = document.querySelector('canvas')
+          const rect = canvasEl?.getBoundingClientRect()
+          if (rect) {
+            const targetZoom = 1.2
+            state.setZoom(targetZoom)
+            state.setPan(
+              rect.width / 2 - item.pos.x * targetZoom,
+              rect.height / 2 - item.pos.y * targetZoom
+            )
+          }
+        }
         break
       }
     }

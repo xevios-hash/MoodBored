@@ -417,6 +417,7 @@ export interface Project {
   components: ComponentDef[]
   settings: Settings
   snapshots: SnapshotMeta[]
+  annotations: Annotation[]
   workspaceId?: string
   created: string
   updated: string

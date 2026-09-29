@@ -1,12 +1,15 @@
 import { useStore } from '@/stores/useStore'
 import { X, Tag, Plus, Trash2 } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import type { BoardItem } from '@/types'
 
 export function Inspector() {
   const project = useStore((s) => s.project)
   const selectedIds = useStore((s) => s.selectedIds)
   const updateItem = useStore((s) => s.updateItem)
+  const updateItemNoHistory = useStore((s) => s.updateItemNoHistory)
+  const pushHistory = useStore((s) => s.pushHistory)
+  const historyTimeoutRef = useRef<NodeJS.Timeout>(null!)
   const removeItem = useStore((s) => s.removeItem)
   const toggleInspector = useStore((s) => s.toggleInspector)
   const [newTag, setNewTag] = useState('')
@@ -31,7 +34,15 @@ export function Inspector() {
     )
   }
 
-  const update = (updates: Record<string, any>) => updateItem(selectedItem.id, updates)
+  const update = (updates: Record<string, any>) => {
+    // Use no-history for frequent updates
+    updateItemNoHistory(selectedItem.id, updates)
+    // Debounce history push
+    clearTimeout(historyTimeoutRef.current)
+    historyTimeoutRef.current = setTimeout(() => {
+      pushHistory()
+    }, 500)
+  }
 
   const addTag = () => {
     if (!newTag.trim()) return

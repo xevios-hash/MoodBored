@@ -85,10 +85,14 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
   const handleExportPNG = () => {
     const canvas = document.querySelector('canvas')
     if (!canvas) return
-    const a = document.createElement('a')
-    a.download = 'moodboard.png'
-    a.href = canvas.toDataURL('image/png')
-    a.click()
+    try {
+      const a = document.createElement('a')
+      a.download = 'moodboard.png'
+      a.href = canvas.toDataURL('image/png')
+      a.click()
+    } catch (err) {
+      alert('Cannot export PNG: canvas contains cross-origin images. Try removing remote images or use Export JSON instead.')
+    }
     setShowMenu(false)
     setShowExportMenu(false)
   }

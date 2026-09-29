@@ -96,8 +96,6 @@ interface AppState {
   updateAnnotation: (id: string, updates: Partial<Annotation>) => void
   removeAnnotation: (id: string) => void
   selectAnnotation: (id: string | null) => void
-  getAnnotationsForItem: (itemId: string) => Annotation[]
-  getAnnotationsForUrl: (url: string) => Annotation[]
 
   // History (undo/redo)
   history: Project[]
@@ -126,7 +124,9 @@ interface AppState {
   // Actions - Items
   addItem: (item: BoardItem) => void
   removeItem: (id: string) => void
+  removeItems: (ids: string[]) => void
   updateItem: (id: string, updates: Record<string, any>) => void
+  updateItemNoHistory: (id: string, updates: Record<string, any>) => void
   moveItem: (id: string, pos: Position) => void
 
   // Actions - Organization
@@ -214,6 +214,7 @@ const defaultProject: Project = {
   viewports: [defaultViewport],
   components: [],
   snapshots: [],
+  annotations: [],
   settings: {
     apiKey: '',
     defaultModel: 'anthropic/claude-sonnet-4',
@@ -350,6 +351,7 @@ export const useStore = create<AppState>()(
   },
 
   removeItem: (id) => {
+    get().pushHistory()
     set((s) => ({
       project: {
         ...s.project,
@@ -359,12 +361,39 @@ export const useStore = create<AppState>()(
           connections: v.connections.filter(
             (c) => c.fromItemId !== id && c.toItemId !== id
           ),
+          typedConnections: (v.typedConnections || []).filter(
+            (c) => c.fromItemId !== id && c.toItemId !== id
+          ),
         })),
         updated: new Date().toISOString(),
       },
       selectedIds: new Set([...s.selectedIds].filter((i) => i !== id)),
     }))
+  },
+
+  removeItems: (ids) => {
+    if (ids.length === 0) return
     get().pushHistory()
+    set((s) => {
+      const idSet = new Set(ids)
+      return {
+        project: {
+          ...s.project,
+          viewports: s.project.viewports.map((v) => ({
+            ...v,
+            items: v.items.filter((i) => !idSet.has(i.id)),
+            connections: v.connections.filter(
+              (c) => !idSet.has(c.fromItemId) && !idSet.has(c.toItemId)
+            ),
+            typedConnections: (v.typedConnections || []).filter(
+              (c) => !idSet.has(c.fromItemId) && !idSet.has(c.toItemId)
+            ),
+          })),
+          updated: new Date().toISOString(),
+        },
+        selectedIds: new Set(),
+      }
+    })
   },
 
   updateItem: (id, updates) => {
@@ -380,6 +409,18 @@ export const useStore = create<AppState>()(
       },
     }))
   },
+
+  updateItemNoHistory: (id, updates) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        viewports: s.project.viewports.map((v) => ({
+          ...v,
+          items: v.items.map((i) => (i.id === id ? { ...i, ...updates } : i)),
+        })),
+        updated: new Date().toISOString(),
+      },
+    })),
 
   moveItem: (id, pos) => {
     // Don't push history for every move - only on drag start
@@ -1184,34 +1225,38 @@ export const useStore = create<AppState>()(
   setAnnotationTool: (tool) => set({ activeAnnotationTool: tool, selectedAnnotationId: null }),
 
   addAnnotation: (annotation) => {
-    set((s) => ({
-      annotations: [...s.annotations, annotation],
-    }))
     get().pushHistory()
+    set((s) => ({
+      project: {
+        ...s.project,
+        annotations: [...(s.project.annotations || []), annotation],
+        updated: new Date().toISOString(),
+      },
+    }))
   },
 
   updateAnnotation: (id, updates) =>
     set((s) => ({
-      annotations: s.annotations.map(a => a.id === id ? { ...a, ...updates } as Annotation : a),
+      project: {
+        ...s.project,
+        annotations: (s.project.annotations || []).map(a => a.id === id ? { ...a, ...updates } as Annotation : a),
+        updated: new Date().toISOString(),
+      },
     })),
 
   removeAnnotation: (id) => {
+    get().pushHistory()
     set((s) => ({
-      annotations: s.annotations.filter(a => a.id !== id),
+      project: {
+        ...s.project,
+        annotations: (s.project.annotations || []).filter(a => a.id !== id),
+        updated: new Date().toISOString(),
+      },
       selectedAnnotationId: s.selectedAnnotationId === id ? null : s.selectedAnnotationId,
     }))
-    get().pushHistory()
   },
 
   selectAnnotation: (id) => set({ selectedAnnotationId: id }),
-
-  getAnnotationsForItem: (itemId) => {
-    return get().annotations.filter(a => a.itemId === itemId)
-  },
-
-  getAnnotationsForUrl: (url) => {
-    return get().annotations.filter(a => a.url === url)
-  },
 
   // Settings
   updateSettings: (updates) =>

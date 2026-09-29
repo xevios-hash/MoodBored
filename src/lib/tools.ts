@@ -257,8 +257,10 @@ ${boardDescription}`
 }
 
 // Process tool calls from the LLM response into AgentActions
-export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove_item' | 'update_item' | 'group_items' | 'arrange_items' | 'generate_image' | 'open_url' | 'draw_connection'; item?: any; itemId?: string; updates?: any; label?: string; layout?: string; cols?: number; gap?: number; prompt?: string; description?: string; purpose?: string; tags?: string[]; url?: string; fromId?: string; toId?: string; connectionType?: string }[] {
-  const actions: any[] = []
+// Returns actions grouped by originating tool call ID
+export function processToolCalls(toolCalls: any[]): { toolCallId: string; actions: any[] }[] {
+  const result: { toolCallId: string; actions: any[] }[] = []
+  
   for (const tc of toolCalls) {
     const fn = tc.function
     if (!fn) continue
@@ -269,16 +271,27 @@ export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove
       continue
     }
 
+    const actions: any[] = []
+
     switch (fn.name) {
       case 'add_items':
         for (const raw of (args.items || [])) {
-          // Ensure item has required fields
+          // Ensure item has required fields including image sources
           const item = {
             ...raw,
             id: raw.id || crypto.randomUUID(),
             pos: raw.pos || { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 },
             size: raw.size || { w: 300, h: 200 },
             tags: raw.tags || [],
+            // Map image source fields correctly
+            ...(raw.kind === 'image' ? {
+              thumbnail: raw.source || raw.url || raw.thumbnail || '',
+              fullSource: raw.source || raw.url || raw.fullSource || '',
+            } : {}),
+            ...(raw.kind === 'video' ? {
+              source: raw.source || raw.url || '',
+              sourceUrl: raw.source || raw.url || '',
+            } : {}),
           }
           actions.push({ type: 'add_item', item })
         }
@@ -294,7 +307,6 @@ export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove
         }
         break
       case 'group_items':
-        // Group items is handled by the store
         actions.push({ type: 'group_items', label: args.label || 'Group' })
         break
       case 'arrange_items':
@@ -313,7 +325,17 @@ export function processToolCalls(toolCalls: any[]): { type: 'add_item' | 'remove
           actions.push({ type: 'draw_connection', fromId: args.from_id, toId: args.to_id, connectionType: args.connection_type, label: args.label })
         }
         break
+      case 'search_items':
+        // Handle search - return results
+        actions.push({ type: 'search_items', query: args.query, tag: args.tag })
+        break
+      case 'export_brief':
+        actions.push({ type: 'export_brief', creation_type: args.creation_type })
+        break
     }
+
+    result.push({ toolCallId: tc.id, actions })
   }
-  return actions
+  
+  return result
 }

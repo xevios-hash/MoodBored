@@ -25,7 +25,8 @@ const ANNOTATION_COLORS = [
 const STROKE_WIDTHS = [1, 2, 3, 5, 8]
 
 export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scrollTop = 0, scrollLeft = 0, isInteractive, isCanvasLayer = false }: AnnotationLayerProps) {
-  const annotations = useStore((s) => s.annotations)
+  const project = useStore((s) => s.project)
+  const annotations = project.annotations || []
   const activeTool = useStore((s) => s.activeAnnotationTool)
   const selectedAnnotationId = useStore((s) => s.selectedAnnotationId)
   const addAnnotation = useStore((s) => s.addAnnotation)
@@ -54,13 +55,13 @@ export function AnnotationLayer({ itemId, url, x, y, width, height, zoom, scroll
     return false
   })
 
-  // Hold Shift to enter annotation mode
+  // Hold Alt to enter annotation mode (not Shift - that's for multi-select)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') setIsAnnotating(true)
+      if (e.key === 'Alt') setIsAnnotating(true)
     }
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') setIsAnnotating(false)
+      if (e.key === 'Alt') setIsAnnotating(false)
     }
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
@@ -643,10 +644,10 @@ function AnnotationToolbar({ activeTool, color, strokeWidth, onToolChange, onCol
         zIndex: 200,
       }}
     >
-      {/* Shift hint for card annotations */}
+      {/* Alt hint for card annotations */}
       {!isCanvas && (
         <div style={{ fontSize: 10, color: '#666', marginRight: 8, whiteSpace: 'nowrap' }}>
-          Hold <b>Shift</b> + draw
+          Hold <b>Alt</b> + draw
         </div>
       )}
       {tools.map(({ tool, icon, label }) => (
