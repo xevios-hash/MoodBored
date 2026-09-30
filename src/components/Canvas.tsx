@@ -396,20 +396,37 @@ export function Canvas() {
       }
 
       // Items (skip web items - they are rendered as HTML overlays)
+      // Viewport culling: only draw items visible in viewport
+      const viewLeft = -c.panX / c.zoom - 100
+      const viewTop = -c.panY / c.zoom - 100
+      const viewRight = viewLeft + rect.width / c.zoom + 200
+      const viewBottom = viewTop + rect.height / c.zoom + 200
+      
+      const isItemVisible = (item: any) => {
+        if (!item || !('pos' in item)) return true
+        const w = item.size?.w ?? 250
+        const h = item.size?.h ?? 150
+        return !(item.pos.x + w < viewLeft || item.pos.x > viewRight || 
+                 item.pos.y + h < viewTop || item.pos.y > viewBottom)
+      }
+
       for (const item of its) {
         if (item.kind === 'connector' || item.kind === 'web' || !('pos' in item)) continue
+        if (!isItemVisible(item)) continue  // Cull off-screen items
         drawItem(ctx, item, sel.has(item.id), c.zoom)
       }
 
-      // Resize handles (skip web items)
+      // Resize handles (skip web items, only visible)
       for (const item of its) {
         if (item.kind === 'connector' || item.kind === 'web' || !('pos' in item)) continue
+        if (!isItemVisible(item)) continue
         if (sel.has(item.id)) drawResizeHandles(ctx, item, c.zoom)
       }
 
-      // Ports (skip web items)
+      // Ports (skip web items, only visible)
       for (const item of its) {
         if (item.kind === 'connector' || item.kind === 'web' || !('pos' in item)) continue
+        if (!isItemVisible(item)) continue
         if ('ports' in item && item.ports) drawPorts(ctx, item, c.zoom)
       }
 

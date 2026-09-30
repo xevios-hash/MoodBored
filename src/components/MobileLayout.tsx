@@ -7,6 +7,7 @@ import { SearchOverlay } from '@/components/SearchOverlay'
 import { SettingsModal } from '@/components/SettingsModal'
 import { SnapshotTimeline } from '@/components/SnapshotTimeline'
 import { WorkspaceManager } from '@/components/WorkspaceManager'
+import { ShareModal } from '@/components/ShareModal'
 import {
   MessageSquare, Layers, Settings, Search, Grid3X3, Plus, MoreVertical,
   Download, Upload, Share2, Camera, FolderOpen,
@@ -33,6 +34,7 @@ export function MobileLayout({ showSplash }: { showSplash: boolean }) {
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showSnapshots, setShowSnapshots] = useState(false)
   const [showWorkspaces, setShowWorkspaces] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const searchOpen = useStore((s) => s.searchOpen)
   const toggleSettings = useStore((s) => s.toggleSettings)
@@ -168,7 +170,7 @@ export function MobileLayout({ showSplash }: { showSplash: boolean }) {
             { icon: <Download size={16} />, label: 'Export JSON', action: () => { const json = exportProject(); const blob = new Blob([json], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'board.json'; a.click(); URL.revokeObjectURL(url); setShowMoreMenu(false) } },
             { icon: <Camera size={16} />, label: 'Snapshots', action: () => { setShowSnapshots(true); setShowMoreMenu(false) } },
             { icon: <FolderOpen size={16} />, label: 'Workspaces', action: () => { setShowWorkspaces(true); setShowMoreMenu(false) } },
-            { icon: <Share2 size={16} />, label: 'Share', action: () => { /* TODO: Share modal */ setShowMoreMenu(false) } },
+            { icon: <Share2 size={16} />, label: 'Share', action: () => { setShowShare(true); setShowMoreMenu(false) } },
           ].map((item, i) => (
             <button
               key={i}
@@ -300,6 +302,7 @@ export function MobileLayout({ showSplash }: { showSplash: boolean }) {
       {searchOpen && <SearchOverlay />}
       {showSnapshots && <SnapshotTimeline onClose={() => setShowSnapshots(false)} />}
       {showWorkspaces && <WorkspaceManager onClose={() => setShowWorkspaces(false)} />}
+      {showShare && <ShareModal onClose={() => setShowShare(false)} />}
     </div>
   )
 }
