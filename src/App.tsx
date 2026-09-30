@@ -19,6 +19,7 @@ import { ColorPicker } from '@/components/ColorPicker'
 import { SnapshotTimeline } from '@/components/SnapshotTimeline'
 import { WorkspaceManager } from '@/components/WorkspaceManager'
 import { ChromeImport } from '@/components/ChromeImport'
+import { KeyboardShortcuts } from '@/components/KeyboardShortcuts'
 import { PresenceBar, RemoteCursors } from '@/components/Presence'
 import { joinBoard, getShareByToken, broadcastCursor, broadcastSelection, broadcastMutation, type PresenceUser, type ShareRole, type CollaborationState } from '@/lib/collaboration'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -138,6 +139,7 @@ export default function App() {
   const [snapshotTimelineOpen, setSnapshotTimelineOpen] = useState(false)
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false)
   const [chromeImportOpen, setChromeImportOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   // Collaboration state
   const [collab, setCollab] = useState<CollaborationState>({
@@ -247,6 +249,22 @@ export default function App() {
   const handleSnapshotTimeline = useCallback(() => setSnapshotTimelineOpen(true), [])
   const handleWorkspaceManager = useCallback(() => setWorkspaceManagerOpen(true), [])
   const handleChromeImport = useCallback(() => setChromeImportOpen(true), [])
+  // Keyboard shortcut for help overlay
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't trigger when typing in inputs
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      
+      if (e.key === '?') {
+        e.preventDefault()
+        setShortcutsOpen(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   const handleGoHome = useCallback(() => setPhase('start'), [])
 
   const canEdit = isEmbed ? !EMBED_READONLY : (collab.role === 'editor' || !collab.shareToken)
@@ -396,6 +414,7 @@ export default function App() {
         {snapshotTimelineOpen && <SnapshotTimeline onClose={() => setSnapshotTimelineOpen(false)} />}
         {workspaceManagerOpen && <WorkspaceManager onClose={() => setWorkspaceManagerOpen(false)} />}
         {chromeImportOpen && <ChromeImport onClose={() => setChromeImportOpen(false)} />}
+        {shortcutsOpen && <KeyboardShortcuts onClose={() => setShortcutsOpen(false)} />}
       </div>
     </>
   )
