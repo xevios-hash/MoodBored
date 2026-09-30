@@ -58,67 +58,69 @@ npx tauri build
 
 ## Features
 
-### New Features (Spatial Browser Workspace)
+### Annotations & Drawing
+- **Annotate websites** — draw on web pages with text, arrows, boxes, circles, highlights
+- **Hold Alt + draw** — annotate without blocking website interaction
+- **Free-floating annotations** — text and shapes on the canvas background
+- **Color picker** — 9 colors, adjustable stroke width
+- **Persistent annotations** — saved with your board
+
+### Spatial Browser Workspace
 
 #### Browser Engine Layer
-- **Live web pages on canvas** — each node can host a real embedded browser view via iframes (Tauri WebContentsView on desktop)
+- **Live web pages on canvas** — each node hosts an embedded browser view
 - **Tab lifecycle** — create, focus, navigate, reload, close web nodes
-- **Session persistence** — cookies and login sessions persist per node
-- **Fullscreen focus** — double-click a web node to focus it fullscreen; press Esc or click the back control to return to board view
-- **Pan and zoom** — nodes stay positioned and interactive while panning/zooming the board
+- **Fullscreen focus** — double-click to focus; Esc to return to board
+- **Interactive websites** — hover over cards to click, scroll, type
+- **Resizable cards** — drag edges/corners to resize web cards
 
 #### Spatial Tab Management
 - **Board IS the tab manager** — no native tab strip; nodes are tabs
-- **Typed connections** — draw lines between nodes to represent citations, dependencies, contradictions, or "related to" links
-- **Connection types** — citation, dependency, contradiction, related, MCP, API, custom
-- **Visual edge types** — MCP and REST API connections render as distinct edge types on the board
+- **Typed connections** — draw lines between nodes (citation, dependency, contradiction, related)
+- **Drag cards** — grab the URL bar to move cards around
 
 #### Blank-Card-First, Multimodal Creation
-- **Double-click empty canvas** — creates a blank card (not a note)
-- **Type-to-act** — on an empty card: URL loads the site, search query runs a search, sentence becomes a note
-- **Drag-and-drop** — text, images, files, and URLs materialize cards of the inferred type
-- **Card morphing** — a search result promotes to a full site card on click-through; a note can absorb a dropped link
+- **Double-click empty canvas** — creates a blank card with centered input
+- **Type-to-act** — URL loads site, question runs search, text becomes note
+- **Card morphing** — text determines card type automatically
 
 #### Forward/Back and History
-- **Per-card browser history** — back/forward controls scoped to the focused card
-- **Board-level undo** — Cmd+Z for every meaningful action: node added, moved, connected, morphed, deleted
+- **Per-card browser history** — back/forward controls on each web card
+- **Board-level undo** — Cmd+Z for every action (add, move, connect, delete)
+- **Batch operations** — multi-delete with single undo
 
-#### Snapshots, Versioning, Forking
-- **Named snapshots** — save a checkpoint of the entire board state
-- **Fork from snapshot** — create a parallel copy for exploration
-- **Scrubbable timeline** — opt-in version UI with restore and fork actions
+#### Snapshots & Workspaces
+- **Named snapshots** — save checkpoints of board state
+- **Fork from snapshot** — create parallel copies for exploration
+- **Named workspaces** — save and restore complete boards
+- **Pin important workspaces** — keep frequent ones at top
 
-#### AI Co-Pilot on the Board
-- **AI can open nodes** — the model can open URLs as live web page cards
-- **AI can draw connections** — the model can create typed connections between items
-- **Summarize across cards** — AI can summarize content across multiple cards
-- **Shared visual context** — the model sees node contents and connections, not just chat text
+#### AI Co-Pilot
+- **AI opens URLs** — model creates web cards from links
+- **AI draws connections** — typed connections between items
+- **AI adds items** — natural language to board items
+- **Shared visual context** — model sees node contents and connections
 
 #### Import from Chrome
-- **One-click import** — every open Chrome tab becomes a node on a fresh board
-- **Domain grouping** — tabs are laid out by domain for instant organization
-- **Chrome DevTools Protocol** — connects to Chrome's debugging port for tab access
+- **One-click import** — Chrome tabs become nodes on the board
+- **Domain grouping** — tabs laid out by domain
 
-#### Data Layer
-- **Local graph store** — IndexedDB (browser) / SQLite (Tauri) for nodes, edges, positions, history, and snapshots
-- **Typed connections** — schema supports citation, dependency, contradiction, related, MCP, API, custom
-- **Multimodal card content** — web, note, search, image, AI, blank card types
-- **Version metadata** — snapshots and workspaces with full state preservation
-
-#### Pin and Restore Workspaces
-- **Named workspaces** — save a board as a named workspace/project
-- **Full restore** — reopening restores sites, notes, connections, and AI context exactly
-- **Pin important workspaces** — keep frequently used workspaces at the top
+### Enhanced Right-Click Menu
+- **Add items** — 10 types in grid layout
+- **Copy/Paste/Duplicate** with keyboard shortcuts
+- **Layer order** — Bring Front/Forward/Backward/Back
+- **Group Selected** — organize items into containers
+- **Lock Position** — prevent accidental moves
+- **Add Annotation** — switch to annotation mode
+- **Connect to...** — draw typed connections
+- **Export as PNG / Copy as JSON**
+- **Fit All to View** — zoom to fit all items
 
 ### Canvas
-- Infinite pan/zoom with smooth touch gestures (pinch-to-zoom on mobile)
+- Infinite pan/zoom with smooth gestures (Ctrl+scroll to zoom)
 - Lasso selection, alignment snapping, multi-select
-- Layers panel, minimap, right-click context menu (all 11 item types)
-- Double-click to create notes, click to expand/collapse
-- Image URL prompts when adding via toolbar
-- Link creation prompts for URL input
+- Viewport culling for performance (handles 500+ items)
 - Video/YouTube background support
-- Eyedropper color picker (Chrome/Edge)
 
 ### 12 Item Types
 | Kind | Description |
@@ -138,43 +140,49 @@ npx tauri build
 
 ### AI
 - LLM chat with tool-calling (OpenRouter) — structured function invocations
-- Image generation via OpenRouter
-- Multi-agent mode (6 specialist roles, toggled off by default)
-- Semantic search — find items by meaning, not just keywords
-- Related items — find items that complement a given item
-- Automatic board population from natural language
+- Image generation via server proxy (API keys stay server-side)
+- Multi-agent mode (6 specialist roles)
+- Semantic search — find items by meaning
+- Related items — find complementary items
 
 ### Content Creation
-- **Unsplash search** — built-in image browser with one-click add
-- **Color picker** — HSL sliders, harmony generators (complementary, analogous, triadic)
-- **Palette extraction** — extract dominant colors from canvas pixels
-- **Export for Creation** — 8 creation types (image, video, game, web, 3D, audio, document), 3 formats (Markdown, JSON, XML)
+- **Unsplash search** — built-in image browser (via server proxy)
+- **Color picker** — HSL sliders, harmony generators
+- **Export for Creation** — 8 creation types, 3 formats (Markdown, JSON, XML)
 
 ### MCP Server
 - 14 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`, `open_url`, `draw_connection`, `create_snapshot`, `list_snapshots`, `summarize_across`
 - Stdio transport (Claude Desktop, Cursor) + SSE transport (OpenCode, web IDEs)
 - `/.well-known/mcp.json` discovery endpoint
-- Connection info page at `/mcp`
 
 ### REST API
-Same tools as MCP, plain HTTP for any client:
 ```
 POST   /api/board/:id/items              — add items
 DELETE /api/board/:id/items              — remove items
-DELETE /api/board/:id/items/all          — clear board
 PATCH  /api/board/:id/items/:itemId      — update item
 GET    /api/board/:id/search?q=&tag=     — text search
 GET    /api/board/:id/semantic?q=        — semantic search
-GET    /api/board/:id/items/:id/related  — related items
-POST   /api/board/:id/arrange            — grid/stack/spiral layout
+POST   /api/board/:id/arrange            — layout arrangement
 GET    /api/board/:id/brief              — creative brief export
+POST   /api/ai/chat                      — AI chat (proxied)
+POST   /api/ai/generate-image            — image generation (proxied)
+GET    /api/unsplash/search?q=           — image search (proxied)
 ```
 
 ### Collaboration
 - Share boards via links with view/edit roles
 - Real-time presence with cursor tracking
+- Real-time edit sync between collaborators
 - No sign-up required for viewers
-- Anonymous identity ("Blue Penguin" style names)
+
+### Security & Reliability
+- **Helmet** — security headers
+- **CORS** — restricted to known origins
+- **Rate limiting** — 100 req/15min API
+- **API keys server-side** — not in client bundle
+- **Atomic file writes** — no data corruption
+- **Error handling** — graceful failure recovery
+- **Request logging** — morgan HTTP logs
 
 ### Platform
 - Web (any browser)
@@ -182,45 +190,11 @@ GET    /api/board/:id/brief              — creative brief export
 - PWA (installable, works offline)
 - Railway deployment (Express server + MCP SSE)
 - Code splitting (vendor/store/UI chunks)
-
-## MCP & REST API
-
-### Claude Desktop / Cursor (stdio)
-
-```json
-{
-  "mcpServers": {
-    "moodbored": {
-      "command": "npx",
-      "args": ["tsx", "/path/to/MoodBored/mcp/mcp-server.ts"],
-      "env": { "MOODBORED_BOARD_ID": "your-board-id" }
-    }
-  }
-}
-```
-
-### OpenCode / Web IDEs (SSE)
-
-```
-https://your-domain.com/mcp/sse?board=your-board-id
-```
-
-### REST API
-
-```bash
-# Create a board
-curl -X POST https://your-domain.com/api/boards -H "Content-Type: application/json" -d '{"name":"My Board"}'
-
-# Add items
-curl -X POST https://your-domain.com/api/board/BOARD_ID/items \
-  -H "Content-Type: application/json" \
-  -d '[{"kind":"note","text":"Hello from curl!"},{"kind":"palette","label":"Colors","colors":[{"hex":"#FF6B35","label":"Orange"}]}]'
-
-# Semantic search
-curl "https://your-domain.com/api/board/BOARD_ID/semantic?q=warm+coastal+vibes"
-```
+- Compression (gzip/brotli)
 
 ## Keyboard Shortcuts
+
+Press `?` for in-app help.
 
 | Key | Action | Key | Action |
 |-----|--------|-----|--------|
@@ -229,11 +203,12 @@ curl "https://your-domain.com/api/board/BOARD_ID/semantic?q=warm+coastal+vibes"
 | `I` | New image | `F` | New font |
 | `L` | New link | `V` | New video |
 | `Ctrl+K` | Search | `Ctrl+Z` | Undo |
-| `Ctrl+A` | Select all | `Ctrl+Y` | Redo |
-| `Ctrl+C` | Copy | `+` / `-` | Zoom in/out |
+| `Ctrl+A` | Select all | `Ctrl+Shift+Z` | Redo |
+| `Ctrl+C` | Copy | `Ctrl+D` | Duplicate |
 | `Ctrl+V` | Paste | `0` | Reset zoom |
-| `Delete` | Delete selected | `Escape` | Cancel/deselect/unfocus |
+| `Delete` | Delete selected | `Escape` | Cancel/deselect |
 | Double-click | Create blank card | Right-click | Context menu |
+| `Alt+Drag` | Annotate | `?` | Show help |
 
 ## License
 
