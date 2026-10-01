@@ -47,7 +47,7 @@ describe('end-to-end: streamed response → board items', () => {
     // gate with unreachable transport → bypass-accept path used in offline runs
     const gate = await gateItems('', 
       actions.map((a: any) => ({ kind: a.item.kind, description: a.item.description ?? a.item.text ?? '' })),
-      'test-key', 0.2,
+      0.2,
       async () => ({ ok: false } as unknown as Response),
     )
     expect(gate.accepted).toBe(true)
@@ -77,11 +77,11 @@ describe('gate strength: should NOT reject borderline-good batches', () => {
 
   for (const [name, answers, shouldAccept] of cases) {
     it(`fit-only question, threshold 0.2: ${name} → ${shouldAccept ? 'accept' : 'reject'}`, async () => {
-      const res = await gateItems('BOARD', [{ kind: 'note', description: 'x' }], 'k', 0.2, mock(answers), 'fit-only')
+      const res = await gateItems('BOARD', [{ kind: 'note', description: 'x' }], 0.2, mock(answers), 'fit-only')
       expect(res.accepted).toBe(shouldAccept)
     })
     it(`fit+novelty sequence, threshold 0.2: ${name} → ${shouldAccept ? 'accept' : 'reject'}`, async () => {
-      const res = await gateItems('BOARD', [{ kind: 'note', description: 'x' }], 'k', 0.2, mock(answers), 'fit+novelty')
+      const res = await gateItems('BOARD', [{ kind: 'note', description: 'x' }], 0.2, mock(answers), 'fit+novelty')
       expect(res.accepted).toBe(shouldAccept)
     })
   }

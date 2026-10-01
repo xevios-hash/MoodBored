@@ -108,7 +108,7 @@ const scenarioOffTheme: Proposal[] = [
 
 async function scoreScenario(seq: QuestionSequence, proposals: Proposal[], threshold: number) {
   const res = await gateItems(
-    boardDesc, proposals, 'test-key', threshold,
+    boardDesc, proposals, threshold,
     mockTransport((state, q) => heurJev(state, q)),
     seq,
   )
@@ -166,8 +166,8 @@ describe('gateItems transport contract', () => {
   it('sends the state and questions to the Decisions API', async () => {
     const seen: { url: string; state: string | undefined; questionKeys: string[] | undefined }[] = []
     await gateItems(
-      'BOARD', [kind('note', 'waves')], 'test-key', 0.5,
-      async (url, init) => {
+      'BOARD', [kind('note', 'waves')], 0.5,
+      async (url: string, init: RequestInit) => {
         const body = JSON.parse(init.body as string)
         seen.push({ url, state: body.state, questionKeys: Object.keys(body.questions) })
         return { ok: false } as unknown as Response
@@ -182,7 +182,7 @@ describe('gateItems transport contract', () => {
 
   it('bypasses the gate when Jev is unavailable', async () => {
     const res = await gateItems(
-      'BOARD', [kind('note', 'waves')], 'test-key', 0.99,
+      'BOARD', [kind('note', 'waves')], 0.99,
       async () => ({ ok: false } as unknown as Response),
       'fit+novelty',
     )
@@ -192,7 +192,7 @@ describe('gateItems transport contract', () => {
 
   it('bypasses when Jev answers none of the asked questions', async () => {
     const res = await gateItems(
-      'BOARD', [kind('note', 'waves')], 'test-key', 0.99,
+      'BOARD', [kind('note', 'waves')], 0.99,
       mockTransport(() => ({})),
       'fit+novelty',
     )

@@ -59,10 +59,6 @@ export function ChatPanel() {
   const handleSend = async () => {
     const text = input.trim()
     if (!text || isStreaming) return
-    if (!settings.apiKey) {
-      addMessage({ id: uuid(), role: 'system', content: 'Please set your OpenRouter API key in Settings first.', timestamp: new Date().toISOString() })
-      return
-    }
 
     addMessage({ id: uuid(), role: 'user', content: text, timestamp: new Date().toISOString() })
     setInput('')
@@ -122,7 +118,7 @@ export function ChatPanel() {
       if (useToolCalling) {
         // ─── Tool-calling mode ──────────────────────────────────────
         await streamChatWithTools(
-          apiMessages as any, settings.apiKey, settings.defaultModel, BOARD_TOOLS,
+          apiMessages as any, settings.defaultModel, BOARD_TOOLS,
           (chunk) => {
             agentDiagnostics.chunksSeen++
             fullResponse += chunk
@@ -164,7 +160,7 @@ export function ChatPanel() {
                   } else if (action.type === 'generate_image') {
                     results.push({ tool_call_id: group.toolCallId, content: 'Generating image...' })
                     const imgPrompt = action.prompt || 'A beautiful image'
-                    generateImage(imgPrompt, settings.apiKey).then((url) => {
+                    generateImage(imgPrompt).then((url) => {
                       if (url) {
                         useStore.getState().addItem({
                           kind: 'image', id: crypto.randomUUID(),
@@ -239,7 +235,7 @@ export function ChatPanel() {
       } else {
         // ─── Regex-parsed mode (legacy fallback) ────────────────────
         await streamChat(
-          apiMessages, settings.apiKey, settings.defaultModel,
+          apiMessages, settings.defaultModel,
           (chunk) => {
             agentDiagnostics.chunksSeen++
             fullResponse += chunk
@@ -355,11 +351,6 @@ export function ChatPanel() {
       </div>
 
       <div className="p-3 border-t border-surface-4">
-        {!settings.apiKey && (
-          <div className="mb-2 px-3 py-1.5 rounded-md text-xs cursor-pointer" onClick={toggleSettings} style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
-            Add API key in Settings to use AI
-          </div>
-        )}
         <div className="flex gap-2">
           <textarea
             value={input}

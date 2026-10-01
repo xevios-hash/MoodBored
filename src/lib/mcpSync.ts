@@ -16,6 +16,14 @@ function getApiBase() {
   return typeof window !== 'undefined' ? window.location.origin : ''
 }
 
+// Get auth headers for board API mutations
+function getAuthHeaders(): Record<string, string> {
+  // In production, the token is configured server-side
+  // For local dev without token, no auth needed
+  const token = typeof window !== 'undefined' ? (window as any).__MOODBORED_API_TOKEN__ || '' : ''
+  return token ? { 'Authorization': `Bearer ${token}` } : {}
+}
+
 async function detectSyncMode() {
   // Try Tauri first
   try {
@@ -59,7 +67,10 @@ function syncToFile() {
           : `${getApiBase()}/api/board`
         await fetch(url, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+          },
           body: payload,
         })
       }

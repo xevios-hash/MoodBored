@@ -179,7 +179,8 @@ GET    /api/unsplash/search?q=           — image search (proxied)
 - **Helmet** — security headers
 - **CORS** — restricted to known origins
 - **Rate limiting** — 100 req/15min API
-- **API keys server-side** — not in client bundle
+- **API keys server-side** — OpenRouter/Unsplash keys configured via `OPENROUTER_API_KEY` and `UNSPLASH_ACCESS_KEY` env vars, never sent to browser
+- **Board API auth** — `BOARD_API_TOKEN` required for mutating endpoints (POST/PUT/DELETE)
 - **Atomic file writes** — no data corruption
 - **Error handling** — graceful failure recovery
 - **Request logging** — morgan HTTP logs
