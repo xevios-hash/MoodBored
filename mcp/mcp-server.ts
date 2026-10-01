@@ -56,10 +56,40 @@ function readState(): any {
   }
 }
 
+// Simple per-board mutex to prevent concurrent write corruption
+const boardLocks = new Map<string, Promise<void>>()
+
+async function acquireLock(boardId: string): Promise<() => void> {
+  const prev = boardLocks.get(boardId) || Promise.resolve()
+  let release: () => void
+  const next = new Promise<void>(resolve => { release = resolve })
+  boardLocks.set(boardId, prev.then(() => next))
+  await prev
+  return release!
+}
+
+async function writeStateLocked(state: any) {
+  const release = await acquireLock('main')
+  try {
+    ensureDir()
+    state.lastModified = new Date().toISOString()
+    // Atomic write: temp file then rename
+    const tmpPath = STATE_PATH + '.tmp'
+    writeFileSync(tmpPath, JSON.stringify(state, null, 2))
+    const { renameSync, existsSync: exists, unlinkSync } = await import('fs')
+    if (exists(STATE_PATH)) {
+      try { renameSync(STATE_PATH, STATE_PATH + '.backup') } catch {}
+    }
+    renameSync(tmpPath, STATE_PATH)
+  } finally {
+    release()
+  }
+}
+
 function writeState(state: any) {
-  ensureDir()
-  state.lastModified = new Date().toISOString()
-  writeFileSync(STATE_PATH, JSON.stringify(state, null, 2))
+  writeStateLocked(state).catch(err => {
+    console.error('[MCP] writeState failed:', err.message)
+  })
 }
 
 function getActiveViewport(state: any): any {

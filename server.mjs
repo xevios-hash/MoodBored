@@ -98,32 +98,42 @@ async function supabaseRequest(method, path, body) {
   if (body) opts.body = JSON.stringify(body)
   try {
     const res = await fetch(url, opts)
-    if (!res.ok) return null
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      console.error(`[MoodBored] Supabase ${method} ${path} failed: ${res.status} ${res.statusText} — ${text}`)
+      return null
+    }
     return await res.json().catch(() => null)
-  } catch { return null }
+  } catch (err) {
+    console.error(`[MoodBored] Supabase ${method} ${path} error:`, err.message)
+    return null
+  }
 }
 
 async function syncToSupabase(id, state) {
   if (!supabaseHeaders) return
   const project = state.project
   if (!project) return
-  await supabaseRequest('POST', 'boards', {
+  const payload = {
     id,
     name: project.name || id,
     data: state,
     updated_at: new Date().toISOString(),
-  }).catch(() => {})
+  }
   // Upsert — Supabase will insert or update based on id conflict
-  await fetch(`${SUPABASE_URL}/rest/v1/boards`, {
-    method: 'POST',
-    headers: { ...supabaseHeaders, Prefer: 'resolution=merge-duplicates' },
-    body: JSON.stringify({
-      id,
-      name: project.name || id,
-      data: state,
-      updated_at: new Date().toISOString(),
-    }),
-  }).catch(() => {})
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/boards`, {
+      method: 'POST',
+      headers: { ...supabaseHeaders, Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      console.error(`[MoodBored] Supabase sync failed for board ${id}: ${res.status} ${res.statusText} — ${text}`)
+    }
+  } catch (err) {
+    console.error(`[MoodBored] Supabase sync error for board ${id}:`, err.message)
+  }
 }
 
 async function loadFromSupabase() {
@@ -251,6 +261,33 @@ const authLimiter = rateLimit({
 })
 
 app.use(express.json({ limit: '10mb' }))
+
+// Board API authentication — require Bearer token for mutating operations
+const BOARD_API_TOKEN = process.env.BOARD_API_TOKEN || ''
+function requireBoardAuth(req, res, next) {
+  // If no token configured, allow all (local development)
+  if (!BOARD_API_TOKEN) return next()
+  
+  // Only check auth for mutating methods on board endpoints
+  const method = req.method
+  const isMutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)
+  const isBoardEndpoint = req.path.startsWith('/api/board') || req.path.startsWith('/api/boards')
+  
+  // Skip auth for health checks and SSE subscriptions
+  const isPublic = req.path === '/api/board/health' || 
+                   req.path.endsWith('/events') ||
+                   (method === 'GET' && req.path.startsWith('/api/board'))
+  
+  if (!isMutating || !isBoardEndpoint || isPublic) return next()
+  
+  const authHeader = req.headers.authorization
+  if (!authHeader || authHeader !== `Bearer ${BOARD_API_TOKEN}`) {
+    return res.status(401).json({ error: 'Authentication required' })
+  }
+  
+  next()
+}
+app.use('/api/', requireBoardAuth)
 
 // ─── Board API ──────────────────────────────────────────────────────
 

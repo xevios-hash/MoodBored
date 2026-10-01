@@ -5,7 +5,7 @@
 If you discover a security vulnerability in MoodBored, please report it responsibly:
 
 1. **Do NOT** create a public GitHub issue
-2. Email security concerns to: [security@example.com]
+2. Use [GitHub's private vulnerability reporting](https://github.com/xevios-hash/MoodBored/security/advisories/new)
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce

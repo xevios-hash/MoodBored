@@ -35,30 +35,9 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
         <div className="p-4 space-y-5 max-h-[60vh] overflow-y-auto">
           {!embed && (<>
           <Section title="API Configuration">
-            <div>
-              <label className="text-xs text-text-muted block mb-1">OpenRouter API Key</label>
-              <div className="relative">
-                <input
-                  type={showApiKey ? 'text' : 'password'}
-                  value={settings.apiKey}
-                  onChange={(e) => updateSettings({ apiKey: e.target.value })}
-                  placeholder="sk-or-..."
-                  className="input w-full pr-10"
-                  aria-label="OpenRouter API key"
-                />
-                <button
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-fast"
-                  aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
-                >
-                  {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              <p className="text-2xs text-text-muted mt-1">
-                Get your key at{' '}
-                <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-[#6a5aae] hover:underline">
-                  openrouter.ai/keys
-                </a>
+            <div className="p-3 rounded-lg border border-accent/15 bg-accent/5">
+              <p className="text-xs text-text-secondary">
+                AI features are powered by the server. The API key is configured server-side and never exposed to the browser.
               </p>
             </div>
             <Field
@@ -132,8 +111,8 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                 MoodBored exposes an MCP server that lets other LLMs read and write to your board.
                 Add the config below to Claude Desktop or any MCP client to connect.
               </p>
-              <p className="text-2xs text-text-muted mb-1">Board state is synced to:</p>
-              <code className="text-2xs bg-surface-0 rounded p-1 block mb-2 text-text-secondary break-all">~/Library/Application Support/MoodBored/board.json</code>
+              <p className="text-2xs text-text-muted mb-1">Board state is stored in:</p>
+              <code className="text-2xs bg-surface-0 rounded p-1 block mb-2 text-text-secondary break-all">~/.moodbored/boards/</code>
               <p className="text-2xs text-text-muted mb-1">MCP server location:</p>
               <code className="text-2xs bg-surface-0 rounded p-1 block mb-2 text-text-secondary break-all">mcp/mcp-server.ts (in your MoodBored project folder)</code>
               <button

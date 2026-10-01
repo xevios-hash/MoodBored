@@ -9,7 +9,6 @@ const OPENROUTER_URL = '/api/ai/chat'  // Proxied through server to keep API key
 
 export async function streamChat(
   messages: { role: string; content: string }[],
-  apiKey: string,
   model: string,
   onChunk: (text: string) => void,
   onDone: () => void,
@@ -20,10 +19,7 @@ export async function streamChat(
     const res = await fetch(OPENROUTER_URL, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://moodbored.app',
-        'X-Title': 'MoodBored',
       },
       body: JSON.stringify({
         model,
@@ -92,7 +88,6 @@ export interface ToolResult {
 
 export async function streamChatWithTools(
   messages: { role: string; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string }[],
-  apiKey: string,
   model: string,
   tools: any[],
   onChunk: (text: string) => void,
@@ -126,10 +121,7 @@ export async function streamChatWithTools(
       const res = await fetch(OPENROUTER_URL, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://moodbored.app',
-          'X-Title': 'MoodBored',
         },
         body: JSON.stringify(body),
         signal,
@@ -231,7 +223,6 @@ export async function streamChatWithTools(
 
 export async function generateImage(
   prompt: string,
-  apiKey: string,
 ): Promise<string | null> {
   try {
     const res = await fetch('/api/ai/generate-image', {
@@ -275,7 +266,6 @@ export type JevQuestions = Record<string, {
 export async function callJev(
   state: string,
   questions: JevQuestions,
-  apiKey: string,
   transport: (url: string, init: RequestInit) => Promise<Response> = fetch,
 ): Promise<Record<string, { score?: number; choice?: string; noul?: number; confidence?: number }> | null> {
   if (jevCallCount >= JEV_MAX_CALLS_PER_SESSION) return null
@@ -285,10 +275,7 @@ export async function callJev(
     const res = await transport('https://openrouter.ai/api/alpha/decisions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://moodbored.app',
-        'X-Title': 'MoodBored',
       },
       body: JSON.stringify({
         model: 'typesafe/jev-1.13',
@@ -364,7 +351,6 @@ const SEQUENCE_WEIGHTS: Record<QuestionSequence, Record<string, number>> = {
 export async function gateItems(
   boardDescription: string,
   proposed: Proposal[],
-  apiKey: string,
   threshold: number,
   transport: (url: string, init: RequestInit) => Promise<Response> = fetch,
   sequence: QuestionSequence = 'fit+novelty',
@@ -372,7 +358,7 @@ export async function gateItems(
   const proposedDesc = proposed.map((i) => `- ${i.kind}: ${i.description}`).join('\n')
   const state = `Current mood board:\n${boardDescription}\n\nProposed additions:\n${proposedDesc}`
 
-  const answers = await callJev(state, buildJevQuestions(proposed, sequence), apiKey, transport)
+  const answers = await callJev(state, buildJevQuestions(proposed, sequence), transport)
 
   if (!answers) {
     return { score: 0.5, reasoning: 'Jev unavailable (session limit or API error) — gate bypassed', accepted: true }

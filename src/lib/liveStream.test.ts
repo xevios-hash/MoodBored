@@ -4,7 +4,6 @@ import { describe, it, expect } from 'vitest'
 import { streamChat, buildSystemPrompt, parseAgentActions, resetAgentDiagnostics, agentDiagnostics } from './api'
 import { useStore } from '@/stores/useStore'
 
-const API_KEY = process.env.MOODBORED_TEST_KEY || ''
 const MODEL = 'anthropic/claude-sonnet-4'
 
 describe.skipIf(!process.env.MOODBORED_LIVE)('live streaming agent round-trip (ChatPanel replica)', () => {
@@ -15,9 +14,9 @@ describe.skipIf(!process.env.MOODBORED_LIVE)('live streaming agent round-trip (C
     let streamError: string | null = null
     await streamChat(
       [{ role: 'system', content: system }, { role: 'user', content: 'populate the board with coastal beach sunset items' }],
-      API_KEY, MODEL,
-      (chunk) => { full += chunk },
-      () => {}, (err) => { streamError = err },
+      MODEL,
+      (chunk: string) => { full += chunk },
+      () => {}, (err: string) => { streamError = err },
     )
     const actions = parseAgentActions(full)
     expect(streamError).toBeNull()
