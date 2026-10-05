@@ -367,3 +367,83 @@ describe('Accessibility', () => {
     expect(typeof a11y.prefersReducedMotion).toBe('function')
   })
 })
+
+describe('Project Templates', () => {
+  it('has templates for all grade levels', async () => {
+    const { PROJECT_TEMPLATES, getTemplatesByGrade } = await import('./projectTemplates')
+    
+    expect(PROJECT_TEMPLATES.length).toBeGreaterThan(0)
+    
+    const k2 = getTemplatesByGrade('K-2')
+    const g35 = getTemplatesByGrade('3-5')
+    const g68 = getTemplatesByGrade('6-8')
+    const g912 = getTemplatesByGrade('9-12')
+    
+    expect(k2.length).toBeGreaterThan(0)
+    expect(g35.length).toBeGreaterThan(0)
+    expect(g68.length).toBeGreaterThan(0)
+    expect(g912.length).toBeGreaterThan(0)
+  })
+
+  it('creates project slide from template', async () => {
+    const { PROJECT_TEMPLATES, createProjectFromTemplate } = await import('./projectTemplates')
+    
+    const template = PROJECT_TEMPLATES[0]
+    const slide = createProjectFromTemplate(template, 0)
+    
+    expect(slide.type).toBe('project')
+    expect(slide.title).toBe(template.name)
+    expect(slide.project?.instructions).toBe(template.instructions)
+    expect(slide.project?.resources).toEqual(template.materials)
+  })
+
+  it('calculates rubric score correctly', async () => {
+    const { calculateRubricScore } = await import('./projectTemplates')
+    type RubricCriteria = import('./projectTemplates').RubricCriteria
+    
+    const rubric: RubricCriteria[] = [
+      {
+        id: 'c1',
+        name: 'Test',
+        description: 'Test criteria',
+        maxPoints: 10,
+        levels: [
+          { label: 'Excellent', points: 10, description: 'Great' },
+          { label: 'Good', points: 7, description: 'Good' },
+        ],
+      },
+    ]
+    
+    const result = calculateRubricScore(rubric, { c1: 8 })
+    expect(result.totalPoints).toBe(10)
+    expect(result.earnedPoints).toBe(8)
+    expect(result.percentage).toBe(80)
+    expect(result.grade).toBe('B')
+  })
+
+  it('generates rubric feedback', async () => {
+    const { generateRubricFeedback } = await import('./projectTemplates')
+    type RubricCriteria = import('./projectTemplates').RubricCriteria
+    
+    const rubric: RubricCriteria[] = [
+      {
+        id: 'c1',
+        name: 'Creativity',
+        description: 'How creative?',
+        maxPoints: 10,
+        levels: [
+          { label: 'Excellent', points: 10, description: 'Very creative' },
+          { label: 'Needs Work', points: 4, description: 'Basic' },
+        ],
+      },
+    ]
+    
+    const feedbackHigh = generateRubricFeedback(rubric, { c1: 10 })
+    const feedbackLow = generateRubricFeedback(rubric, { c1: 4 })
+    
+    expect(feedbackHigh.length).toBeGreaterThan(0)
+    expect(feedbackHigh[0]).toContain('Excellent')
+    expect(feedbackLow.length).toBeGreaterThan(0)
+    expect(feedbackLow[0]).toContain('Work on')
+  })
+})
