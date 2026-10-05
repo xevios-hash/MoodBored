@@ -65,6 +65,14 @@ interface AppState {
   closeWebNode: (id: string) => void
   updateWebNode: (id: string, updates: Partial<WebItem>) => void
 
+  // Education / Lesson Mode
+  lessonMode: boolean
+  currentLesson: any | null // Lesson type
+  lessonSlideIndex: number
+  enterLessonMode: (lesson: any) => void
+  exitLessonMode: () => void
+  setLessonSlide: (index: number) => void
+
   // Typed Connections
   typedConnections: TypedConnection[]
   addTypedConnection: (conn: TypedConnection) => void
@@ -263,6 +271,11 @@ export const useStore = create<AppState>()(
   // Browser / Spatial Tabs
   focusedWebNodeId: null,
   webNodes: new Map<string, WebItem>(),
+
+  // Education / Lesson Mode
+  lessonMode: false,
+  currentLesson: null,
+  lessonSlideIndex: 0,
 
   // Typed Connections
   typedConnections: [],
@@ -941,6 +954,11 @@ export const useStore = create<AppState>()(
 
   // Browser / Spatial Tab Actions
   focusWebNode: (id) => set({ focusedWebNodeId: id }),
+
+  // Education / Lesson Mode Actions
+  enterLessonMode: (lesson) => set({ lessonMode: true, currentLesson: lesson, lessonSlideIndex: 0 }),
+  exitLessonMode: () => set({ lessonMode: false, currentLesson: null, lessonSlideIndex: 0 }),
+  setLessonSlide: (index) => set({ lessonSlideIndex: index }),
 
   navigateWebNode: (id, url) =>
     set((s) => {
