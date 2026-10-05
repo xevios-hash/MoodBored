@@ -13,16 +13,20 @@ import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner
 
 const ITEM_TYPES = [
   { kind: 'note', icon: '📝', label: 'Note', key: 'N' },
-  { kind: 'text', icon: '📄', label: 'Text', key: 'T' },
   { kind: 'image', icon: '🖼️', label: 'Image', key: 'I' },
+  { kind: 'web', icon: '🌐', label: 'Website', key: 'W' },
   { kind: 'link', icon: '🔗', label: 'Link', key: 'L' },
+]
+
+const ADVANCED_ITEM_TYPES = [
+  { kind: 'text', icon: '📄', label: 'Text', key: 'T' },
+  { kind: 'video', icon: '🎬', label: 'Video', key: 'V' },
   { kind: 'palette', icon: '🎨', label: 'Palette', key: 'P' },
   { kind: 'gradient', icon: '🌈', label: 'Gradient', key: 'G' },
   { kind: 'font', icon: '🔤', label: 'Font', key: 'F' },
   { kind: 'swatch', icon: '🟧', label: 'Color', key: 'C' },
   { kind: 'sizeguide', icon: '📐', label: 'Size', key: null },
   { kind: 'container', icon: '📦', label: 'Group', key: null },
-  { kind: 'video', icon: '🎬', label: 'Video', key: 'V' },
 ]
 
 function createDefaultItem(kind: string, pos: Position): BoardItem {
@@ -462,13 +466,18 @@ export function Canvas() {
 
       // Empty state
       if (its.filter(i => i.kind !== 'connector').length === 0) {
-        ctx.fillStyle = txtSecondary()
-        ctx.font = `500 ${16 / c.zoom}px Inter, sans-serif`
+        ctx.fillStyle = txtPrimary()
+        ctx.font = `600 ${20 / c.zoom}px Inter, sans-serif`
         ctx.textAlign = 'center'
-        ctx.fillText('Drop files here or use the chat to add items', 0, 50 / c.zoom)
-        ctx.font = `${12 / c.zoom}px Inter, sans-serif`
+        ctx.fillText('Start building your board', 0, -20 / c.zoom)
+        
+        ctx.fillStyle = txtSecondary()
+        ctx.font = `${14 / c.zoom}px Inter, sans-serif`
+        ctx.fillText('Double-click anywhere to add your first card', 0, 15 / c.zoom)
+        
         ctx.fillStyle = txtMuted()
-        ctx.fillText('Two-finger scroll to pan · Option+scroll to zoom', 0, 80 / c.zoom)
+        ctx.font = `${12 / c.zoom}px Inter, sans-serif`
+        ctx.fillText('or drag & drop images and links here', 0, 40 / c.zoom)
         ctx.textAlign = 'start'
       }
 
@@ -1460,7 +1469,7 @@ export function Canvas() {
           onMouseLeave={() => setContextMenu(null)}
         >
           {/* Add item section */}
-          <div className="px-2 py-1 text-2xs font-semibold text-text-muted uppercase tracking-wider">Add Item</div>
+          <div className="px-2 py-1 text-2xs font-semibold text-text-muted uppercase tracking-wider">Add</div>
           <div className="grid grid-cols-2 gap-1 px-1">
             {ITEM_TYPES.map(({ kind, icon, label }) => (
               <CtxItem
@@ -1481,7 +1490,6 @@ export function Canvas() {
           {/* Canvas actions (always available) */}
           <CtxItem label="📋  Paste" shortcut="⌘V" onClick={() => handleContextAction('paste')} />
           <CtxItem label="🔍  Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
-          <CtxItem label="📐  Fit All to View" onClick={() => handleContextAction('fit-all')} />
 
           {contextMenu.itemId && (
             <>
