@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import type { Slide, BoardItem, WebItem, QuizQuestion, GradeLevel, SlideInteraction } from '@/types'
 import { NarrationEngine } from './NarrationEngine'
 import { getEducationTheme, a11y, ariaLabels } from './GradeSchoolTheme'
+import { ProjectSubmission, ProjectSubmissionData } from './ProjectSubmission'
 
 interface SlideRendererProps {
   slide: Slide
@@ -18,6 +19,7 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
   const [showResults, setShowResults] = useState(false)
   const [projectSubmitted, setProjectSubmitted] = useState(false)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [showProjectSubmission, setShowProjectSubmission] = useState(false)
   
   const theme = getEducationTheme(gradeLevel)
 
@@ -47,7 +49,12 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
   }, [slide.quiz, quizAnswers, onScoreUpdate])
 
   const handleProjectSubmit = useCallback(() => {
+    setShowProjectSubmission(true)
+  }, [])
+
+  const handleProjectSubmitted = useCallback((submission: ProjectSubmissionData) => {
     setProjectSubmitted(true)
+    setShowProjectSubmission(false)
     onComplete()
   }, [onComplete])
 
@@ -387,6 +394,16 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
            'Press → to continue'}
         </div>
       </div>
+
+      {/* Project Submission Modal */}
+      {showProjectSubmission && (
+        <ProjectSubmission
+          slide={slide}
+          gradeLevel={gradeLevel}
+          onSubmit={handleProjectSubmitted}
+          onClose={() => setShowProjectSubmission(false)}
+        />
+      )}
     </div>
   )
 }
