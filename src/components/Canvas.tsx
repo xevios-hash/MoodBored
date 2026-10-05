@@ -1229,6 +1229,7 @@ export function Canvas() {
       <div className="add-toolbar">
         {addToolbarOpen && (
           <div className="add-toolbar-items">
+            {/* Core items */}
             {ITEM_TYPES.map(({ kind, icon, label }) => (
               <button
                 key={kind}
@@ -1263,6 +1264,25 @@ export function Canvas() {
                   } else {
                     state.addItem(createDefaultItem(kind, { x: cx, y: cy }))
                   }
+                  setAddToolbarOpen(false)
+                }}
+              >
+                {icon}
+              </button>
+            ))}
+            {/* Divider */}
+            <div style={{ width: '100%', height: 1, background: 'var(--border-color)', margin: '4px 0' }} />
+            {/* Advanced items */}
+            {ADVANCED_ITEM_TYPES.map(({ kind, icon, label }) => (
+              <button
+                key={kind}
+                className="add-toolbar-item"
+                title={label}
+                onClick={() => {
+                  const state = useStore.getState()
+                  const cx = -state.canvas.panX / state.canvas.zoom + 400
+                  const cy = -state.canvas.panY / state.canvas.zoom + 300
+                  state.addItem(createDefaultItem(kind, { x: cx, y: cy }))
                   setAddToolbarOpen(false)
                 }}
               >
@@ -1484,6 +1504,26 @@ export function Canvas() {
               />
             ))}
           </div>
+          
+          <details className="px-1">
+            <summary className="px-2 py-1 text-2xs text-text-muted cursor-pointer hover:bg-surface-2 rounded">
+              More types →
+            </summary>
+            <div className="grid grid-cols-2 gap-1 px-1">
+              {ADVANCED_ITEM_TYPES.map(({ kind, icon, label }) => (
+                <CtxItem
+                  key={kind}
+                  label={`${icon}  ${label}`}
+                  onClick={() => {
+                    const state = useStore.getState()
+                    state.addItem(createDefaultItem(kind, { x: contextMenu.wx, y: contextMenu.wy }))
+                    setContextMenu(null)
+                  }}
+                  small
+                />
+              ))}
+            </div>
+          </details>
 
           <div className="status-divider" style={{ margin: '4px 0' }} />
 
