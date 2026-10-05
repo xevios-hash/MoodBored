@@ -21,6 +21,7 @@ import { WorkspaceManager } from '@/components/WorkspaceManager'
 import { ChromeImport } from '@/components/ChromeImport'
 import { KeyboardShortcuts } from '@/components/KeyboardShortcuts'
 import { LessonPlayer } from '@/components/education/LessonPlayer'
+import { LessonGenerator } from '@/components/education/LessonGenerator'
 import { PresenceBar, RemoteCursors } from '@/components/Presence'
 import { joinBoard, getShareByToken, broadcastCursor, broadcastSelection, broadcastMutation, type PresenceUser, type ShareRole, type CollaborationState } from '@/lib/collaboration'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -143,6 +144,7 @@ export default function App() {
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false)
   const [chromeImportOpen, setChromeImportOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [lessonGeneratorOpen, setLessonGeneratorOpen] = useState(false)
 
   // Collaboration state
   const [collab, setCollab] = useState<CollaborationState>({
@@ -271,11 +273,13 @@ export default function App() {
   const handleGoHome = useCallback(() => setPhase('start'), [])
   const handlePresent = useCallback(() => {
     // Convert current project to lesson and enter lesson mode
-    const { projectToLesson } = require('@/lib/lesson')
     const state = useStore.getState()
-    const lesson = projectToLesson(state.project)
-    state.enterLessonMode(lesson)
+    import('@/lib/lesson').then(({ projectToLesson }) => {
+      const lesson = projectToLesson(state.project)
+      state.enterLessonMode(lesson)
+    })
   }, [])
+  const handleCreateLesson = useCallback(() => setLessonGeneratorOpen(true), [])
 
   const canEdit = isEmbed ? !EMBED_READONLY : (collab.role === 'editor' || !collab.shareToken)
 
@@ -398,7 +402,7 @@ export default function App() {
           <Sidebar />
         </div>
         <main className="flex flex-col flex-1 min-w-0">
-          <TopBar onExportForCreation={handleExportForCreation} onUnsplashSearch={handleUnsplashSearch} onShare={handleShareOpen} onColorPicker={handleColorPickerOpen} onSnapshotTimeline={handleSnapshotTimeline} onWorkspaceManager={handleWorkspaceManager} onChromeImport={handleChromeImport} onGoHome={handleGoHome} onPresent={handlePresent} presenceBar={<PresenceBar users={remoteUsers} isConnected={collab.isConnected} />} />
+          <TopBar onExportForCreation={handleExportForCreation} onUnsplashSearch={handleUnsplashSearch} onShare={handleShareOpen} onColorPicker={handleColorPickerOpen} onSnapshotTimeline={handleSnapshotTimeline} onWorkspaceManager={handleWorkspaceManager} onChromeImport={handleChromeImport} onGoHome={handleGoHome} onPresent={handlePresent} onCreateLesson={handleCreateLesson} presenceBar={<PresenceBar users={remoteUsers} isConnected={collab.isConnected} />} />
           <div className="flex flex-1 min-h-0 relative">
             <Canvas />
             <RemoteCursors users={remoteUsers} canvasPanX={canvas.panX} canvasPanY={canvas.panY} canvasZoom={canvas.zoom} />
@@ -425,6 +429,9 @@ export default function App() {
         {workspaceManagerOpen && <WorkspaceManager onClose={() => setWorkspaceManagerOpen(false)} />}
         {chromeImportOpen && <ChromeImport onClose={() => setChromeImportOpen(false)} />}
         {shortcutsOpen && <KeyboardShortcuts onClose={() => setShortcutsOpen(false)} />}
+        {lessonGeneratorOpen && (
+          <LessonGenerator onClose={() => setLessonGeneratorOpen(false)} />
+        )}
         {lessonMode && currentLesson && (
           <LessonPlayer
             lesson={currentLesson}

@@ -4,7 +4,7 @@ import {
   Search, PanelLeft, MessageSquare, Settings, MoreVertical,
   Download, Upload, FileText, Camera, FolderOpen, Globe,
   ImageIcon, Share2, Palette, Sparkles, LayoutGrid, Keyboard,
-  Home, Play,
+  Home, Play, GraduationCap,
 } from 'lucide-react'
 
 interface Props {
@@ -17,10 +17,11 @@ interface Props {
   onChromeImport?: () => void
   onGoHome?: () => void
   onPresent?: () => void
+  onCreateLesson?: () => void
   presenceBar?: React.ReactNode
 }
 
-export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColorPicker, onSnapshotTimeline, onWorkspaceManager, onChromeImport, onGoHome, onPresent, presenceBar }: Props) {
+export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColorPicker, onSnapshotTimeline, onWorkspaceManager, onChromeImport, onGoHome, onPresent, onCreateLesson, presenceBar }: Props) {
   const project = useStore((s) => s.project)
   const [showMenu, setShowMenu] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -270,6 +271,9 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
 
               <div className="h-px my-1" style={{ background: 'var(--border-color)' }} />
 
+              <button onClick={() => { onCreateLesson?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <GraduationCap size={14} /> Create Lesson
+              </button>
               <button onClick={() => { onPresent?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Play size={14} /> Present
               </button>
