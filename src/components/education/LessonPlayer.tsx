@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Lesson, Slide, BoardItem, GradeLevel } from '@/types'
 import { SlideRenderer } from './SlideRenderer'
 import { NarrationEngine, useSpeech } from './NarrationEngine'
+import { ScoreTracker, useStudentProgress } from './ScoreTracker'
 
 interface LessonPlayerProps {
   lesson: Lesson
@@ -14,9 +15,11 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
   const [completedSlides, setCompletedSlides] = useState<Set<string>>(new Set())
   const [autoPlay, setAutoPlay] = useState(false)
   const [showThumbnails, setShowThumbnails] = useState(false)
+  const [showScore, setShowScore] = useState(false)
   const [zoomedImage, setZoomedImage] = useState<BoardItem | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const { speak, stop } = useSpeech()
+  const { progress: studentProgress, markSlideComplete, recordQuizScore } = useStudentProgress(lesson.id)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const slides = lesson.slides || []
@@ -52,6 +55,12 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
         case 't':
         case 'T':
           setShowThumbnails(!showThumbnails)
+          setShowScore(false)
+          break
+        case 's':
+        case 'S':
+          setShowScore(!showScore)
+          setShowThumbnails(false)
           break
       }
     }
@@ -168,8 +177,8 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
 
           {/* Thumbnails toggle */}
           <button
-            onClick={() => setShowThumbnails(!showThumbnails)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            onClick={() => { setShowThumbnails(!showThumbnails); setShowScore(false) }}
+            className={`p-2 rounded-lg transition-colors ${showThumbnails ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}
             title="Slide thumbnails (T)"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -177,6 +186,17 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
               <rect x="14" y="3" width="7" height="7" />
               <rect x="3" y="14" width="7" height="7" />
               <rect x="14" y="14" width="7" height="7" />
+            </svg>
+          </button>
+
+          {/* Score tracker toggle */}
+          <button
+            onClick={() => { setShowScore(!showScore); setShowThumbnails(false) }}
+            className={`p-2 rounded-lg transition-colors ${showScore ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}
+            title="Progress & Score (S)"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 20V10M12 20V4M6 20v-6" />
             </svg>
           </button>
 
@@ -201,6 +221,9 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
           onNavigate={handleNavigate}
           onComplete={handleSlideComplete}
           onZoomImage={handleZoomImage}
+          onScoreUpdate={(questionId, score) => {
+            recordQuizScore(questionId, score)
+          }}
         />
       </div>
 
@@ -276,6 +299,18 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Score tracker sidebar */}
+      {showScore && (
+        <div className="absolute right-0 top-[72px] bottom-[120px] w-80 bg-white border-l border-gray-200 shadow-lg overflow-y-auto">
+          <div className="p-4">
+            <ScoreTracker
+              lesson={lesson}
+              studentProgress={studentProgress}
+            />
           </div>
         </div>
       )}
