@@ -85,31 +85,52 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', zIndex: 1 }} />
 
         <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 700, color: '#1a1028', marginBottom: 8 }}>
-          Choose a Template
+        <h2 style={{ fontSize: 28, fontWeight: 700, color: '#1a1028', marginBottom: 8 }}>
+          Start Creating
         </h2>
-        <p style={{ fontSize: 14, color: '#8a7aaa', marginBottom: 32 }}>
-          Start with a pre-built board or go blank
+        <p style={{ fontSize: 15, color: '#5a5070', marginBottom: 32 }}>
+          Collect ideas, save websites, and organize your thoughts
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, maxWidth: 800, width: '100%', marginBottom: 32 }}>
-          {TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setSelectedTemplate(t.id)}
-              style={{
-                background: selectedTemplate === t.id ? 'var(--accent-muted)' : '#ffffff',
-                border: selectedTemplate === t.id ? '2px solid #8b7dc8' : '2px solid #e5e7eb',
-                borderRadius: 12, padding: 20, cursor: 'pointer', textAlign: 'left',
-                transition: 'all 150ms ease',
-              }}
-            >
-              <div style={{ fontSize: 32, marginBottom: 8 }}>{t.icon}</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1028', marginBottom: 4 }}>{t.name}</div>
-              <div style={{ fontSize: 12, color: '#8a7aaa' }}>{t.description}</div>
-            </button>
-          ))}
-        </div>
+        {/* Primary action - big obvious button */}
+        <button
+          onClick={() => { setSelectedTemplate('blank'); setProjectName('My Board'); setTimeout(() => handleNewProject(), 10) }}
+          style={{
+            background: '#6a5aae', color: 'white', border: 'none', borderRadius: 16,
+            padding: '18px 48px', fontSize: 18, fontWeight: 600, cursor: 'pointer',
+            marginBottom: 24, boxShadow: '0 4px 20px rgba(106,90,174,0.3)',
+            transition: 'transform 150ms, box-shadow 150ms',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = '0 6px 28px rgba(106,90,174,0.4)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(106,90,174,0.3)' }}
+        >
+          New Board
+        </button>
+
+        {/* Secondary - templates collapsed */}
+        <details style={{ marginBottom: 32, textAlign: 'center' }}>
+          <summary style={{ fontSize: 13, color: '#8a7aaa', cursor: 'pointer', padding: '8px 16px' }}>
+            Or start from a template →
+          </summary>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, maxWidth: 600, width: '100%', marginTop: 16 }}>
+            {TEMPLATES.filter(t => t.id !== 'blank').map((t) => (
+              <button
+                key={t.id}
+                onClick={() => { setSelectedTemplate(t.id); setProjectName('My Board'); setTimeout(() => handleNewProject(), 10) }}
+                style={{
+                  background: '#ffffff', border: '1px solid #e5e7eb',
+                  borderRadius: 10, padding: 14, cursor: 'pointer', textAlign: 'left',
+                  transition: 'all 150ms ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8b7dc8' }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb' }}
+              >
+                <div style={{ fontSize: 22, marginBottom: 6 }}>{t.icon}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1028' }}>{t.name}</div>
+              </button>
+            ))}
+          </div>
+        </details>
 
         {selectedTemplate && (
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 24 }}>

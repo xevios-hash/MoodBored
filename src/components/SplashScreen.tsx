@@ -7,9 +7,19 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
   const isDark = theme === 'dark'
 
   useEffect(() => {
-    const timer = setTimeout(() => setFadeOut(true), 3000)
-    const done = setTimeout(() => onComplete(), 3800)
-    return () => { clearTimeout(timer); clearTimeout(done) }
+    const timer = setTimeout(() => setFadeOut(true), 800)
+    const done = setTimeout(() => onComplete(), 1200)
+    
+    // Allow skipping with click/key
+    const skip = () => { setFadeOut(true); setTimeout(onComplete, 100) }
+    window.addEventListener('click', skip)
+    window.addEventListener('keydown', skip)
+    
+    return () => {
+      clearTimeout(timer); clearTimeout(done)
+      window.removeEventListener('click', skip)
+      window.removeEventListener('keydown', skip)
+    }
   }, [onComplete])
 
   const videoSrc = '/sky-day.mp4'  // sky-night.mp4 doesn't exist

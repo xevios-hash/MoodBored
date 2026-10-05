@@ -211,48 +211,32 @@ export function WebNode({ item, canvasZoom, canvasPanX, canvasPanY, isSelected, 
         )}
         {(loadError || isBlocked) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 z-10 gap-3 p-4">
-            <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-600">
+            <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6a5aae" strokeWidth="1.5">
                 <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
               </svg>
             </div>
             <div className="text-center">
-              <div className="text-sm font-semibold text-gray-900">
-                {isBlocked ? "Can't embed this site" : 'Failed to load'}
-              </div>
-              <div className="text-xs text-gray-600 mt-1 max-w-[250px]">
-                {isBlocked
-                  ? `${getDomain(item.url) || 'This site'} blocks embedding for security reasons.`
-                  : 'Something went wrong loading this page.'}
+              <div className="text-sm font-semibold text-gray-800">{getDomain(item.url) || 'Website'}</div>
+              <div className="text-xs text-gray-500 mt-1">
+                Open in your browser to view this site
               </div>
             </div>
-            <div className="flex gap-2">
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-medium hover:bg-purple-700"
-                onClick={(e) => e.stopPropagation()}
-              >
-                Open in tab <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-              </a>
-              {!isBlocked && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleReload() }}
-                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Retry
-                </button>
-              )}
-              <button
-                onClick={(e) => { e.stopPropagation(); handleClose() }}
-                className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Close
-              </button>
-            </div>
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Open in Browser
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+            </a>
           </div>
         )}
         {!isBlocked && (
