@@ -3,6 +3,8 @@ import type { Lesson, Slide, BoardItem, GradeLevel } from '@/types'
 import { SlideRenderer } from './SlideRenderer'
 import { NarrationEngine, useSpeech } from './NarrationEngine'
 import { ScoreTracker, useStudentProgress } from './ScoreTracker'
+import { FreeExploration } from './FreeExploration'
+import { PathEditor } from './PathEditor'
 
 interface LessonPlayerProps {
   lesson: Lesson
@@ -16,6 +18,8 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
   const [autoPlay, setAutoPlay] = useState(false)
   const [showThumbnails, setShowThumbnails] = useState(false)
   const [showScore, setShowScore] = useState(false)
+  const [showExploration, setShowExploration] = useState(false)
+  const [showPathEditor, setShowPathEditor] = useState(false)
   const [zoomedImage, setZoomedImage] = useState<BoardItem | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const { speak, stop } = useSpeech()
@@ -61,6 +65,14 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
         case 'S':
           setShowScore(!showScore)
           setShowThumbnails(false)
+          break
+        case 'e':
+        case 'E':
+          setShowExploration(true)
+          break
+        case 'p':
+        case 'P':
+          setShowPathEditor(true)
           break
       }
     }
@@ -189,6 +201,33 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
             </svg>
           </button>
 
+          {/* Free Exploration toggle */}
+          <button
+            onClick={() => setShowExploration(true)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            title="Free Exploration (E)"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+          </button>
+
+          {/* Path Editor toggle */}
+          <button
+            onClick={() => setShowPathEditor(true)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            title="Edit Paths (P)"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+          </button>
+
           {/* Score tracker toggle */}
           <button
             onClick={() => { setShowScore(!showScore); setShowThumbnails(false) }}
@@ -313,6 +352,24 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
             />
           </div>
         </div>
+      )}
+
+      {/* Free Exploration mode */}
+      {showExploration && (
+        <FreeExploration
+          lesson={lesson}
+          onClose={() => setShowExploration(false)}
+          onScoreUpdate={(questionId, score) => recordQuizScore(questionId, score)}
+        />
+      )}
+
+      {/* Path Editor */}
+      {showPathEditor && (
+        <PathEditor
+          lesson={lesson}
+          onUpdateLesson={() => {}}
+          onClose={() => setShowPathEditor(false)}
+        />
       )}
 
       {/* Zoomed image modal */}
