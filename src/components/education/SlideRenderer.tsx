@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react'
-import type { Slide, BoardItem, WebItem, QuizQuestion, GradeLevel } from '@/types'
+import { useState, useCallback } from 'react'
+import type { Slide, BoardItem, WebItem, QuizQuestion, GradeLevel, SlideInteraction } from '@/types'
 import { NarrationEngine } from './NarrationEngine'
 
 interface SlideRendererProps {
@@ -8,28 +8,49 @@ interface SlideRendererProps {
   onNavigate: (slideId: string) => void
   onComplete: () => void
   onZoomImage: (item: BoardItem) => void
+  onScoreUpdate?: (questionId: string, score: number) => void
 }
 
-export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoomImage }: SlideRendererProps) {
+export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoomImage, onScoreUpdate }: SlideRendererProps) {
   const [revealedItems, setRevealedItems] = useState<Set<string>>(new Set())
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string | number>>({})
   const [showResults, setShowResults] = useState(false)
+  const [projectSubmitted, setProjectSubmitted] = useState(false)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
 
   // Grade-level styling
   const fontSize = gradeLevel === 'K-2' ? 'text-lg' : gradeLevel === '3-5' ? 'text-base' : 'text-sm'
   const headerSize = gradeLevel === 'K-2' ? 'text-2xl' : gradeLevel === '3-5' ? 'text-xl' : 'text-lg'
+  const buttonSize = gradeLevel === 'K-2' ? 'px-8 py-5 text-lg' : gradeLevel === '3-5' ? 'px-6 py-4 text-base' : 'px-4 py-3 text-sm'
 
-  const handleReveal = (itemId: string) => {
+  const handleReveal = useCallback((itemId: string) => {
     setRevealedItems(prev => new Set([...prev, itemId]))
-  }
+  }, [])
 
-  const handleQuizAnswer = (questionId: string, answer: string | number) => {
+  const handleQuizAnswer = useCallback((questionId: string, answer: string | number) => {
     setQuizAnswers(prev => ({ ...prev, [questionId]: answer }))
-  }
+  }, [])
 
-  const handleCheckQuiz = () => {
+  const handleCheckQuiz = useCallback(() => {
     setShowResults(true)
-  }
+    // Calculate and report scores
+    if (slide.quiz && onScoreUpdate) {
+      slide.quiz.forEach(q => {
+        const userAnswer = quizAnswers[q.id]
+        const isCorrect = userAnswer === q.correctAnswer
+        onScoreUpdate(q.id, isCorrect ? q.points : 0)
+      })
+    }
+  }, [slide.quiz, quizAnswers, onScoreUpdate])
+
+  const handleProjectSubmit = useCallback(() => {
+    setProjectSubmitted(true)
+    onComplete()
+  }, [onComplete])
+
+  const handleBranchChoice = useCallback((targetSlideId: string) => {
+    onNavigate(targetSlideId)
+  }, [onNavigate])
 
   const renderContentItem = (item: BoardItem) => {
     if (!('pos' in item)) return null
@@ -39,12 +60,12 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
         return (
           <div 
             key={item.id}
-            className="cursor-pointer rounded-lg overflow-hidden hover:opacity-90 transition-opacity"
+            className="cursor-pointer rounded-xl overflow-hidden hover:opacity-90 transition-opacity shadow-sm"
             onClick={() => onZoomImage(item)}
           >
             <img 
-              src={item.thumbnail || item.fullSource} 
-              alt={item.description || 'Slide image'}
+              src={(item as any).thumbnail || (item as any).fullSource} 
+              alt={(item as any).description || 'Slide image'}
               className="w-full h-auto max-h-[400px] object-contain"
             />
           </div>
@@ -58,7 +79,7 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
         )
       case 'web':
         return (
-          <div key={item.id} className="rounded-lg overflow-hidden border border-gray-200">
+          <div key={item.id} className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             <iframe 
               src={(item as WebItem).url} 
               className="w-full h-[300px]"
@@ -71,111 +92,247 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
     }
   }
 
-  const renderQuiz = (questions: QuizQuestion[]) => (
-    <div className="space-y-4">
-      {questions.map((q, idx) => (
-        <div key={q.id} className="bg-white rounded-xl p-4 shadow-sm">
-          <div className={`font-semibold mb-3 ${fontSize}`}>
-            {idx + 1}. {q.question}
+  // Click-to-reveal annotation
+  const renderReveal = (interaction: SlideInteraction) => (
+    <button
+      key={interaction.target}
+      onClick={() => handleReveal(interaction.target)}
+      className={`w-full ${buttonSize} rounded-xl border-2 border-dashed border-purple-300 bg-purple-50 text-purple-700 font-medium hover:bg-purple-100 transition-colors`}
+    >
+      {revealedItems.has(interaction.target) ? (
+        <span>✓ Revealed!</span>
+      ) : (
+        <span>👆 Click to reveal</span>
+      )}
+    </button>
+  )
+
+  const renderQuiz = (questions: QuizQuestion[]) => {
+    const currentQ = questions[currentQuestionIndex]
+    if (!currentQ) return null
+
+    return (
+      <div className="space-y-4">
+        {/* Question counter */}
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-gray-500">
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </div>
+          <div className="text-sm text-gray-500">
+            {Object.keys(quizAnswers).length} answered
+          </div>
+        </div>
+
+        {/* Current question */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className={`font-semibold mb-4 ${fontSize}`}>
+            {currentQ.question}
           </div>
           
-          {q.type === 'multiple-choice' && q.options && (
-            <div className="space-y-2">
-              {q.options.map((option, optIdx) => {
-                const isSelected = quizAnswers[q.id] === optIdx
-                const isCorrect = showResults && optIdx === q.correctAnswer
-                const isWrong = showResults && isSelected && optIdx !== q.correctAnswer
+          {currentQ.type === 'multiple-choice' && currentQ.options && (
+            <div className="space-y-3">
+              {currentQ.options.map((option, optIdx) => {
+                const isSelected = quizAnswers[currentQ.id] === optIdx
+                const isCorrect = showResults && optIdx === currentQ.correctAnswer
+                const isWrong = showResults && isSelected && optIdx !== currentQ.correctAnswer
                 
                 return (
                   <button
                     key={optIdx}
-                    onClick={() => handleQuizAnswer(q.id, optIdx)}
+                    onClick={() => handleQuizAnswer(currentQ.id, optIdx)}
                     disabled={showResults}
-                    className={`w-full text-left px-4 py-2.5 rounded-lg border-2 transition-colors ${
+                    className={`w-full text-left px-5 py-4 rounded-xl border-2 transition-all ${
+                      isCorrect ? 'border-green-500 bg-green-50 shadow-sm' :
+                      isWrong ? 'border-red-500 bg-red-50 shadow-sm' :
+                      isSelected ? 'border-purple-500 bg-purple-50 shadow-sm' :
+                      'border-gray-200 hover:border-purple-300 hover:bg-purple-50/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium ${
+                        isCorrect ? 'border-green-500 bg-green-500 text-white' :
+                        isWrong ? 'border-red-500 bg-red-500 text-white' :
+                        isSelected ? 'border-purple-500 bg-purple-500 text-white' :
+                        'border-gray-300'
+                      }`}>
+                        {isCorrect ? '✓' : isWrong ? '✗' : String.fromCharCode(65 + optIdx)}
+                      </div>
+                      <span className={fontSize}>{option}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {currentQ.type === 'true-false' && (
+            <div className="flex gap-3">
+              {['True', 'False'].map((option) => {
+                const isSelected = quizAnswers[currentQ.id] === option.toLowerCase()
+                const correctAnswer = currentQ.correctAnswer === option.toLowerCase() || 
+                  currentQ.correctAnswer === (option === 'True' ? 'true' : 'false')
+                const isCorrect = showResults && correctAnswer
+                const isWrong = showResults && isSelected && !correctAnswer
+                
+                return (
+                  <button
+                    key={option}
+                    onClick={() => handleQuizAnswer(currentQ.id, option.toLowerCase())}
+                    disabled={showResults}
+                    className={`flex-1 ${buttonSize} rounded-xl border-2 transition-all ${
                       isCorrect ? 'border-green-500 bg-green-50' :
                       isWrong ? 'border-red-500 bg-red-50' :
                       isSelected ? 'border-purple-500 bg-purple-50' :
                       'border-gray-200 hover:border-purple-300'
                     }`}
                   >
-                    <span className={fontSize}>{option}</span>
-                    {isCorrect && <span className="ml-2 text-green-600">✓</span>}
-                    {isWrong && <span className="ml-2 text-red-600">✗</span>}
+                    {option === 'True' ? '✓ True' : '✗ False'}
                   </button>
                 )
               })}
             </div>
           )}
 
-          {q.type === 'true-false' && (
-            <div className="flex gap-2">
-              {['True', 'False'].map((option) => {
-                const isSelected = quizAnswers[q.id] === option.toLowerCase()
-                return (
-                  <button
-                    key={option}
-                    onClick={() => handleQuizAnswer(q.id, option.toLowerCase())}
-                    disabled={showResults}
-                    className={`flex-1 px-4 py-2.5 rounded-lg border-2 transition-colors ${
-                      isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-purple-300'
-                    }`}
-                  >
-                    {option}
-                  </button>
-                )
-              })}
-            </div>
+          {currentQ.type === 'fill-blank' && (
+            <input
+              type="text"
+              value={quizAnswers[currentQ.id] as string || ''}
+              onChange={(e) => handleQuizAnswer(currentQ.id, e.target.value)}
+              disabled={showResults}
+              placeholder="Type your answer..."
+              className={`w-full ${buttonSize} rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none`}
+            />
           )}
 
-          {showResults && q.explanation && (
-            <div className="mt-3 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-              💡 {q.explanation}
+          {/* Feedback */}
+          {showResults && currentQ.explanation && (
+            <div className={`mt-4 p-4 rounded-xl ${
+              quizAnswers[currentQ.id] === currentQ.correctAnswer 
+                ? 'bg-green-50 border border-green-200' 
+                : 'bg-blue-50 border border-blue-200'
+            }`}>
+              <div className="flex items-start gap-2">
+                <span className="text-xl">
+                  {quizAnswers[currentQ.id] === currentQ.correctAnswer ? '🎉' : '💡'}
+                </span>
+                <div className={fontSize}>
+                  {quizAnswers[currentQ.id] === currentQ.correctAnswer 
+                    ? 'Correct! ' 
+                    : 'Not quite. '}
+                  {currentQ.explanation}
+                </div>
+              </div>
             </div>
           )}
         </div>
-      ))}
-      
-      {!showResults && (
-        <button
-          onClick={handleCheckQuiz}
-          className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors"
-        >
-          Check Answers
-        </button>
-      )}
-    </div>
-  )
+
+        {/* Navigation */}
+        <div className="flex gap-3">
+          {currentQuestionIndex > 0 && (
+            <button
+              onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+              className={`flex-1 ${buttonSize} rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors`}
+            >
+              ← Previous
+            </button>
+          )}
+          
+          {!showResults && (
+            <button
+              onClick={handleCheckQuiz}
+              className={`flex-1 ${buttonSize} rounded-xl font-semibold bg-purple-600 text-white hover:bg-purple-700 transition-colors`}
+            >
+              Check Answer
+            </button>
+          )}
+          
+          {showResults && currentQuestionIndex < questions.length - 1 && (
+            <button
+              onClick={() => { setShowResults(false); setCurrentQuestionIndex(prev => prev + 1) }}
+              className={`flex-1 ${buttonSize} rounded-xl font-semibold bg-purple-600 text-white hover:bg-purple-700 transition-colors`}
+            >
+              Next Question →
+            </button>
+          )}
+          
+          {showResults && currentQuestionIndex === questions.length - 1 && (
+            <button
+              onClick={onComplete}
+              className={`flex-1 ${buttonSize} rounded-xl font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors`}
+            >
+              Continue →
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   const renderProject = () => (
-    <div className="bg-white rounded-xl p-6 shadow-sm">
-      <div className={`font-bold mb-4 ${headerSize}`}>📝 Project</div>
-      <div className={`text-gray-700 ${fontSize} leading-relaxed whitespace-pre-wrap`}>
+    <div className="bg-white rounded-2xl p-6 shadow-sm">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
+          <span className="text-2xl">📝</span>
+        </div>
+        <div>
+          <div className={`font-bold ${headerSize}`}>Project</div>
+          <div className="text-sm text-gray-500">Hands-on activity</div>
+        </div>
+      </div>
+      
+      <div className={`text-gray-700 ${fontSize} leading-relaxed whitespace-pre-wrap mb-6`}>
         {slide.project?.instructions}
       </div>
+      
       {slide.project?.resources && slide.project.resources.length > 0 && (
-        <div className="mt-4">
-          <div className="font-semibold mb-2">Resources:</div>
-          <ul className="list-disc list-inside space-y-1">
+        <div className="mb-6">
+          <div className="font-semibold mb-3 text-gray-800">📚 Resources</div>
+          <div className="space-y-2">
             {slide.project.resources.map((r, i) => (
-              <li key={i} className="text-gray-600">{r}</li>
+              <div key={i} className="flex items-center gap-2 text-gray-600">
+                <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">{i + 1}</span>
+                {r}
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
+
+      <button
+        onClick={handleProjectSubmit}
+        disabled={projectSubmitted}
+        className={`w-full ${buttonSize} rounded-xl font-semibold transition-colors ${
+          projectSubmitted 
+            ? 'bg-green-100 text-green-700 cursor-default' 
+            : 'bg-orange-500 text-white hover:bg-orange-600'
+        }`}
+      >
+        {projectSubmitted ? '✓ Submitted!' : 'Submit Project'}
+      </button>
     </div>
   )
 
   const renderBranch = () => (
-    <div className="bg-white rounded-xl p-6 shadow-sm text-center">
-      <div className={`font-bold mb-6 ${headerSize}`}>{slide.branch?.prompt}</div>
-      <div className="flex flex-col gap-3">
-        {slide.branch?.choices.map((choice) => (
+    <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+      <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
+        <span className="text-3xl">🔀</span>
+      </div>
+      <div className={`font-bold mb-2 ${headerSize}`}>{slide.branch?.prompt}</div>
+      <div className="text-gray-500 mb-6">Choose your path to continue</div>
+      
+      <div className="space-y-3">
+        {slide.branch?.choices.map((choice, idx) => (
           <button
             key={choice.targetSlideId}
-            onClick={() => onNavigate(choice.targetSlideId)}
-            className="px-6 py-4 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors text-lg"
+            onClick={() => handleBranchChoice(choice.targetSlideId)}
+            className={`w-full ${buttonSize} rounded-xl font-semibold bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 transition-all shadow-md hover:shadow-lg`}
           >
-            {choice.label}
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                {String.fromCharCode(65 + idx)}
+              </span>
+              {choice.label}
+            </span>
           </button>
         ))}
       </div>
@@ -189,13 +346,16 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
         {slide.title}
       </h1>
 
-      {/* Content */}
+      {/* Content based on slide type */}
       <div className="space-y-6">
         {slide.type === 'quiz' && slide.quiz && renderQuiz(slide.quiz)}
         {slide.type === 'project' && renderProject()}
         {slide.type === 'branch' && renderBranch()}
         
-        {slide.type !== 'quiz' && slide.type !== 'branch' && (
+        {/* Reveal interactions */}
+        {slide.interactions?.filter(i => i.type === 'reveal').map(renderReveal)}
+        
+        {slide.type !== 'quiz' && slide.type !== 'branch' && slide.type !== 'project' && (
           <>
             {/* Main content items */}
             {slide.content.map(item => renderContentItem(item))}
@@ -217,7 +377,7 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
         {/* Navigation hint */}
         <div className="text-center text-gray-400 text-sm pt-4">
           {slide.type === 'branch' ? 'Choose a path to continue' : 
-           slide.type === 'quiz' ? 'Answer the questions above' :
+           slide.type === 'quiz' ? 'Answer the question above' :
            slide.type === 'project' ? 'Complete the project when ready' :
            'Press → to continue'}
         </div>
