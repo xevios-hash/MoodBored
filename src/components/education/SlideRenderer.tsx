@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { Slide, BoardItem, WebItem, QuizQuestion, GradeLevel, SlideInteraction } from '@/types'
 import { NarrationEngine } from './NarrationEngine'
+import { getEducationTheme, a11y, ariaLabels } from './GradeSchoolTheme'
 
 interface SlideRendererProps {
   slide: Slide
@@ -17,11 +18,13 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
   const [showResults, setShowResults] = useState(false)
   const [projectSubmitted, setProjectSubmitted] = useState(false)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  
+  const theme = getEducationTheme(gradeLevel)
 
   // Grade-level styling
-  const fontSize = gradeLevel === 'K-2' ? 'text-lg' : gradeLevel === '3-5' ? 'text-base' : 'text-sm'
-  const headerSize = gradeLevel === 'K-2' ? 'text-2xl' : gradeLevel === '3-5' ? 'text-xl' : 'text-lg'
-  const buttonSize = gradeLevel === 'K-2' ? 'px-8 py-5 text-lg' : gradeLevel === '3-5' ? 'px-6 py-4 text-base' : 'px-4 py-3 text-sm'
+  const fontSize = theme.fontSize.body
+  const headerSize = theme.fontSize.header
+  const buttonSize = theme.spacing.buttonPadding + ' font-semibold'
 
   const handleReveal = useCallback((itemId: string) => {
     setRevealedItems(prev => new Set([...prev, itemId]))
@@ -112,19 +115,19 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
     if (!currentQ) return null
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-4" role="region" aria-label={ariaLabels.quizQuestion(currentQuestionIndex, questions.length)}>
         {/* Question counter */}
         <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-500">
-            Question {currentQuestionIndex + 1} of {questions.length}
+          <div className={`text-sm text-gray-500 ${theme.fontSize.caption}`}>
+            {ariaLabels.quizQuestion(currentQuestionIndex, questions.length)}
           </div>
-          <div className="text-sm text-gray-500">
+          <div className={`text-sm text-gray-500 ${theme.fontSize.caption}`}>
             {Object.keys(quizAnswers).length} answered
           </div>
         </div>
 
         {/* Current question */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-6 shadow-sm" role="group" aria-label="Quiz question">
           <div className={`font-semibold mb-4 ${fontSize}`}>
             {currentQ.question}
           </div>
@@ -141,6 +144,8 @@ export function SlideRenderer({ slide, gradeLevel, onNavigate, onComplete, onZoo
                     key={optIdx}
                     onClick={() => handleQuizAnswer(currentQ.id, optIdx)}
                     disabled={showResults}
+                    aria-label={`${String.fromCharCode(65 + optIdx)}: ${option}`}
+                    aria-pressed={isSelected}
                     className={`w-full text-left px-5 py-4 rounded-xl border-2 transition-all ${
                       isCorrect ? 'border-green-500 bg-green-50 shadow-sm' :
                       isWrong ? 'border-red-500 bg-red-50 shadow-sm' :

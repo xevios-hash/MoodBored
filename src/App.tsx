@@ -22,6 +22,7 @@ import { ChromeImport } from '@/components/ChromeImport'
 import { KeyboardShortcuts } from '@/components/KeyboardShortcuts'
 import { LessonPlayer } from '@/components/education/LessonPlayer'
 import { LessonGenerator } from '@/components/education/LessonGenerator'
+import { StudentDashboard } from '@/components/education/StudentDashboard'
 import { PresenceBar, RemoteCursors } from '@/components/Presence'
 import { joinBoard, getShareByToken, broadcastCursor, broadcastSelection, broadcastMutation, type PresenceUser, type ShareRole, type CollaborationState } from '@/lib/collaboration'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -145,6 +146,7 @@ export default function App() {
   const [chromeImportOpen, setChromeImportOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [lessonGeneratorOpen, setLessonGeneratorOpen] = useState(false)
+  const [dashboardOpen, setDashboardOpen] = useState(false)
 
   // Collaboration state
   const [collab, setCollab] = useState<CollaborationState>({
@@ -431,6 +433,13 @@ export default function App() {
         {shortcutsOpen && <KeyboardShortcuts onClose={() => setShortcutsOpen(false)} />}
         {lessonGeneratorOpen && (
           <LessonGenerator onClose={() => setLessonGeneratorOpen(false)} />
+        )}
+        {dashboardOpen && (
+          <StudentDashboard
+            lessons={[]}
+            onOpenLesson={() => {}}
+            onClose={() => setDashboardOpen(false)}
+          />
         )}
         {lessonMode && currentLesson && (
           <LessonPlayer

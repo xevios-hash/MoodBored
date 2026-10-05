@@ -307,3 +307,63 @@ describe('Path Adapter', () => {
     expect(Array.isArray(effectiveness.improvements)).toBe(true)
   })
 })
+
+describe('Grade School Theme', () => {
+  it('provides theme for each grade level', async () => {
+    const { getEducationTheme, GRADE_THEMES } = await import('@/components/education/GradeSchoolTheme')
+    
+    expect(GRADE_THEMES['K-2']).toBeDefined()
+    expect(GRADE_THEMES['3-5']).toBeDefined()
+    expect(GRADE_THEMES['6-8']).toBeDefined()
+    expect(GRADE_THEMES['9-12']).toBeDefined()
+    expect(GRADE_THEMES['adult']).toBeDefined()
+    
+    const theme = getEducationTheme('K-2')
+    expect(theme.fontSize.body).toBe('text-xl')
+    expect(theme.colors.primary).toBeDefined()
+  })
+
+  it('K-2 theme has larger fonts', async () => {
+    const { getEducationTheme } = await import('@/components/education/GradeSchoolTheme')
+    
+    const k2 = getEducationTheme('K-2')
+    const adult = getEducationTheme('adult')
+    
+    // K-2 should have larger font classes
+    expect(k2.fontSize.body).toBe('text-xl')
+    expect(adult.fontSize.body).toBe('text-sm')
+  })
+
+  it('generates CSS variables', async () => {
+    const { getEducationTheme, getThemeCSS } = await import('@/components/education/GradeSchoolTheme')
+    
+    const theme = getEducationTheme('3-5')
+    const css = getThemeCSS(theme)
+    
+    expect(css).toContain('--edu-primary')
+    expect(css).toContain('--edu-bg')
+    expect(css).toContain('--edu-text')
+  })
+})
+
+describe('Accessibility', () => {
+  it('provides ARIA labels', async () => {
+    const { ariaLabels } = await import('@/components/education/GradeSchoolTheme')
+    
+    expect(ariaLabels.quizQuestion(0, 5)).toBe('Question 1 of 5')
+    expect(ariaLabels.progressBar(75)).toBe('Progress: 75 percent complete')
+    expect(ariaLabels.slideNavigation(3, 10)).toBe('Slide 3 of 10')
+    expect(ariaLabels.scoreDisplay(85)).toBe('Your score: 85 percent')
+    expect(ariaLabels.nextSlide()).toBe('Go to next slide')
+    expect(ariaLabels.previousSlide()).toBe('Go to previous slide')
+  })
+
+  it('has accessibility helpers', async () => {
+    const { a11y } = await import('@/components/education/GradeSchoolTheme')
+    
+    expect(typeof a11y.announce).toBe('function')
+    expect(typeof a11y.trapFocus).toBe('function')
+    expect(typeof a11y.prefersHighContrast).toBe('function')
+    expect(typeof a11y.prefersReducedMotion).toBe('function')
+  })
+})
