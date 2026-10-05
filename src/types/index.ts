@@ -526,3 +526,86 @@ export function getDefaultPorts(kind: string): Port[] {
       return []
   }
 }
+
+// ─── Education: Lesson & Slide Types ────────────────────────────────
+
+export type SlideType = 'concept' | 'detail' | 'quiz' | 'project' | 'summary' | 'branch'
+export type GradeLevel = 'K-2' | '3-5' | '6-8' | '9-12' | 'adult'
+export type NavigationMode = 'linear' | 'branching' | 'free' | 'prerequisites'
+
+export interface Narration {
+  script: string
+  duration: number // seconds
+  rate: number // speech rate (0.5-2.0)
+  pitch: number // speech pitch (0-2)
+  highlights: string[] // item IDs to highlight during narration
+}
+
+export interface QuizQuestion {
+  id: string
+  question: string
+  type: 'multiple-choice' | 'true-false' | 'fill-blank'
+  options?: string[]
+  correctAnswer: string | number
+  explanation: string
+  points: number
+}
+
+export interface SlideInteraction {
+  type: 'choice' | 'reveal' | 'quiz' | 'submit'
+  target: string // item ID or action
+  label: string
+  action: {
+    type: 'navigate' | 'reveal' | 'submit' | 'highlight'
+    target?: string // slide ID for navigate
+    value?: any
+  }
+}
+
+export interface Slide {
+  id: string
+  type: SlideType
+  order: number
+  title: string
+  content: BoardItem[]
+  narration: Narration
+  interactions: SlideInteraction[]
+  quiz?: QuizQuestion[]
+  project?: {
+    instructions: string
+    resources: string[]
+    deliverables: string[]
+  }
+  branch?: {
+    prompt: string
+    choices: { label: string; targetSlideId: string }[]
+  }
+  prerequisites?: string[] // slide IDs that must be completed first
+  duration?: number // auto-advance after N seconds (0 = wait for user)
+}
+
+export interface LessonMetadata {
+  title: string
+  subject: string
+  gradeLevel: GradeLevel
+  estimatedTime: string
+  learningObjectives: string[]
+  author: string
+  created: string
+}
+
+export interface StudentProgress {
+  lessonId: string
+  completedSlides: string[]
+  quizScores: Record<string, number>
+  currentSlide: string
+  timeSpent: number // seconds
+  lastAccessed: string
+  projectSubmissions: Record<string, any>
+}
+
+export interface Lesson extends Project {
+  metadata: LessonMetadata
+  slides: Slide[]
+  navigation: NavigationMode
+}
