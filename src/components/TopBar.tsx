@@ -4,7 +4,7 @@ import {
   Search, PanelLeft, MessageSquare, Settings, MoreVertical,
   Download, Upload, FileText, Camera, FolderOpen, Globe,
   ImageIcon, Share2, Palette, Sparkles, LayoutGrid, Keyboard,
-  Home, Play, GraduationCap,
+  Home, Play, GraduationCap, BarChart3,
 } from 'lucide-react'
 
 interface Props {
@@ -267,6 +267,9 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
 
               <button onClick={() => { onGoHome?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Home size={14} /> Projects
+              </button>
+              <button onClick={() => { onGoHome?.(); setShowMenu(false) }} className="w-full px-3 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <BarChart3 size={14} /> Dashboard
               </button>
 
               <div className="h-px my-1" style={{ background: 'var(--border-color)' }} />
