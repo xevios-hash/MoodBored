@@ -1220,3 +1220,4 @@ app.listen(PORT, () => {
   console.log(`  MCP SSE:   ${origin}/mcp/sse`)
   console.log(`  Board dir: ${BOARDS_DIR}`)
 })
+// Force Railway rebuild Mon Oct  5 12:11:35 PDT 2026
