@@ -15,12 +15,12 @@ const ITEM_TYPES = [
   { kind: 'note', icon: '📝', label: 'Note', key: 'N' },
   { kind: 'image', icon: '🖼️', label: 'Image', key: 'I' },
   { kind: 'web', icon: '🌐', label: 'Website', key: 'W' },
-  { kind: 'link', icon: '🔗', label: 'Link', key: 'L' },
+  { kind: 'video', icon: '🎬', label: 'Video', key: 'V' },
 ]
 
 const ADVANCED_ITEM_TYPES = [
+  { kind: 'link', icon: '🔗', label: 'Bookmark', key: 'L' },
   { kind: 'text', icon: '📄', label: 'Text', key: 'T' },
-  { kind: 'video', icon: '🎬', label: 'Video', key: 'V' },
   { kind: 'palette', icon: '🎨', label: 'Palette', key: 'P' },
   { kind: 'gradient', icon: '🌈', label: 'Gradient', key: 'G' },
   { kind: 'font', icon: '🔤', label: 'Font', key: 'F' },
