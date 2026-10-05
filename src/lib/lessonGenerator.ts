@@ -45,12 +45,20 @@ export async function generateLesson(options: LessonGenerationOptions): Promise<
       }),
     })
 
+    // Handle any non-OK response with fallback
     if (!response.ok) {
       console.warn('[LessonGen] API error:', response.status, '— using fallback lesson')
       return createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject)
     }
 
     const data = await response.json()
+    
+    // Check for error in response
+    if (data.error) {
+      console.warn('[LessonGen] API returned error:', data.error, '— using fallback lesson')
+      return createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject)
+    }
+    
     const content = data.choices?.[0]?.message?.content
     if (!content) {
       console.warn('[LessonGen] No content in response — using fallback lesson')

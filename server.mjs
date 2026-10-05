@@ -1066,7 +1066,7 @@ app.get('/mcp.json', (_req, res) => {
 app.post('/api/ai/chat', async (req, res) => {
   const apiKey = process.env.OPENROUTER_API_KEY || ''
   if (!apiKey) {
-    res.status(501).json({ error: 'AI features require OPENROUTER_API_KEY on the server' })
+    res.status(501).json({ error: 'AI features require OPENROUTER_API_KEY on the server. Set this environment variable to enable AI.' })
     return
   }
   try {
@@ -1080,8 +1080,22 @@ app.post('/api/ai/chat', async (req, res) => {
       },
       body: JSON.stringify(req.body),
     })
+    
+    if (!response.ok) {
+      // Don't propagate the upstream error - return a friendly message
+      const status = response.status
+      if (status === 401) {
+        res.status(502).json({ error: 'AI service authentication failed. Check OPENROUTER_API_KEY.' })
+      } else if (status === 429) {
+        res.status(429).json({ error: 'AI service rate limited. Try again later.' })
+      } else {
+        res.status(502).json({ error: `AI service error (${status})` })
+      }
+      return
+    }
+    
     const data = await response.json()
-    res.status(response.status).json(data)
+    res.status(200).json(data)
   } catch (err) {
     res.status(502).json({ error: `AI proxy error: ${err.message}` })
   }
