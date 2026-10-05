@@ -58,6 +58,51 @@ npx tauri build
 
 ## Features
 
+### 📚 Education Mode (Living Textbook)
+
+Transform MoodBored into an interactive learning platform with AI-powered lessons.
+
+#### Slideshow Presentation
+- **Full-screen slideshow** with AI narration (Web Speech API)
+- **Interactive quizzes** — multiple choice, true/false, fill-in-blank
+- **Project submissions** — write, upload files, or link to external work
+- **Progress tracking** — scores, completion, resume where you left off
+
+#### AI Lesson Generation
+- **"Teach me about X"** — AI creates complete lessons with slides
+- **Grade-level adaptation** — K-2, 3-5, 6-8, 9-12, Adult
+- **Auto-generated narration** — spoken slides with adjustable speed
+- **Quiz questions** — with answers and explanations
+
+#### Nonlinear Learning Paths
+- **Visual path editor** — connect slides with arrows
+- **Branching choices** — "Want to learn about X or Y?"
+- **Free exploration** — browse any slide in any order
+- **Prerequisites** — lock/unlock slides based on progress
+
+#### Project-Based Learning
+- **8 project templates** — from drawing to research essays
+- **Rubric-based grading** — criteria, points, feedback
+- **Teacher dashboard** — monitor student progress
+- **Submission system** — write, upload, or link projects
+
+#### Accessibility
+- **Grade-school themes** — larger fonts, bright colors for K-2
+- **Screen reader support** — ARIA labels, announcements
+- **Keyboard navigation** — full keyboard accessibility
+- **High contrast mode** — respects user preferences
+
+**Keyboard shortcuts in Lesson Mode:**
+| Key | Action |
+|-----|--------|
+| `← →` | Navigate slides |
+| `S` | Score tracking |
+| `E` | Free exploration |
+| `P` | Path editor |
+| `T` | Slide thumbnails |
+| `F` | Fullscreen |
+| `Esc` | Close |
+
 ### Annotations & Drawing
 - **Annotate websites** — draw on web pages with text, arrows, boxes, circles, highlights
 - **Hold Alt + draw** — annotate without blocking website interaction

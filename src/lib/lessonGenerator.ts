@@ -46,20 +46,156 @@ export async function generateLesson(options: LessonGenerationOptions): Promise<
     })
 
     if (!response.ok) {
-      console.error('[LessonGen] API error:', response.status)
-      return null
+      console.warn('[LessonGen] API error:', response.status, '— using fallback lesson')
+      return createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject)
     }
 
     const data = await response.json()
     const content = data.choices?.[0]?.message?.content
-    if (!content) return null
+    if (!content) {
+      console.warn('[LessonGen] No content in response — using fallback lesson')
+      return createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject)
+    }
 
     // Parse the generated lesson from JSON
     const lessonData = parseLessonResponse(content, topic, gradeLevel, subject)
     return lessonData
   } catch (err) {
-    console.error('[LessonGen] Failed to generate lesson:', err)
-    return null
+    console.warn('[LessonGen] Failed to generate lesson, using fallback:', err)
+    return createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject)
+  }
+}
+
+// Create a fallback lesson when AI is unavailable
+function createFallbackLesson(
+  topic: string,
+  gradeLevel: GradeLevel,
+  subject: string,
+  slideCount: number,
+  includeQuizzes: boolean,
+  includeProject: boolean
+): Lesson {
+  const slides: Slide[] = []
+  
+  // Intro slide
+  slides.push({
+    id: uuid(),
+    type: 'concept',
+    order: 0,
+    title: `Welcome to ${topic}!`,
+    content: [{
+      kind: 'note',
+      id: uuid(),
+      text: `Let's learn about ${topic}. This is a ${subject} lesson for ${gradeLevel} students.`,
+      purpose: '', importance: '', tags: [],
+      pos: { x: 100, y: 100 },
+    }],
+    narration: { script: `Welcome! Today we're going to learn about ${topic}.`, duration: 15, rate: 0.85, pitch: 1, highlights: [] },
+    interactions: [],
+  })
+
+  // Content slides
+  for (let i = 1; i < slideCount - 1; i++) {
+    slides.push({
+      id: uuid(),
+      type: 'concept',
+      order: i,
+      title: `Key Concept ${i}`,
+      content: [{
+        kind: 'note',
+        id: uuid(),
+        text: `Important concept ${i} about ${topic}. Add your notes here.`,
+        purpose: '', importance: '', tags: [],
+        pos: { x: 100, y: 100 },
+      }],
+      narration: { script: `Here's an important concept about ${topic}.`, duration: 20, rate: 0.85, pitch: 1, highlights: [] },
+      interactions: [],
+    })
+  }
+
+  // Quiz slide
+  if (includeQuizzes) {
+    slides.push({
+      id: uuid(),
+      type: 'quiz',
+      order: slides.length,
+      title: 'Quick Check!',
+      content: [],
+      narration: { script: '', duration: 0, rate: 0.85, pitch: 1, highlights: [] },
+      interactions: [],
+      quiz: [{
+        id: uuid(),
+        question: `What did you learn about ${topic}?`,
+        type: 'multiple-choice',
+        options: ['Option A', 'Option B', 'Option C', 'Option D'],
+        correctAnswer: 0,
+        explanation: 'Good job! Keep learning!',
+        points: 10,
+      }],
+    })
+  }
+
+  // Project slide
+  if (includeProject) {
+    slides.push({
+      id: uuid(),
+      type: 'project',
+      order: slides.length,
+      title: 'Try It Yourself!',
+      content: [],
+      narration: { script: 'Now it\'s your turn to try!', duration: 15, rate: 0.85, pitch: 1, highlights: [] },
+      interactions: [],
+      project: {
+        instructions: `Create something about ${topic}! Draw, write, or build to show what you learned.`,
+        resources: ['Paper', 'Pencils', 'Your imagination!'],
+        deliverables: ['Creative project'],
+      },
+    })
+  }
+
+  // Summary slide
+  slides.push({
+    id: uuid(),
+    type: 'summary',
+    order: slides.length,
+    title: 'Great Job!',
+    content: [{
+      kind: 'note',
+      id: uuid(),
+      text: `You learned about ${topic}! Keep exploring and asking questions.`,
+      purpose: '', importance: '', tags: [],
+      pos: { x: 100, y: 100 },
+    }],
+    narration: { script: `Great job! You learned so much about ${topic}. Keep exploring!`, duration: 15, rate: 0.85, pitch: 1, highlights: [] },
+    interactions: [],
+  })
+
+  return {
+    id: uuid(),
+    name: topic,
+    viewports: [],
+    components: [],
+    settings: {
+      apiKey: '', defaultModel: 'anthropic/claude-sonnet-4',
+      jevThreshold: 0.2, multiAgent: false, theme: 'light',
+      canvasBg: '#e0f2fe', canvasBgType: 'color', canvasBgVideo: '',
+      customBgUrls: [], customBgLabels: {},
+    },
+    snapshots: [],
+    annotations: [],
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    metadata: {
+      title: topic,
+      subject,
+      gradeLevel,
+      estimatedTime: `${slideCount * 2} minutes`,
+      learningObjectives: [`Learn about ${topic}`],
+      author: 'Generated',
+      created: new Date().toISOString(),
+    },
+    slides,
+    navigation: 'linear',
   }
 }
 
