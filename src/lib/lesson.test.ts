@@ -213,3 +213,97 @@ describe('Interactive Elements', () => {
     expect(mixedScore).toBeGreaterThan(baseScore)
   })
 })
+
+describe('Path Adapter', () => {
+  it('adapts path based on quiz performance', async () => {
+    const { adaptPath, getNextRecommendedSlide, isSlideUnlocked } = await import('./pathAdapter')
+    
+    const lesson = projectToLesson(mockProject, {
+      title: 'Test Lesson',
+      learningObjectives: ['Learn something'],
+    })
+    
+    // Add quiz slide
+    lesson.slides.push(createQuizSlide('Quiz', [
+      { question: 'Q1?', options: ['A', 'B'], correctAnswer: 0, explanation: '' },
+    ]))
+    
+    // Mock student progress with good scores
+    const progress = {
+      lessonId: lesson.id,
+      completedSlides: [lesson.slides[0].id],
+      quizScores: { 'q1': 10 },
+      currentSlide: lesson.slides[0].id,
+      timeSpent: 120,
+      lastAccessed: new Date().toISOString(),
+      projectSubmissions: {},
+    }
+    
+    const adapted = adaptPath(lesson, progress)
+    expect(adapted.slides.length).toBeGreaterThan(0)
+    expect(adapted.difficulty).toBeDefined()
+    expect(adapted.estimatedTime).toBeGreaterThan(0)
+    expect(Array.isArray(adapted.recommendations)).toBe(true)
+  })
+
+  it('checks slide prerequisites', async () => {
+    const { isSlideUnlocked } = await import('./pathAdapter')
+    
+    const slide = {
+      id: 'test-slide',
+      type: 'concept' as const,
+      order: 0,
+      title: 'Test',
+      content: [],
+      narration: { script: '', duration: 30, rate: 0.85, pitch: 1, highlights: [] },
+      interactions: [],
+      prerequisites: ['required-slide'],
+    }
+    
+    const progress = {
+      lessonId: 'test',
+      completedSlides: ['required-slide'],
+      quizScores: {},
+      currentSlide: '',
+      timeSpent: 0,
+      lastAccessed: new Date().toISOString(),
+      projectSubmissions: {},
+    }
+    
+    expect(isSlideUnlocked(slide, progress)).toBe(true)
+    
+    progress.completedSlides = []
+    expect(isSlideUnlocked(slide, progress)).toBe(false)
+  })
+
+  it('generates path visualization', async () => {
+    const { getPathVisualization } = await import('./pathAdapter')
+    
+    const lesson = projectToLesson(mockProject, { title: 'Test' })
+    const viz = getPathVisualization(lesson)
+    
+    expect(viz.nodes.length).toBe(lesson.slides.length)
+    expect(viz.edges.length).toBeGreaterThanOrEqual(0)
+  })
+
+  it('calculates learning effectiveness', async () => {
+    const { calculateLearningEffectiveness } = await import('./pathAdapter')
+    
+    const lesson = projectToLesson(mockProject, { title: 'Test' })
+    const progress = {
+      lessonId: lesson.id,
+      completedSlides: [lesson.slides[0].id],
+      quizScores: { 'q1': 10 },
+      currentSlide: '',
+      timeSpent: 120,
+      lastAccessed: new Date().toISOString(),
+      projectSubmissions: {},
+    }
+    
+    const effectiveness = calculateLearningEffectiveness(lesson, progress)
+    expect(effectiveness.score).toBeGreaterThanOrEqual(0)
+    expect(effectiveness.score).toBeLessThanOrEqual(100)
+    expect(Array.isArray(effectiveness.strengths)).toBe(true)
+    expect(Array.isArray(effectiveness.improvements)).toBe(true)
+  })
+})
