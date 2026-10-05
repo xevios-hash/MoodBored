@@ -1069,6 +1069,10 @@ app.post('/api/ai/chat', async (req, res) => {
     res.status(501).json({ error: 'AI features require OPENROUTER_API_KEY on the server. Set this environment variable to enable AI.' })
     return
   }
+  
+  // Check if streaming is requested
+  const isStreaming = req.body?.stream === true
+  
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -1082,8 +1086,10 @@ app.post('/api/ai/chat', async (req, res) => {
     })
     
     if (!response.ok) {
-      // Don't propagate the upstream error - return a friendly message
       const status = response.status
+      const errorText = await response.text().catch(() => '')
+      console.error(`[MoodBored] OpenRouter API error ${status}:`, errorText.slice(0, 200))
+      
       if (status === 401) {
         res.status(502).json({ error: 'AI service authentication failed. Check OPENROUTER_API_KEY.' })
       } else if (status === 429) {
@@ -1094,8 +1100,26 @@ app.post('/api/ai/chat', async (req, res) => {
       return
     }
     
-    const data = await response.json()
-    res.status(200).json(data)
+    // Handle streaming response
+    if (isStreaming) {
+      res.setHeader('Content-Type', 'text/event-stream')
+      res.setHeader('Cache-Control', 'no-cache')
+      res.setHeader('Connection', 'keep-alive')
+      
+      const reader = response.body.getReader()
+      const pump = async () => {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          res.write(value)
+        }
+        res.end()
+      }
+      pump().catch(() => res.end())
+    } else {
+      const data = await response.json()
+      res.status(200).json(data)
+    }
   } catch (err) {
     res.status(502).json({ error: `AI proxy error: ${err.message}` })
   }
