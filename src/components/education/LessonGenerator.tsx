@@ -30,6 +30,7 @@ export function LessonGenerator({ onClose, onGenerated }: LessonGeneratorProps) 
   const [includeBranches, setIncludeBranches] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [placeholder, setPlaceholder] = useState<Lesson | null>(null)
   const enterLessonMode = useStore((s) => s.enterLessonMode)
 
   const handleGenerate = async () => {
@@ -42,7 +43,7 @@ export function LessonGenerator({ onClose, onGenerated }: LessonGeneratorProps) 
     setError(null)
 
     try {
-      const lesson = await generateLesson({
+      const result = await generateLesson({
         topic: topic.trim(),
         gradeLevel,
         slideCount,
@@ -52,12 +53,13 @@ export function LessonGenerator({ onClose, onGenerated }: LessonGeneratorProps) 
         subject,
       })
 
-      if (lesson) {
-        enterLessonMode(lesson)
-        onGenerated?.(lesson)
+      if (result.source === 'ai') {
+        enterLessonMode(result.lesson)
+        onGenerated?.(result.lesson)
         onClose()
       } else {
-        setError('Failed to generate lesson. Please try again.')
+        setPlaceholder(result.lesson)
+        setError(result.warning || 'AI did not return a lesson. The placeholder is not a generated lesson.')
       }
     } catch (err) {
       setError('An error occurred. Please try again.')
@@ -217,8 +219,17 @@ export function LessonGenerator({ onClose, onGenerated }: LessonGeneratorProps) 
 
           {/* Error */}
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
-              {error}
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 space-y-2">
+              <div>{error}</div>
+              {placeholder && (
+                <button
+                  type="button"
+                  onClick={() => { enterLessonMode(placeholder); onGenerated?.(placeholder); onClose() }}
+                  className="underline"
+                >
+                  Open placeholder anyway
+                </button>
+              )}
             </div>
           )}
         </div>

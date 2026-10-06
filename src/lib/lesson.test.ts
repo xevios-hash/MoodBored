@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { resolveBranchTargets } from './lesson'
 import { projectToLesson, createSlide, createQuizSlide, createProjectSlide, createBranchSlide, generateNarrationScript, estimateLessonDuration, getLessonProgress } from './lesson'
 import { generateImagePrompt, estimateLessonQuality } from './lessonGenerator'
 import type { Project, Slide, Lesson } from '@/types'
@@ -445,5 +446,17 @@ describe('Project Templates', () => {
     expect(feedbackHigh[0]).toContain('Excellent')
     expect(feedbackLow.length).toBeGreaterThan(0)
     expect(feedbackLow[0]).toContain('Work on')
+  })
+})
+
+describe('resolveBranchTargets', () => {
+  it('replaces slide-index placeholders with real ids and leaves real ids alone', () => {
+    const slides = [
+      { id: 'a', type: 'concept', order: 0, title: 'A', content: [], narration: { script: '', duration: 0, rate: 1, pitch: 1, highlights: [] }, interactions: [] },
+      { id: 'b', type: 'branch', order: 1, title: 'B', content: [], narration: { script: '', duration: 0, rate: 1, pitch: 1, highlights: [] }, interactions: [], branch: { prompt: 'go', choices: [{ label: 'A', targetSlideId: 'slide-0' }, { label: 'stay', targetSlideId: 'already' }] } },
+    ] as any
+    const resolved = resolveBranchTargets(slides)
+    expect(resolved[1].branch.choices[0].targetSlideId).toBe('a')
+    expect(resolved[1].branch.choices[1].targetSlideId).toBe('already')
   })
 })

@@ -124,6 +124,8 @@ export interface AnnotationBase {
   url?: string // For page-persistent annotations
   itemId?: string // Parent card ID (null for free-floating)
   created: string
+  persistent?: boolean // teaching marks stay; temporary ones are replaced
+  owner?: 'user' | 'llm'
 }
 
 export interface TextAnnotation extends AnnotationBase {

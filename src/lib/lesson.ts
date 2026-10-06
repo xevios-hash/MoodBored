@@ -234,3 +234,23 @@ export function getLessonProgress(
     percentage: total > 0 ? (completed / total) * 100 : 0,
   }
 }
+
+// Turn placeholder branch targets (slide-3) into real slide ids after slides exist.
+export function resolveBranchTargets(slides: Slide[]): Slide[] {
+  return slides.map((slide) => {
+    if (slide.type !== 'branch' || !slide.branch) return slide
+    return {
+      ...slide,
+      branch: {
+        ...slide.branch,
+        choices: slide.branch.choices.map((choice) => {
+          const match = /^slide-(\d+)$/.exec(choice.targetSlideId)
+          if (!match) return choice
+          const target = slides[Number(match[1])]
+          if (!target) return choice
+          return { ...choice, targetSlideId: target.id }
+        }),
+      },
+    }
+  })
+}

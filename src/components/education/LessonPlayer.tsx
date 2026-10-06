@@ -254,6 +254,7 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
 
       {/* Main content area */}
       <div className="flex-1 overflow-y-auto px-6 py-8">
+        <div className="relative">
         <SlideRenderer
           slide={currentSlide}
           gradeLevel={lesson.metadata?.gradeLevel || '3-5'}
@@ -264,6 +265,19 @@ export function LessonPlayer({ lesson, onClose, onProgressUpdate }: LessonPlayer
             recordQuizScore(questionId, score)
           }}
         />
+        {(lesson.annotations || []).map((mark) => (
+          <div key={mark.id} className="pointer-events-none absolute" style={{ left: mark.x, top: mark.y, color: mark.color, zIndex: 5 }}>
+            {mark.type === 'text' ? (
+              <div className="text-sm font-medium bg-white/90 rounded px-2 py-1 shadow">{mark.text}</div>
+            ) : null}
+            {mark.type === 'arrow' ? (
+              <svg width="160" height="80" className="overflow-visible">
+                <line x1="0" y1="0" x2={mark.x2 - mark.x} y2={mark.y2 - mark.y} stroke={mark.color} strokeWidth={mark.strokeWidth} />
+              </svg>
+            ) : null}
+          </div>
+        ))}
+        </div>
       </div>
 
       {/* Navigation footer */}

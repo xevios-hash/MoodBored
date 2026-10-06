@@ -1,6 +1,6 @@
 import type { Lesson, Slide, GradeLevel, QuizQuestion, Narration, LessonMetadata, BoardItem } from '@/types'
 import { v4 as uuid } from 'uuid'
-import { createSlide, createQuizSlide, createProjectSlide, createBranchSlide } from './lesson'
+import { createSlide, createQuizSlide, createProjectSlide, createBranchSlide, resolveBranchTargets } from './lesson'
 
 interface LessonGenerationOptions {
   topic: string
@@ -12,8 +12,14 @@ interface LessonGenerationOptions {
   subject?: string
 }
 
-// Generate a lesson using AI
-export async function generateLesson(options: LessonGenerationOptions): Promise<Lesson | null> {
+export interface LessonGenerationResult {
+  lesson: Lesson
+  source: 'ai' | 'fallback'
+  warning?: string
+}
+
+// Generate a lesson using AI. Fallback stays available, but source says so.
+export async function generateLesson(options: LessonGenerationOptions): Promise<LessonGenerationResult> {
   const {
     topic,
     gradeLevel,
@@ -48,7 +54,7 @@ export async function generateLesson(options: LessonGenerationOptions): Promise<
     // Handle any non-OK response with fallback
     if (!response.ok) {
       console.warn('[LessonGen] API error:', response.status, '— using fallback lesson')
-      return createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject)
+      return { lesson: createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject), source: 'fallback', warning: `AI proxy returned ${response.status}. Showing a placeholder, not a generated lesson.` }
     }
 
     const data = await response.json()
@@ -56,21 +62,24 @@ export async function generateLesson(options: LessonGenerationOptions): Promise<
     // Check for error in response
     if (data.error) {
       console.warn('[LessonGen] API returned error:', data.error, '— using fallback lesson')
-      return createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject)
+      return { lesson: createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject), source: 'fallback', warning: typeof data.error === 'string' ? data.error : 'AI proxy returned an error. Showing a placeholder, not a generated lesson.' }
     }
     
     const content = data.choices?.[0]?.message?.content
     if (!content) {
       console.warn('[LessonGen] No content in response — using fallback lesson')
-      return createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject)
+      return { lesson: createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject), source: 'fallback', warning: 'AI proxy returned no lesson. Showing a placeholder, not a generated lesson.' }
     }
 
     // Parse the generated lesson from JSON
     const lessonData = parseLessonResponse(content, topic, gradeLevel, subject)
-    return lessonData
+    if (!lessonData) {
+      return { lesson: createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject), source: 'fallback', warning: 'AI response could not be parsed. Showing a placeholder, not a generated lesson.' }
+    }
+    return { lesson: lessonData, source: 'ai' }
   } catch (err) {
     console.warn('[LessonGen] Failed to generate lesson, using fallback:', err)
-    return createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject)
+    return { lesson: createFallbackLesson(topic, gradeLevel, subject, slideCount, includeQuizzes, includeProject), source: 'fallback', warning: 'AI proxy failed. Showing a placeholder, not a generated lesson.' }
   }
 }
 
@@ -361,7 +370,7 @@ function parseLessonResponse(content: string, topic: string, gradeLevel: GradeLe
       created: new Date().toISOString(),
       updated: new Date().toISOString(),
       metadata,
-      slides,
+      slides: resolveBranchTargets(slides),
       navigation: 'linear',
     }
   } catch (err) {

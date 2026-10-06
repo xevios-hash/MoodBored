@@ -632,6 +632,42 @@ server.tool(
   }
 )
 
+
+server.tool(
+  'instruct',
+  'Point at the board with one temporary teaching mark. Replaces the previous temporary mark. Set persistent to keep the line.',
+  {
+    text: z.string().describe('Short instruction line'),
+    x: z.number().describe('Text x'),
+    y: z.number().describe('Text y'),
+    x2: z.number().optional().describe('Arrow tip x'),
+    y2: z.number().optional().describe('Arrow tip y'),
+    persistent: z.boolean().optional().describe('Keep this mark. Default false, replaced on the next instruct'),
+  },
+  async ({ text: line, x, y, x2, y2, persistent }) => {
+    const state = readState()
+    if (!state.project) return { content: [{ type: 'text', text: 'Error: No board open.' }] }
+    const existing = Array.isArray(state.project.annotations) ? state.project.annotations : []
+    const kept = existing.filter((a: any) => a.persistent || a.owner !== 'llm')
+    const now = new Date().toISOString()
+    const marks: any[] = [{
+      id: uuid(), type: 'text', x, y, text: line, fontSize: 16, fontWeight: 600,
+      color: '#6a5aae', strokeWidth: 2, opacity: 1, created: now,
+      persistent: !!persistent, owner: 'llm',
+    }]
+    if (x2 != null && y2 != null) {
+      marks.push({
+        id: uuid(), type: 'arrow', x, y, x2, y2, arrowHead: 'arrow',
+        color: '#6a5aae', strokeWidth: 2, opacity: 1, created: now,
+        persistent: !!persistent, owner: 'llm',
+      })
+    }
+    state.project.annotations = [...kept, ...marks]
+    writeState(state)
+    return { content: [{ type: 'text', text: persistent ? 'Pinned instruction.' : 'Instruction set. The next instruct replaces it.' }] }
+  }
+)
+
 // ─── Start ──────────────────────────────────────────────────────────
 
 async function main() {
