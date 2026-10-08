@@ -1,8 +1,15 @@
 import { useStore } from '@/stores/useStore'
-import { X, Eye, EyeOff, Shield } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { X, Eye, EyeOff, Shield, RefreshCw, Check, AlertCircle, Loader2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
 import { resetJevCounter, fetchAvailableProviders, getModelsForProvider, type AIProvider, type ProviderInfo } from '@/lib/api'
 import { showToast } from '@/lib/toasts'
+
+interface ModelState {
+  loading: boolean
+  models: { id: string; name: string; loaded?: boolean }[]
+  connected: boolean
+  error?: string
+}
 
 export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: () => void }) {
   const settings = useStore((s) => s.project.settings)
@@ -10,12 +17,61 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
   const toggleSettings = useStore((s) => s.toggleSettings)
   const [showApiKey, setShowApiKey] = useState(false)
   const [providers, setProviders] = useState<ProviderInfo[]>([])
+  const [modelState, setModelState] = useState<ModelState>({ loading: false, models: [], connected: false })
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle')
 
   const handleClose = onClose || toggleSettings
 
   useEffect(() => {
     fetchAvailableProviders().then(setProviders)
   }, [])
+
+  // Fetch models from local provider
+  const fetchModels = useCallback(async () => {
+    const provider = settings.provider || 'openrouter'
+    const isLocal = ['lmstudio', 'ollama', 'automatic1111', 'comfyui', 'invokeai'].includes(provider)
+
+    if (!isLocal) {
+      setModelState({ loading: false, models: [], connected: false })
+      return
+    }
+
+    setModelState(prev => ({ ...prev, loading: true }))
+    setConnectionStatus('checking')
+
+    try {
+      const urlParam = provider === 'lmstudio' ? settings.lmstudioUrl :
+                       provider === 'ollama' ? settings.ollamaUrl :
+                       provider === 'custom' ? settings.customAiUrl : ''
+
+      const res = await fetch(`/api/ai/models/${provider}${urlParam ? `?url=${encodeURIComponent(urlParam)}` : ''}`)
+      const data = await res.json()
+
+      if (data.connected) {
+        setModelState({ loading: false, models: data.models || [], connected: true })
+        setConnectionStatus('connected')
+        showToast(`Connected to ${provider} — ${data.models?.length || 0} models found`, 'success')
+      } else {
+        setModelState({ loading: false, models: [], connected: false, error: data.error })
+        setConnectionStatus('error')
+      }
+    } catch (err) {
+      setModelState({ loading: false, models: [], connected: false, error: 'Connection failed' })
+      setConnectionStatus('error')
+    }
+  }, [settings.provider, settings.lmstudioUrl, settings.ollamaUrl, settings.customAiUrl])
+
+  // Auto-fetch models when provider changes
+  useEffect(() => {
+    const provider = settings.provider || 'openrouter'
+    const isLocal = ['lmstudio', 'ollama', 'automatic1111', 'comfyui', 'invokeai'].includes(provider)
+    if (isLocal) {
+      fetchModels()
+    } else {
+      setModelState({ loading: false, models: [], connected: false })
+      setConnectionStatus('idle')
+    }
+  }, [settings.provider, settings.lmstudioUrl, settings.ollamaUrl])
 
   return (
     <div
@@ -48,48 +104,98 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
               {/* Provider Selection */}
               <div className="mb-3">
                 <label className="text-xs text-text-muted block mb-1">Provider</label>
-                <select
-                  value={settings.provider || 'openrouter'}
-                  onChange={(e) => {
-                    const provider = e.target.value as AIProvider
-                    const models = getModelsForProvider(provider)
-                    updateSettings({ provider, defaultModel: models[0] || '' })
-                  }}
-                  className="input w-full"
-                >
-                  <optgroup label="Cloud Providers">
-                    <option value="openrouter">OpenRouter (100+ models)</option>
-                    <option value="openai">OpenAI (GPT-4, GPT-4o)</option>
-                    <option value="anthropic">Anthropic (Claude)</option>
-                    <option value="gemini">Google Gemini</option>
-                    <option value="groq">Groq (Ultra-fast)</option>
-                    <option value="together">Together AI</option>
-                    <option value="mistral">Mistral AI</option>
-                    <option value="cohere">Cohere</option>
-                    <option value="perplexity">Perplexity</option>
-                    <option value="fireworks">Fireworks AI</option>
-                    <option value="deepseek">DeepSeek</option>
-                  </optgroup>
-                  <optgroup label="Local Providers">
-                    <option value="ollama">Ollama (Local)</option>
-                    <option value="lmstudio">LM Studio (Local)</option>
-                    <option value="custom">Custom Endpoint</option>
-                  </optgroup>
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={settings.provider || 'openrouter'}
+                    onChange={(e) => {
+                      const provider = e.target.value as AIProvider
+                      const models = getModelsForProvider(provider)
+                      updateSettings({ provider, defaultModel: models[0] || '' })
+                    }}
+                    className="input flex-1"
+                  >
+                    <optgroup label="Cloud Providers">
+                      <option value="openrouter">OpenRouter (100+ models)</option>
+                      <option value="openai">OpenAI (GPT-4, GPT-4o)</option>
+                      <option value="anthropic">Anthropic (Claude)</option>
+                      <option value="gemini">Google Gemini</option>
+                      <option value="groq">Groq (Ultra-fast)</option>
+                      <option value="together">Together AI</option>
+                      <option value="mistral">Mistral AI</option>
+                      <option value="cohere">Cohere</option>
+                      <option value="perplexity">Perplexity</option>
+                      <option value="fireworks">Fireworks AI</option>
+                      <option value="deepseek">DeepSeek</option>
+                    </optgroup>
+                    <optgroup label="Local Providers">
+                      <option value="ollama">Ollama (Local)</option>
+                      <option value="lmstudio">LM Studio (Local)</option>
+                      <option value="automatic1111">Automatic1111</option>
+                      <option value="comfyui">ComfyUI</option>
+                      <option value="invokeai">Invoke AI</option>
+                      <option value="custom">Custom Endpoint</option>
+                    </optgroup>
+                  </select>
+
+                  {/* Connection Status Indicator */}
+                  <div className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs border ${
+                    connectionStatus === 'connected' ? 'bg-green-500/10 border-green-500/30 text-green-500' :
+                    connectionStatus === 'checking' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' :
+                    connectionStatus === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-500' :
+                    'bg-surface-2 border-white/[0.06] text-text-muted'
+                  }`}>
+                    {connectionStatus === 'connected' && <Check size={12} />}
+                    {connectionStatus === 'checking' && <Loader2 size={12} className="animate-spin" />}
+                    {connectionStatus === 'error' && <AlertCircle size={12} />}
+                    {connectionStatus === 'idle' && <div className="w-2 h-2 rounded-full bg-gray-400" />}
+                    <span className="hidden sm:inline">
+                      {connectionStatus === 'connected' ? 'Connected' :
+                       connectionStatus === 'checking' ? 'Checking...' :
+                       connectionStatus === 'error' ? 'Disconnected' : 'Not connected'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Model Selection */}
               <div className="mb-3">
-                <label className="text-xs text-text-muted block mb-1">Model</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-text-muted">Model</label>
+                  {modelState.connected && (
+                    <button
+                      onClick={fetchModels}
+                      className="text-2xs text-accent hover:underline flex items-center gap-1"
+                    >
+                      <RefreshCw size={10} /> Scan models
+                    </button>
+                  )}
+                </div>
                 <select
                   value={settings.defaultModel}
                   onChange={(e) => updateSettings({ defaultModel: e.target.value })}
                   className="input w-full"
                 >
-                  {getModelsForProvider((settings.provider || 'openrouter') as AIProvider).map(model => (
-                    <option key={model} value={model}>{model}</option>
-                  ))}
+                  {/* Show fetched models if available, otherwise show presets */}
+                  {modelState.models.length > 0 ? (
+                    modelState.models.map(model => (
+                      <option key={model.id} value={model.id}>
+                        {model.name}{model.loaded ? ' (loaded)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    getModelsForProvider((settings.provider || 'openrouter') as AIProvider).map(model => (
+                      <option key={model} value={model}>{model}</option>
+                    ))
+                  )}
                 </select>
+                {modelState.loading && (
+                  <p className="text-2xs text-text-muted mt-1 flex items-center gap-1">
+                    <Loader2 size={10} className="animate-spin" /> Scanning for models...
+                  </p>
+                )}
+                {modelState.connected && modelState.models.length === 0 && !modelState.loading && (
+                  <p className="text-2xs text-yellow-500 mt-1">No models found. Load a model in {settings.provider}.</p>
+                )}
               </div>
 
               {/* Local Provider Configuration */}

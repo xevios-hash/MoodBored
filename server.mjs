@@ -1780,6 +1780,170 @@ app.get('/api/ai/bridge', async (req, res) => {
   }
 })
 
+// ─── Local Provider Model Scanning ──────────────────────────────────
+// Fetch available models from local AI providers
+
+app.get('/api/ai/models/:provider', async (req, res) => {
+  const provider = req.params.provider
+  const baseUrl = req.query.url || ''
+
+  let modelsUrl = ''
+  let headers = { 'Content-Type': 'application/json' }
+
+  switch (provider) {
+    case 'lmstudio':
+      modelsUrl = baseUrl ? `${baseUrl}/v1/models` : 'http://localhost:1234/v1/models'
+      break
+    case 'ollama':
+      modelsUrl = baseUrl ? `${baseUrl}/api/tags` : 'http://localhost:11434/api/tags'
+      break
+    case 'automatic1111':
+      modelsUrl = baseUrl ? `${baseUrl}/sdapi/v1/sd-models` : 'http://localhost:7860/sdapi/v1/sd-models'
+      break
+    case 'comfyui':
+      modelsUrl = baseUrl ? `${baseUrl}/object_info/CheckpointLoaderSimple` : 'http://localhost:8188/object_info/CheckpointLoaderSimple'
+      break
+    case 'invokeai':
+      modelsUrl = baseUrl ? `${baseUrl}/api/v1/models/` : 'http://localhost:9090/api/v1/models/'
+      break
+    default:
+      res.status(400).json({ error: `Unknown provider: ${provider}` })
+      return
+  }
+
+  try {
+    const response = await fetch(modelsUrl, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(5000),
+    })
+
+    if (!response.ok) {
+      res.json({
+        connected: false,
+        provider,
+        error: `HTTP ${response.status}`,
+        models: [],
+      })
+      return
+    }
+
+    const data = await response.json()
+
+    // Parse models based on provider
+    let models = []
+    switch (provider) {
+      case 'lmstudio':
+        models = (data.data || []).map(m => ({
+          id: m.id,
+          name: m.id,
+          loaded: m.loaded || false,
+        }))
+        break
+      case 'ollama':
+        models = (data.models || []).map(m => ({
+          id: m.name,
+          name: m.name,
+          size: m.size,
+          modified: m.modified_at,
+        }))
+        break
+      case 'automatic1111':
+        models = (data || []).map(m => ({
+          id: m.title || m.model_name,
+          name: m.model_name,
+          hash: m.hash,
+        }))
+        break
+      case 'comfyui':
+        // ComfyUI returns object info with model list
+        const checkpointInfo = data.CheckpointLoaderSimple
+        if (checkpointInfo?.input?.required?.ckpt_name) {
+          models = checkpointInfo.input.required.ckpt_name[0].map(name => ({
+            id: name,
+            name: name,
+          }))
+        }
+        break
+      case 'invokeai':
+        models = (data || []).map(m => ({
+          id: m.id || m.name,
+          name: m.name,
+          type: m.type,
+          base: m.base,
+        }))
+        break
+    }
+
+    res.json({
+      connected: true,
+      provider,
+      url: modelsUrl.replace(/\/(v1\/models|api\/tags|sdapi\/v1\/sd-models|object_info\/CheckpointLoaderSimple|api\/v1\/models\/)/, ''),
+      models,
+      count: models.length,
+    })
+  } catch (err) {
+    res.json({
+      connected: false,
+      provider,
+      error: err.message,
+      models: [],
+    })
+  }
+})
+
+// ─── Connection Status Check ────────────────────────────────────────
+// Check if a provider is reachable
+
+app.get('/api/ai/status/:provider', async (req, res) => {
+  const provider = req.params.provider
+  const baseUrl = req.query.url || ''
+
+  let checkUrl = ''
+
+  switch (provider) {
+    case 'lmstudio':
+      checkUrl = baseUrl ? `${baseUrl}/v1/models` : 'http://localhost:1234/v1/models'
+      break
+    case 'ollama':
+      checkUrl = baseUrl ? `${baseUrl}/api/tags` : 'http://localhost:11434/api/tags'
+      break
+    case 'automatic1111':
+      checkUrl = baseUrl ? `${baseUrl}/sdapi/v1/sd-models` : 'http://localhost:7860/sdapi/v1/sd-models'
+      break
+    case 'comfyui':
+      checkUrl = baseUrl ? `${baseUrl}/system_stats` : 'http://localhost:8188/system_stats'
+      break
+    case 'invokeai':
+      checkUrl = baseUrl ? `${baseUrl}/api/v1/app/version` : 'http://localhost:9090/api/v1/app/version'
+      break
+    default:
+      res.json({ connected: false, provider, error: 'Unknown provider' })
+      return
+  }
+
+  try {
+    const response = await fetch(checkUrl, {
+      method: 'GET',
+      signal: AbortSignal.timeout(3000),
+    })
+
+    res.json({
+      connected: response.ok,
+      provider,
+      status: response.status,
+      url: checkUrl,
+    })
+  } catch (err) {
+    res.json({
+      connected: false,
+      provider,
+      error: err.message,
+      url: checkUrl,
+    })
+  }
+})
+
 // ─── SPA Fallback (catch-all, last) ─────────────────────────────────
 
 // Serve static files with proper caching
