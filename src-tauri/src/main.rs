@@ -615,32 +615,26 @@ fn main() {
         ])
         .setup(|app| {
             // Start the server on app launch in a background thread
-            // Wait for it to be ready before the WebView loads
-            let app_handle = app.handle().clone();
+            // The exe is in the release directory alongside server.mjs and dist/
+            let exe_dir = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                .unwrap_or_else(|| PathBuf::from("."));
+
+            println!("Exe dir: {:?}", exe_dir);
 
             std::thread::spawn(move || {
-                // Try to find server.mjs in current directory and parent directories
-                let server_paths = vec![
-                    PathBuf::from("server.mjs"),
-                    PathBuf::from("../server.mjs"),
-                    PathBuf::from("../../server.mjs"),
-                    // Also check relative to exe
-                    std::env::current_exe().unwrap_or_default().parent().unwrap_or(&PathBuf::from(".")).join("server.mjs"),
-                    std::env::current_exe().unwrap_or_default().parent().unwrap_or(&PathBuf::from(".")).join("../server.mjs"),
-                ];
+                // server.mjs should be in the same directory as the exe
+                let server_path = exe_dir.join("server.mjs");
 
-                let mut found_path = None;
-                for path in &server_paths {
-                    if path.exists() {
-                        found_path = Some(path.clone());
-                        break;
-                    }
-                }
+                println!("Looking for server.mjs at: {:?}", server_path);
+                println!("server.mjs exists: {}", server_path.exists());
 
-                if let Some(server_path) = found_path {
+                if server_path.exists() {
                     match Command::new("node")
                         .arg(server_path.to_str().unwrap())
                         .env("PORT", "3000")
+                        .current_dir(exe_dir)  // Set working directory to exe location
                         .spawn()
                     {
                         Ok(_child) => {
@@ -665,7 +659,7 @@ fn main() {
                         }
                     }
                 } else {
-                    eprintln!("Could not find server.mjs");
+                    eprintln!("Could not find server.mjs at {:?}", server_path);
                 }
             });
 
