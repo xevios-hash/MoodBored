@@ -613,15 +613,20 @@ fn main() {
             stop_server,
             get_server_status,
         ])
-        .setup(|_app| {
+        .setup(|app| {
             // Start the server on app launch in a background thread
-            // The exe should be run from the project root directory
-            std::thread::spawn(|| {
+            // Wait for it to be ready before the WebView loads
+            let app_handle = app.handle().clone();
+
+            std::thread::spawn(move || {
                 // Try to find server.mjs in current directory and parent directories
                 let server_paths = vec![
                     PathBuf::from("server.mjs"),
                     PathBuf::from("../server.mjs"),
                     PathBuf::from("../../server.mjs"),
+                    // Also check relative to exe
+                    std::env::current_exe().unwrap_or_default().parent().unwrap_or(&PathBuf::from(".")).join("server.mjs"),
+                    std::env::current_exe().unwrap_or_default().parent().unwrap_or(&PathBuf::from(".")).join("../server.mjs"),
                 ];
 
                 let mut found_path = None;
@@ -640,6 +645,20 @@ fn main() {
                     {
                         Ok(_child) => {
                             println!("MoodBored server started on port 3000");
+
+                            // Wait for server to be ready (up to 10 seconds)
+                            for i in 0..20 {
+                                std::thread::sleep(std::time::Duration::from_millis(500));
+                                match std::net::TcpStream::connect("127.0.0.1:3000") {
+                                    Ok(_) => {
+                                        println!("Server is ready after {}ms", (i + 1) * 500);
+                                        break;
+                                    }
+                                    Err(_) => {
+                                        println!("Waiting for server... {}ms", (i + 1) * 500);
+                                    }
+                                }
+                            }
                         }
                         Err(e) => {
                             eprintln!("Failed to start server: {}", e);
