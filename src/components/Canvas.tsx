@@ -259,6 +259,8 @@ export function Canvas() {
   const [addToolbarOpen, setAddToolbarOpen] = useState(false)
   const [expandedLinks, setExpandedLinks] = useState<Set<string>>(new Set())
   const [editingItem, setEditingItem] = useState<{ id: string; field: string; value: string } | null>(null)
+  const [canvasConversations, setCanvasConversations] = useState<Map<string, { parentId: string; responseIds: string[] }>>(new Map())
+  const [isGeneratingResponse, setIsGeneratingResponse] = useState<Set<string>>(new Set())
 
   const project = useStore((s) => s.project)
   const activeViewportId = useStore((s) => s.activeViewportId)
@@ -302,6 +304,142 @@ export function Canvas() {
   useEffect(() => {
     maybeClearImageFailed(project.id)
   }, [project.id])
+
+  // ─── Canvas Conversation ──────────────────────────────────────────
+  // When user creates a note, they can request an AI response directly on canvas
+
+  const requestCanvasResponse = useCallback(async (noteItem: any) => {
+    if (isGeneratingResponse.has(noteItem.id)) return
+
+    const noteText = noteItem.text || ''
+    if (!noteText.trim()) return
+
+    setIsGeneratingResponse(prev => new Set([...prev, noteItem.id]))
+
+    try {
+      const state = useStore.getState()
+      const settings = state.project.settings
+
+      // Build a prompt that asks for a canvas response
+      const systemPrompt = `You are a creative assistant on a visual mood board. The user has created a note on the canvas. Respond with helpful, creative content that builds on their idea.
+
+IMPORTANT: Respond with a JSON array of items to add to the canvas. Each item should have:
+- kind: "note", "text", or "link"
+- text/raw/title: The content
+- purpose: Why this relates to the user's note
+
+Example response:
+[{"kind":"note","text":"Great idea! Consider...","purpose":"Building on your thought"},{"kind":"text","raw":"Additional details...","purpose":"Supporting info"}]
+
+Keep responses concise and creative. Maximum 3 items.`
+
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: settings.defaultModel || 'anthropic/claude-sonnet-4',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `My note says: "${noteText}"\n\nRespond with related items for the canvas.` },
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Failed to get AI response')
+
+      const data = await response.json()
+      const content = data.choices?.[0]?.message?.content || ''
+
+      // Parse the response to extract items
+      let items: any[] = []
+      try {
+        // Try to parse JSON from the response
+        const jsonMatch = content.match(/\[[\s\S]*\]/)
+        if (jsonMatch) {
+          items = JSON.parse(jsonMatch[0])
+        }
+      } catch {
+        // If JSON parsing fails, create a single note with the response
+        items = [{ kind: 'note', text: content.slice(0, 200), purpose: 'AI Response' }]
+      }
+
+      // Create response items near the original note
+      const responseIds: string[] = []
+      const offsetX = (noteItem.size?.w || 250) + 40
+      const startY = noteItem.pos.y
+
+      items.forEach((item: any, idx: number) => {
+        const newItem = {
+          kind: item.kind || 'note',
+          id: crypto.randomUUID(),
+          text: item.text || item.raw || item.title || '',
+          raw: item.raw || item.text || '',
+          purpose: item.purpose || 'AI Response',
+          importance: 'AI generated',
+          tags: ['ai-response', 'canvas-conversation'],
+          pos: {
+            x: noteItem.pos.x + offsetX,
+            y: startY + (idx * 130),
+          },
+          size: { w: 280, h: 100 },
+        }
+        state.addItem(newItem)
+        responseIds.push(newItem.id)
+      })
+
+      // Track the conversation
+      setCanvasConversations(prev => {
+        const next = new Map(prev)
+        const existing = next.get(noteItem.id)
+        next.set(noteItem.id, {
+          parentId: noteItem.id,
+          responseIds: [...(existing?.responseIds || []), ...responseIds],
+        })
+        return next
+      })
+
+      // Create connectors between note and responses
+      responseIds.forEach(responseId => {
+        state.addConnection({
+          fromItemId: noteItem.id,
+          fromPortId: 'note-out',
+          toItemId: responseId,
+          toPortId: 'note-in',
+        })
+      })
+
+      showToast('AI response added to canvas', 'success')
+    } catch (err) {
+      console.error('Canvas conversation error:', err)
+      showToast('Failed to get AI response', 'error')
+    } finally {
+      setIsGeneratingResponse(prev => {
+        const next = new Set(prev)
+        next.delete(noteItem.id)
+        return next
+      })
+    }
+  }, [isGeneratingResponse])
+
+  // Handle annotation double-click for canvas conversation
+  const handleAnnotationConversation = useCallback(async (annotation: any) => {
+    if (annotation.type !== 'text') return
+    const text = (annotation as any).text || ''
+    if (!text.trim()) return
+
+    // Create a temporary note item for the conversation
+    const tempNote = {
+      id: annotation.id,
+      text: text,
+      pos: { x: annotation.x, y: annotation.y },
+      size: { w: 250, h: 100 },
+    }
+
+    await requestCanvasResponse(tempNote)
+  }, [requestCanvasResponse])
+
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) needsRedraw.current = true
@@ -1152,6 +1290,16 @@ export function Canvas() {
         window.dispatchEvent(event)
         break
       }
+      case 'ask-ai': {
+        // Request AI response for the selected note
+        if (contextMenu.itemId) {
+          const item = items.find(i => i.id === contextMenu.itemId)
+          if (item && (item.kind === 'note' || item.kind === 'text')) {
+            requestCanvasResponse(item)
+          }
+        }
+        break
+      }
     }
     setContextMenu(null)
   }
@@ -1645,7 +1793,30 @@ export function Canvas() {
               {/* Annotations & Connections */}
               <CtxItem label="🖍️  Add Annotation" onClick={() => handleContextAction('annotate')} />
               <CtxItem label="🔗  Connect to..." onClick={() => handleContextAction('connect')} />
-              
+
+              {/* Canvas Conversation - only for notes/text */}
+              {contextMenu.itemId && (() => {
+                const item = items.find(i => i.id === contextMenu.itemId)
+                if (item && (item.kind === 'note' || item.kind === 'text')) {
+                  const itemId = item.id
+                  return (
+                    <>
+                      <div className="status-divider" style={{ margin: '4px 0' }} />
+                      <CtxItem
+                        label={isGeneratingResponse.has(itemId) ? "⏳  Generating..." : "💬  Ask AI"}
+                        onClick={() => {
+                          if (!isGeneratingResponse.has(itemId)) {
+                            requestCanvasResponse(item)
+                            setContextMenu(null)
+                          }
+                        }}
+                      />
+                    </>
+                  )
+                }
+                return null
+              })()}
+
               <div className="status-divider" style={{ margin: '4px 0' }} />
               
               {/* Export */}
@@ -2158,13 +2329,28 @@ function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, 
   const cx = x + PAD
   const contentW = w - PAD * 2
 
+  // Check if this is an AI response or part of a conversation
+  const isAiResponse = tags.includes('ai-response') || tags.includes('canvas-conversation')
+  const isGenerating = false // Could be connected to state if needed
+
   // Fixed zones from bottom: tags (14px) → purpose (14px) → text fills the rest
   const tagsZone = tags.length > 0 ? y + h - PAD + 2 : y + h
   const purposeZone = purpose ? tagsZone - 18 : tagsZone
   const textMaxH = Math.max(14, purposeZone - (y + PAD + 20) - 4)
 
-  ctx.fillStyle = accent(); ctx.font = '600 9px Inter, sans-serif'
+  // AI response indicator
+  const labelColor = isAiResponse ? '#4CAF50' : accent()
+  ctx.fillStyle = labelColor; ctx.font = '600 9px Inter, sans-serif'
   ctx.fillText(label, cx, y + PAD + 9)
+
+  // AI icon for response items
+  if (isAiResponse) {
+    const iconX = x + w - PAD - 16
+    const iconY = y + PAD
+    ctx.fillStyle = '#4CAF50'
+    ctx.font = '10px Inter, sans-serif'
+    ctx.fillText('AI', iconX, iconY + 9)
+  }
 
   if (text.length > 0 && textMaxH > 10) {
     ctx.fillStyle = txtPrimary(); ctx.font = '400 10px Inter, sans-serif'
