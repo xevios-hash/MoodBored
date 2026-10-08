@@ -198,6 +198,33 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                 )}
               </div>
 
+              {/* API Key for Cloud Providers */}
+              {['openrouter', 'openai', 'anthropic', 'gemini', 'groq', 'together', 'mistral', 'cohere', 'perplexity', 'fireworks', 'deepseek'].includes(settings.provider || 'openrouter') && (
+                <div className="mb-3 p-3 rounded-lg border border-accent/15 bg-accent/5">
+                  <label className="text-xs text-text-muted block mb-1">API Key</label>
+                  <input
+                    type="password"
+                    value={settings.apiKey || ''}
+                    onChange={(e) => updateSettings({ apiKey: e.target.value })}
+                    placeholder={`Enter your ${settings.provider || 'OpenRouter'} API key`}
+                    className="input w-full"
+                  />
+                  <p className="text-2xs text-text-muted mt-1">
+                    {settings.provider === 'openrouter' && 'Get your key at openrouter.ai/keys'}
+                    {settings.provider === 'openai' && 'Get your key at platform.openai.com/api-keys'}
+                    {settings.provider === 'anthropic' && 'Get your key at console.anthropic.com'}
+                    {settings.provider === 'gemini' && 'Get your key at aistudio.google.com/apikey'}
+                    {settings.provider === 'groq' && 'Get your key at console.groq.com/keys'}
+                    {settings.provider === 'together' && 'Get your key at api.together.xyz'}
+                    {settings.provider === 'mistral' && 'Get your key at console.mistral.ai'}
+                    {settings.provider === 'cohere' && 'Get your key at dashboard.cohere.com'}
+                    {settings.provider === 'perplexity' && 'Get your key at perplexity.ai/settings/api'}
+                    {settings.provider === 'fireworks' && 'Get your key at fireworks.ai/account/api-keys'}
+                    {settings.provider === 'deepseek' && 'Get your key at platform.deepseek.com'}
+                  </p>
+                </div>
+              )}
+
               {/* Local Provider Configuration */}
               {(settings.provider || 'openrouter') === 'ollama' && (
                 <div className="mb-3 p-3 rounded-lg border border-accent/15 bg-accent/5">

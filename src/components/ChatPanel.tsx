@@ -234,6 +234,7 @@ export function ChatPanel() {
           5, // maxIterations
           {
             provider: settings.provider,
+            apiKey: settings.apiKey,
             ollamaUrl: settings.ollamaUrl,
             lmstudioUrl: settings.lmstudioUrl,
             customAiUrl: settings.customAiUrl,
@@ -275,6 +276,7 @@ export function ChatPanel() {
           abortController.signal,
           {
             provider: settings.provider,
+            apiKey: settings.apiKey,
             ollamaUrl: settings.ollamaUrl,
             lmstudioUrl: settings.lmstudioUrl,
             customAiUrl: settings.customAiUrl,

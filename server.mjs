@@ -1650,13 +1650,16 @@ app.post('/api/ai/chat', async (req, res) => {
     providerUrl = providerSettings.customAiUrl
   }
 
-  const apiKey = provider === 'custom' && providerSettings.customAiKey
-    ? providerSettings.customAiKey
-    : (config.envKey ? (process.env[config.envKey] || '') : '')
+  // Get API key from: 1) request body, 2) provider settings, 3) environment variable
+  const requestApiKey = req.body?.apiKey || providerSettings.apiKey || ''
+  const envApiKey = config.envKey ? (process.env[config.envKey] || '') : ''
+  const apiKey = requestApiKey || (provider === 'custom' ? (providerSettings.customAiKey || '') : envApiKey)
 
-  if (config.envKey && !apiKey && provider !== 'custom') {
+  // Only require API key for cloud providers that need it
+  const requiresApiKey = config.envKey && !['ollama', 'lmstudio', 'custom'].includes(provider)
+  if (requiresApiKey && !apiKey) {
     res.status(501).json({
-      error: `${provider} requires ${config.envKey} environment variable`,
+      error: `${provider} requires an API key. Set it in Settings or via ${config.envKey} environment variable.`,
       provider,
       availableProviders: Object.keys(AI_PROVIDERS).filter(p => !AI_PROVIDERS[p].envKey || process.env[AI_PROVIDERS[p].envKey]),
     })

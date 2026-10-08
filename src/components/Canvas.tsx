@@ -424,8 +424,10 @@ Example response:
         body: JSON.stringify({
           model: settings.defaultModel || 'anthropic/claude-sonnet-4',
           provider: settings.provider || undefined,
+          apiKey: settings.apiKey || undefined,
           providerSettings: {
             provider: settings.provider,
+            apiKey: settings.apiKey,
             ollamaUrl: settings.ollamaUrl,
             lmstudioUrl: settings.lmstudioUrl,
             customAiUrl: settings.customAiUrl,

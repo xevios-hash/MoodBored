@@ -72,7 +72,7 @@ export async function streamChat(
   onDone: () => void,
   onError: (err: string) => void,
   signal?: AbortSignal,
-  providerSettings?: { provider?: string; ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
+  providerSettings?: { provider?: string; apiKey?: string; ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
 ) {
   // Use explicit provider if provided, otherwise detect from model
   const provider = (providerSettings?.provider as AIProvider) || detectProvider(model)
@@ -87,6 +87,7 @@ export async function streamChat(
       body: JSON.stringify({
         model,
         provider,
+        apiKey: providerSettings?.apiKey,
         messages,
         stream: true,
         temperature: 0.8,
@@ -161,7 +162,7 @@ export async function streamChatWithTools(
   onError: (err: string) => void,
   signal?: AbortSignal,
   maxIterations = 5,
-  providerSettings?: { provider?: string; ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
+  providerSettings?: { provider?: string; apiKey?: string; ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
 ) {
   // Use explicit provider if provided, otherwise detect from model
   const provider = (providerSettings?.provider as AIProvider) || detectProvider(model)
@@ -172,6 +173,7 @@ export async function streamChatWithTools(
     const body: any = {
       model,
       provider,
+      apiKey: providerSettings?.apiKey,
       messages: currentMessages,
       stream: true,
       temperature: 0.8,
