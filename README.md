@@ -39,9 +39,14 @@ npm run dev
 npm run build && npm start    # serves at http://localhost:3000
 ```
 
-**macOS desktop:**
+**Desktop (Windows/macOS/Linux):**
 ```bash
-npx tauri build
+npm run tauri build
+```
+
+**AI Bridge (for web access to local models):**
+```bash
+node scripts/ai-bridge.js    # runs on port 3001
 ```
 
 ## Screenshots
@@ -190,17 +195,33 @@ Transform MoodBored into an interactive learning platform with AI-powered lesson
 - Multi-agent mode (6 specialist roles)
 - Semantic search — find items by meaning
 - Related items — find complementary items
+- **Canvas conversations** — AI responds to notes directly on the board
+
+### Model Management
+- **Native model scanner** — auto-detects models in common locations
+- **Model catalog** — browse and download popular models from HuggingFace
+- **Runtime detection** — finds llama.cpp, Ollama, LM Studio, ComfyUI, Automatic1111, Invoke AI
+- **VRAM estimation** — estimates memory requirements for each model
+- **Model Manager UI** — installed models, catalog, runtimes, settings
+
+### Inference Orchestration
+- **Local runtime support** — llama.cpp, Ollama, LM Studio, ComfyUI, Automatic1111, Invoke AI
+- **Unified API** — same interface for local and cloud models
+- **Automatic fallback** — tries local runtimes first, then cloud
+- **Direct generation** — send prompts to image generation services
 
 ### Regions & Organization
 - **Regions** — colored, named boxes for organizing board areas
 - **Arrange tools** — grid, stack, spiral layouts via right-click menu
 - **Presentation mode** — convert boards to slideshows with narration
 - **Lesson generation** — create educational content via API/MCP
+- **Export for AI** — prompts for SD, Midjourney, DALL-E, video models, LLMs
 
 ### Content Creation
 - **Unsplash search** — built-in image browser (via server proxy)
 - **Color picker** — HSL sliders, harmony generators
 - **Export for Creation** — 8 creation types, 3 formats (Markdown, JSON, XML)
+- **Quick input** — press `/` to create nodes with smart type detection
 
 ### MCP Server
 - 15 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`, `open_url`, `draw_connection`, `create_snapshot`, `list_snapshots`, `summarize_across`, `generate_lesson`
@@ -220,6 +241,10 @@ POST   /api/board/:id/lesson             — generate lesson
 GET    /api/board/:id/lesson             — get lesson data
 POST   /api/ai/chat                      — AI chat (multi-provider)
 GET    /api/ai/providers                 — list available providers
+GET    /api/ai/models/:provider          — scan provider models
+GET    /api/ai/status/:provider          — check provider status
+POST   /api/scan/models                  — scan local filesystem
+GET    /api/scan/auto                    — auto-scan common locations
 POST   /api/ai/generate-image            — image generation (proxied)
 GET    /api/unsplash/search?q=           — image search (proxied)
 ```
@@ -239,6 +264,8 @@ GET    /api/unsplash/search?q=           — image search (proxied)
 - **Atomic file writes** — no data corruption
 - **Error handling** — graceful failure recovery
 - **Request logging** — morgan HTTP logs
+- **Schema versioning** — board format versioning with migrations
+- **Offline mode** — full offline support for desktop builds
 
 ### AI Providers
 | Provider | Env Variable | Models |
@@ -260,7 +287,9 @@ GET    /api/unsplash/search?q=           — image search (proxied)
 
 ### Platform
 - Web (any browser)
+- Windows desktop (Tauri) — auto-starts server
 - macOS desktop (Tauri)
+- Linux desktop (Tauri)
 - PWA (installable, works offline)
 - Railway deployment (Express server + MCP SSE)
 - Code splitting (vendor/store/UI chunks)
