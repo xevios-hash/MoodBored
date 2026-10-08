@@ -172,7 +172,7 @@ Transform MoodBored into an interactive learning platform with AI-powered lesson
 - Viewport culling for performance (handles 500+ items)
 - Video/YouTube background support
 
-### 12 Item Types
+### 13 Item Types
 | Kind | Description |
 |------|-------------|
 | `note` | Text thoughts, quotes, keywords |
@@ -187,6 +187,7 @@ Transform MoodBored into an interactive learning platform with AI-powered lesson
 | `video` | Video reference with subject and motion description |
 | `container` | Group of items with layout modes (free/grid/stack) |
 | `web` | Live web page with browser controls and navigation history |
+| `file` | File on disk with syntax-highlighted preview and editor |
 
 ### AI
 - LLM chat with tool-calling — structured function invocations
@@ -217,6 +218,20 @@ Transform MoodBored into an interactive learning platform with AI-powered lesson
 - **Lesson generation** — create educational content via API/MCP
 - **Export for AI** — prompts for SD, Midjourney, DALL-E, video models, LLMs
 
+### File Nodes (IDE Layer)
+- **File items** — files on disk become canvas nodes with syntax-highlighted preview
+- **Language badges** — auto-detects language from file extension
+- **File operations** — read, write, delete, rename via MCP tools
+- **Chunked writes** — handles large content arriving in segments from agents
+- **Editor mode** — click to edit files directly on the canvas
+
+### Concurrency Hardening
+- **Version vectors** — track changes across multiple agents
+- **Optimistic locking** — prevents conflicting simultaneous edits
+- **Conflict detection** — identifies and surfaces conflicts to users
+- **Operation logging** — full audit trail of all changes
+- **Agent dashboard** — real-time view of connected agents and their operations
+
 ### Content Creation
 - **Unsplash search** — built-in image browser (via server proxy)
 - **Color picker** — HSL sliders, harmony generators
@@ -224,7 +239,7 @@ Transform MoodBored into an interactive learning platform with AI-powered lesson
 - **Quick input** — press `/` to create nodes with smart type detection
 
 ### MCP Server
-- 15 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`, `open_url`, `draw_connection`, `create_snapshot`, `list_snapshots`, `summarize_across`, `generate_lesson`
+- 20 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`, `open_url`, `draw_connection`, `create_snapshot`, `list_snapshots`, `summarize_across`, `generate_lesson`, `read_file`, `write_file`, `list_files`, `delete_file`, `rename_file`
 - Stdio transport (Claude Desktop, Cursor) + SSE transport (OpenCode, web IDEs)
 - `/.well-known/mcp.json` discovery endpoint
 
@@ -247,6 +262,10 @@ POST   /api/scan/models                  — scan local filesystem
 GET    /api/scan/auto                    — auto-scan common locations
 POST   /api/ai/generate-image            — image generation (proxied)
 GET    /api/unsplash/search?q=           — image search (proxied)
+GET    /api/agents                       — list connected agents
+POST   /api/agents/register              — register agent
+GET    /api/operations                   — view operation history
+GET    /api/conflicts                    — view conflicts
 ```
 
 ### Collaboration

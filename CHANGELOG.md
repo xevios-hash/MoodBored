@@ -5,6 +5,20 @@ All notable changes to MoodBored will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **File Nodes (IDE Layer)**: Files become first-class canvas nodes with syntax-highlighted preview, language badges, and full editor support
+- **Chunking Mechanism**: Generic content chunking for large files arriving in segments from agents
+- **File MCP Tools**: `read_file`, `write_file`, `list_files`, `delete_file`, `rename_file` for filesystem operations
+- **Concurrency Hardening**: Version vectors, optimistic locking, and conflict detection for multi-agent writes
+- **Agent Observability Dashboard**: Real-time view of connected agents, operations, and conflicts
+- **14 AI Providers**: OpenRouter, OpenAI, Anthropic, Gemini, Groq, Together, Mistral, Cohere, Perplexity, Fireworks, DeepSeek, Ollama, LM Studio, Custom
+- **Model Manager**: Native model scanning, catalog with HuggingFace models, runtime detection
+- **Inference Orchestration**: Direct integration with llama.cpp, Ollama, LM Studio, ComfyUI, Automatic1111, Invoke AI
+- **Canvas Conversations**: AI responds to notes directly on the board
+- **Regions**: Colored, named boxes for organizing board areas
+- **Schema Versioning**: Board format versioning with migration system
+- **Offline Mode**: Full offline support for desktop builds
+- **Quick Input Box**: Press `/` to create nodes with smart type detection
+- **Export for AI**: Prompts for SD, Midjourney, DALL-E, video models, LLMs
 - P0 security fixes (helmet, CORS, rate limiting, atomic writes)
 - API proxy endpoints to keep keys server-side
 - Enhanced right-click context menu with 20+ actions
