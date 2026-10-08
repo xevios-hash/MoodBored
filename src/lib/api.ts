@@ -72,9 +72,10 @@ export async function streamChat(
   onDone: () => void,
   onError: (err: string) => void,
   signal?: AbortSignal,
-  providerSettings?: { ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
+  providerSettings?: { provider?: string; ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
 ) {
-  const provider = detectProvider(model)
+  // Use explicit provider if provided, otherwise detect from model
+  const provider = (providerSettings?.provider as AIProvider) || detectProvider(model)
   const url = getProviderUrl(provider)
 
   try {
@@ -85,6 +86,7 @@ export async function streamChat(
       },
       body: JSON.stringify({
         model,
+        provider,
         messages,
         stream: true,
         temperature: 0.8,
@@ -159,15 +161,17 @@ export async function streamChatWithTools(
   onError: (err: string) => void,
   signal?: AbortSignal,
   maxIterations = 5,
-  providerSettings?: { ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
+  providerSettings?: { provider?: string; ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
 ) {
-  const provider = detectProvider(model)
+  // Use explicit provider if provided, otherwise detect from model
+  const provider = (providerSettings?.provider as AIProvider) || detectProvider(model)
   const url = getProviderUrl(provider)
   let currentMessages = [...messages]
 
   for (let i = 0; i < maxIterations; i++) {
     const body: any = {
       model,
+      provider,
       messages: currentMessages,
       stream: true,
       temperature: 0.8,

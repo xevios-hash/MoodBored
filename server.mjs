@@ -1620,7 +1620,19 @@ function getProviderConfig(provider) {
 }
 
 app.post('/api/ai/chat', async (req, res) => {
-  const provider = detectProvider(req.body?.model)
+  // Detect provider from model name OR from explicit provider field
+  let provider = detectProvider(req.body?.model)
+
+  // If provider not detected from model, check if explicitly set
+  if (provider === 'openrouter' && req.body?.provider) {
+    provider = req.body.provider
+  }
+
+  // Also check providerSettings for provider type
+  if (provider === 'openrouter' && req.body?.providerSettings?.provider) {
+    provider = req.body.providerSettings.provider
+  }
+
   const config = getProviderConfig(provider)
 
   // Get provider settings from request body (for local providers)

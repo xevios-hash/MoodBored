@@ -231,6 +231,14 @@ export function ChatPanel() {
             setStreaming(false)
           },
           abortController.signal,
+          5, // maxIterations
+          {
+            provider: settings.provider,
+            ollamaUrl: settings.ollamaUrl,
+            lmstudioUrl: settings.lmstudioUrl,
+            customAiUrl: settings.customAiUrl,
+            customAiKey: settings.customAiKey,
+          },
         )
       } else {
         // ─── Regex-parsed mode (legacy fallback) ────────────────────
@@ -265,6 +273,13 @@ export function ChatPanel() {
             setStreaming(false)
           },
           abortController.signal,
+          {
+            provider: settings.provider,
+            ollamaUrl: settings.ollamaUrl,
+            lmstudioUrl: settings.lmstudioUrl,
+            customAiUrl: settings.customAiUrl,
+            customAiKey: settings.customAiKey,
+          },
         )
       }
     } catch (err) {

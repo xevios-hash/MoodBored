@@ -423,6 +423,14 @@ Example response:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: settings.defaultModel || 'anthropic/claude-sonnet-4',
+          provider: settings.provider || undefined,
+          providerSettings: {
+            provider: settings.provider,
+            ollamaUrl: settings.ollamaUrl,
+            lmstudioUrl: settings.lmstudioUrl,
+            customAiUrl: settings.customAiUrl,
+            customAiKey: settings.customAiKey,
+          },
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: `My note says: "${noteText}"\n\nRespond with related items for the canvas. Return ONLY valid JSON array.` },
