@@ -6,6 +6,7 @@ export interface VideoBackground {
   url: string
   label: string
   category: 'nature' | 'abstract' | 'geometric' | 'space' | 'urban'
+  brightness: 'dark' | 'medium' | 'light'  // Auto-selects theme
   author: string
   authorUrl: string
   license: string
@@ -20,6 +21,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/tropical-jungle.mp4',
     label: 'Tropical Jungle',
     category: 'nature',
+    brightness: 'light',  // Green foliage is bright
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/lush-tropical-jungle-with-palm-trees-and-greenery-34411623/',
     license: 'Pexels License (Free for personal and commercial use)',
@@ -29,6 +31,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/sky-day.mp4',
     label: 'Daytime Sky',
     category: 'nature',
+    brightness: 'light',  // Bright sky
     author: 'MoodBored',
     authorUrl: '',
     license: 'Original',
@@ -40,6 +43,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/luminous-particles.mp4',
     label: 'Luminous Particles',
     category: 'abstract',
+    brightness: 'dark',  // Dark background with glowing particles
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/luminous-particles-loop-with-tunnel-effect-11354070/',
     license: 'Pexels License (Free for personal and commercial use)',
@@ -49,6 +53,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/light-waves.mp4',
     label: 'Light Waves',
     category: 'abstract',
+    brightness: 'dark',  // Dark background with light waves
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/vibrant-abstract-light-waves-on-dark-background-29377163/',
     license: 'Pexels License (Free for personal and commercial use)',
@@ -58,6 +63,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/organic-formations.mp4',
     label: 'Organic Formations',
     category: 'abstract',
+    brightness: 'dark',  // Dark abstract formations
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/abstract-organic-formations-in-motion-36458860/',
     license: 'Pexels License (Free for personal and commercial use)',
@@ -67,6 +73,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/neon-space.mp4',
     label: 'Neon Space',
     category: 'space',
+    brightness: 'dark',  // Dark space with neon glows
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/dynamic-abstract-space-animation-with-neon-glows-35909871/',
     license: 'Pexels License (Free for personal and commercial use)',
@@ -78,6 +85,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/geometric-vj.mp4',
     label: 'Geometric VJ',
     category: 'geometric',
+    brightness: 'dark',  // Dark geometric patterns
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/mesmerizing-abstract-geometric-vj-loop-39662721/',
     license: 'Pexels License (Free for personal and commercial use)',
@@ -87,6 +95,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/fractal-animation.mp4',
     label: 'Fractal Animation',
     category: 'geometric',
+    brightness: 'dark',  // Dark fractal patterns
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/hypnotic-abstract-fractal-animation-loop-39478038/',
     license: 'Pexels License (Free for personal and commercial use)',
@@ -96,6 +105,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/cg-vj-loop.mp4',
     label: 'CG VJ Loop',
     category: 'abstract',
+    brightness: 'dark',  // Dark CG background
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/abstract-background-cg-hypnotic-vj-loop-18196311/',
     license: 'Pexels License (Free for personal and commercial use)',
@@ -107,17 +117,9 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/red-spheres-tunnel.mp4',
     label: 'Red Spheres Tunnel',
     category: 'space',
+    brightness: 'dark',  // Dark tunnel with red spheres
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/vibrant-abstract-tunnel-of-red-and-pink-spheres-33260736/',
-    license: 'Pexels License (Free for personal and commercial use)',
-  },
-  {
-    id: 'blue-digital-tunnel',
-    url: '/videos/blue-digital-tunnel.mp4',
-    label: 'Blue Digital Tunnel',
-    category: 'space',
-    author: 'Pexels',
-    authorUrl: 'https://www.pexels.com/video/futuristic-blue-digital-tunnel-animation-36028944/',
     license: 'Pexels License (Free for personal and commercial use)',
   },
 
@@ -127,6 +129,7 @@ export const VIDEO_BACKGROUNDS: VideoBackground[] = [
     url: '/videos/black-white-maze.mp4',
     label: 'Black & White Maze',
     category: 'geometric',
+    brightness: 'medium',  // Mixed black and white
     author: 'Pexels',
     authorUrl: 'https://www.pexels.com/video/a-black-and-white-image-of-a-maze-17552070/',
     license: 'Pexels License (Free for personal and commercial use)',
@@ -157,6 +160,16 @@ export function getVideoCategories(): VideoBackground['category'][] {
 // Get the default video (first one or random)
 export function getDefaultVideo(): VideoBackground {
   return VIDEO_BACKGROUNDS[0]
+}
+
+// Get recommended theme based on video brightness
+export function getRecommendedTheme(video: VideoBackground): 'dark' | 'light' {
+  return video.brightness === 'light' ? 'light' : 'dark'
+}
+
+// Get video by URL
+export function getVideoByUrl(url: string): VideoBackground | undefined {
+  return VIDEO_BACKGROUNDS.find(v => v.url === url)
 }
 
 // Format video credits for display

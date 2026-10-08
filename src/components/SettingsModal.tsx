@@ -3,6 +3,7 @@ import { X, Eye, EyeOff, Shield, RefreshCw, Check, AlertCircle, Loader2 } from '
 import { useState, useEffect, useCallback } from 'react'
 import { resetJevCounter, fetchAvailableProviders, getModelsForProvider, type AIProvider, type ProviderInfo } from '@/lib/api'
 import { showToast } from '@/lib/toasts'
+import { getVideoByUrl, getRecommendedTheme } from '@/lib/videoBackgrounds'
 
 interface ModelState {
   loading: boolean
@@ -500,22 +501,29 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                   {/* Built-in presets */}
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { url: '/sky-day.mp4', label: 'Daytime Sky' },
-                      { url: '/videos/tropical-jungle.mp4', label: 'Tropical Jungle' },
-                      { url: '/videos/luminous-particles.mp4', label: 'Luminous Particles' },
-                      { url: '/videos/geometric-vj.mp4', label: 'Geometric VJ' },
-                      { url: '/videos/light-waves.mp4', label: 'Light Waves' },
-                      { url: '/videos/black-white-maze.mp4', label: 'B&W Maze' },
-                      { url: '/videos/fractal-animation.mp4', label: 'Fractal Animation' },
-                      { url: '/videos/cg-vj-loop.mp4', label: 'CG VJ Loop' },
-                      { url: '/videos/red-spheres-tunnel.mp4', label: 'Red Spheres' },
-                      { url: '/videos/organic-formations.mp4', label: 'Organic Forms' },
-                      { url: '/videos/neon-space.mp4', label: 'Neon Space' },
-                      { url: '/videos/blue-digital-tunnel.mp4', label: 'Blue Tunnel' },
+                      { url: '/sky-day.mp4', label: '☀️ Daytime Sky' },
+                      { url: '/videos/tropical-jungle.mp4', label: '🌴 Tropical Jungle' },
+                      { url: '/videos/luminous-particles.mp4', label: '✨ Luminous Particles' },
+                      { url: '/videos/geometric-vj.mp4', label: '🔷 Geometric VJ' },
+                      { url: '/videos/light-waves.mp4', label: '🌊 Light Waves' },
+                      { url: '/videos/black-white-maze.mp4', label: '🏁 B&W Maze' },
+                      { url: '/videos/fractal-animation.mp4', label: '🌀 Fractal Animation' },
+                      { url: '/videos/cg-vj-loop.mp4', label: '💎 CG VJ Loop' },
+                      { url: '/videos/red-spheres-tunnel.mp4', label: '🔴 Red Spheres' },
+                      { url: '/videos/organic-formations.mp4', label: '🫧 Organic Forms' },
+                      { url: '/videos/neon-space.mp4', label: '💜 Neon Space' },
                     ].map((bg) => (
                       <button
                         key={bg.url}
-                        onClick={() => updateSettings({ canvasBgVideo: bg.url })}
+                        onClick={() => {
+                          // Auto-switch theme based on video brightness
+                          const video = getVideoByUrl(bg.url)
+                          const updates: any = { canvasBgVideo: bg.url }
+                          if (video) {
+                            updates.theme = getRecommendedTheme(video)
+                          }
+                          updateSettings(updates)
+                        }}
                         className={`px-3 py-2 rounded-lg text-xs font-medium transition-fast border ${
                           settings.canvasBgVideo === bg.url
                             ? 'bg-[#8b7dc8] text-white border-accent'
