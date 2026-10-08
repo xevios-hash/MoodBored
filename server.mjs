@@ -1576,6 +1576,24 @@ const AI_PROVIDERS = {
   },
 }
 
+// ─── AI Bridge Detection ────────────────────────────────────────────
+// The AI Bridge is a local proxy that allows the web app to connect to
+// local AI providers. It runs on the user's machine and handles CORS.
+
+const AI_BRIDGE_URL = process.env.AI_BRIDGE_URL || 'http://localhost:3001'
+
+async function detectAIBridge() {
+  try {
+    const res = await fetch(`${AI_BRIDGE_URL}/health`, { signal: AbortSignal.timeout(2000) })
+    if (res.ok) {
+      const data = await res.json()
+      console.log(`[MoodBored] AI Bridge detected at ${AI_BRIDGE_URL}`)
+      return data
+    }
+  } catch {}
+  return null
+}
+
 function detectProvider(model) {
   if (!model) return 'openrouter'
   const lower = model.toLowerCase()
@@ -1697,11 +1715,15 @@ app.post('/api/ai/chat', async (req, res) => {
 })
 
 // List available providers
-app.get('/api/ai/providers', (req, res) => {
+app.get('/api/ai/providers', async (req, res) => {
+  const bridge = await detectAIBridge()
+
   const providers = Object.entries(AI_PROVIDERS).map(([name, config]) => ({
     name,
     available: !config.envKey || !!process.env[config.envKey],
     envKey: config.envKey,
+    local: ['ollama', 'lmstudio', 'custom'].includes(name),
+    bridgeAvailable: bridge !== null,
     models: name === 'openrouter' ? ['anthropic/claude-sonnet-4', 'openai/gpt-4', 'google/gemini-pro', 'meta-llama/llama-3-70b', 'mistralai/mistral-large'] :
             name === 'openai' ? ['gpt-4', 'gpt-4-turbo', 'gpt-4o', 'gpt-3.5-turbo'] :
             name === 'anthropic' ? ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'] :
@@ -1717,7 +1739,33 @@ app.get('/api/ai/providers', (req, res) => {
             name === 'lmstudio' ? ['local-model', 'default'] :
             name === 'custom' ? ['custom-model'] : [],
   }))
-  res.json({ providers })
+
+  res.json({
+    providers,
+    bridge: bridge ? {
+      available: true,
+      url: AI_BRIDGE_URL,
+      providers: bridge.providers || [],
+    } : {
+      available: false,
+      url: AI_BRIDGE_URL,
+      message: 'Run "node scripts/ai-bridge.js" to enable local AI providers',
+    },
+  })
+})
+
+// AI Bridge status check
+app.get('/api/ai/bridge', async (req, res) => {
+  const bridge = await detectAIBridge()
+  if (bridge) {
+    res.json({ connected: true, ...bridge })
+  } else {
+    res.json({
+      connected: false,
+      message: 'AI Bridge not detected. Run: node scripts/ai-bridge.js',
+      url: AI_BRIDGE_URL,
+    })
+  }
 })
 
 // ─── SPA Fallback (catch-all, last) ─────────────────────────────────

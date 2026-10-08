@@ -151,7 +151,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
               <div className="mt-3">
                 <label className="text-xs text-text-muted block mb-2">Provider Status</label>
                 <div className="space-y-1">
-                  {providers.map(p => (
+                  {providers.filter(p => !p.local).map(p => (
                     <div key={p.name} className="flex items-center gap-2 text-xs">
                       <span className={`w-2 h-2 rounded-full ${p.available ? 'bg-green-500' : 'bg-gray-400'}`} />
                       <span className="text-text-secondary capitalize">{p.name}</span>
@@ -160,6 +160,31 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                       )}
                     </div>
                   ))}
+                </div>
+
+                {/* Local Providers Info */}
+                <div className="mt-3 p-3 rounded-lg border border-accent/15 bg-accent/5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm">💻</span>
+                    <span className="text-xs font-medium text-text-primary">Local Providers</span>
+                  </div>
+                  <p className="text-2xs text-text-muted mb-2">
+                    LM Studio, Ollama, and Custom endpoints require running MoodBored locally.
+                  </p>
+                  <div className="space-y-1">
+                    {providers.filter(p => p.local).map(p => (
+                      <div key={p.name} className="flex items-center gap-2 text-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                        <span className="text-text-secondary capitalize">{p.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 p-2 rounded bg-surface-0 text-2xs font-mono text-text-muted">
+                    npm run dev
+                  </div>
+                  <p className="text-2xs text-text-muted mt-1">
+                    Or use the AI Bridge for web access
+                  </p>
                 </div>
               </div>
             </div>

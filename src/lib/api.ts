@@ -1020,6 +1020,8 @@ export interface ProviderInfo {
   name: AIProvider
   available: boolean
   envKey: string | null
+  local?: boolean
+  bridgeAvailable?: boolean
   models: string[]
 }
 
