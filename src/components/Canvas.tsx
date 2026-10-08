@@ -507,7 +507,20 @@ Example response:
       showToast('AI response added to canvas', 'success')
     } catch (err) {
       console.error('Canvas conversation error:', err)
-      showToast('Failed to get AI response', 'error')
+
+      // Provide helpful error message based on the error
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+      const currentProvider = useStore.getState().project.settings.provider || 'openrouter'
+      const isLocalProvider = currentProvider === 'ollama' || currentProvider === 'lmstudio' || currentProvider === 'custom'
+      const isProduction = window.location.hostname.includes('railway.app') || window.location.hostname.includes('up.railway.app')
+
+      if (isLocalProvider && isProduction) {
+        showToast('Local AI providers require running MoodBored locally. Use npm run dev.', 'error')
+      } else if (errorMsg.includes('fetch') || errorMsg.includes('network')) {
+        showToast(`Cannot connect to ${currentProvider}. Make sure it's running.`, 'error')
+      } else {
+        showToast('Failed to get AI response', 'error')
+      }
     } finally {
       setIsGeneratingResponse(prev => {
         const next = new Set(prev)
