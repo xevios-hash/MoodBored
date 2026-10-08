@@ -1718,14 +1718,21 @@ app.use(express.static(join(__dirname, 'dist'), {
   index: false, // Don't serve index.html from static
 }))
 
-// Serve index.html with no-cache headers
+// Serve index.html with no-cache headers for root
 app.get(['/', '/index.html'], (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
   res.setHeader('Pragma', 'no-cache')
   res.setHeader('Expires', '0')
   res.sendFile(join(__dirname, 'dist', 'index.html'))
 })
-app.get('/{*splat}', (_req, res) => {
+
+// SPA fallback - only for routes that don't match static files
+// This allows Express static middleware to serve JS/CSS/assets first
+app.get('/{*splat}', (req, res, next) => {
+  // Skip if it's an API route (should have been handled above)
+  if (req.path.startsWith('/api/') || req.path.startsWith('/mcp/')) {
+    return next()
+  }
   res.sendFile(join(__dirname, 'dist', 'index.html'))
 })
 
