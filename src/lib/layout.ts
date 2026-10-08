@@ -106,9 +106,20 @@ export function getItemCenter(item: BoardItem): Position | null {
 }
 
 export function hitTestItem(items: BoardItem[], wx: number, wy: number): BoardItem | null {
+  // First pass: check non-region items (they have priority)
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i]
-    if (item.kind === 'connector') continue
+    if (item.kind === 'connector' || item.kind === 'region') continue
+    const rect = getItemRect(item)
+    if (!rect) continue
+    if (wx >= rect.x && wx <= rect.x + rect.w && wy >= rect.y && wy <= rect.y + rect.h) {
+      return item
+    }
+  }
+  // Second pass: check regions only if no other item was hit
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i]
+    if (item.kind !== 'region') continue
     const rect = getItemRect(item)
     if (!rect) continue
     if (wx >= rect.x && wx <= rect.x + rect.w && wy >= rect.y && wy <= rect.y + rect.h) {

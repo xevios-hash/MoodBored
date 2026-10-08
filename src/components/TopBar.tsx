@@ -148,6 +148,23 @@ export function TopBar({ onExportForCreation, onUnsplashSearch, onShare, onColor
       {/* Right: Core actions */}
       <div className="flex items-center gap-0.5">
         <button
+          onClick={onPresent}
+          className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+          style={{ color: 'var(--text-primary)' }}
+          title="Present (Play)"
+        >
+          <Play size={16} />
+        </button>
+        <button
+          onClick={onCreateLesson}
+          className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+          style={{ color: 'var(--text-primary)' }}
+          title="Create Lesson"
+        >
+          <GraduationCap size={16} />
+        </button>
+        <div className="w-px h-5 mx-1" style={{ background: 'var(--border-color)' }} />
+        <button
           onClick={toggleSearch}
           className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
           style={{ color: 'var(--text-primary)' }}

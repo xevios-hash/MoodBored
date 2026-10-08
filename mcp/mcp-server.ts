@@ -632,6 +632,185 @@ server.tool(
   }
 )
 
+// ─── Lesson Generator ───────────────────────────────────────────────
+
+function generateLessonSlides(topic: string, gradeLevel: string, slideCount: number, includeQuizzes: boolean): any[] {
+  const slides: any[] = []
+  const level = gradeLevel.toLowerCase()
+  const isYoung = ['k-2', '3-5'].includes(level)
+  const isTeen = ['6-8', '9-12'].includes(level)
+
+  // Intro slide
+  slides.push({
+    type: 'concept',
+    title: `Welcome to ${topic}!`,
+    content: isYoung
+      ? `Hi there! Today we're going to learn about ${topic}. It's going to be fun!`
+      : `Let's explore ${topic}. This lesson will cover the key concepts and help you understand this important topic.`,
+    narration: isYoung
+      ? `Hi friends! Are you ready to learn about ${topic}? Let's get started!`
+      : `Welcome to this lesson on ${topic}. By the end, you'll have a solid understanding of the fundamentals.`,
+  })
+
+  // What is it slide
+  slides.push({
+    type: 'concept',
+    title: `What is ${topic}?`,
+    content: isYoung
+      ? `${topic} is something really cool that we use all the time. Let's find out what it is!`
+      : `${topic} is a fundamental concept that plays a key role in many areas. Understanding it opens doors to many applications.`,
+    narration: isYoung
+      ? `So what exactly is ${topic}? Let me explain it in a way that's easy to understand.`
+      : `Let's start by defining what ${topic} actually is and why it matters.`,
+  })
+
+  // Key concepts (generate based on slide count)
+  const concepts = [
+    { title: `The Basics of ${topic}`, content: `Every topic has building blocks. For ${topic}, the foundational concepts are essential to understand before moving on to more complex ideas.` },
+    { title: `How ${topic} Works`, content: `Now that we know what ${topic} is, let's look at how it works. The mechanisms and principles behind it are fascinating.` },
+    { title: `Why ${topic} Matters`, content: `${topic} isn't just theoretical - it has real-world applications that affect our daily lives in many ways.` },
+    { title: `${topic} in Practice`, content: `Let's see how ${topic} is used in the real world. From science to technology, its applications are vast.` },
+    { title: `Key Principles of ${topic}`, content: `Understanding the core principles of ${topic} will help you apply this knowledge in different contexts.` },
+  ]
+
+  for (let i = 0; i < Math.min(slideCount - 4, concepts.length); i++) {
+    slides.push({
+      type: 'concept',
+      title: concepts[i].title,
+      content: concepts[i].content,
+      narration: `Let me tell you about ${concepts[i].title.toLowerCase()}.`,
+    })
+  }
+
+  // Quiz slides
+  if (includeQuizzes) {
+    slides.push({
+      type: 'quiz',
+      title: 'Quick Check!',
+      questions: [
+        {
+          question: `What is the main purpose of ${topic}?`,
+          options: ['To confuse people', 'To solve problems', 'To make things harder', 'None of the above'],
+          correctAnswer: 1,
+          explanation: `${topic} is used to solve problems and understand the world better!`,
+        },
+        {
+          question: `True or False: ${topic} is only useful in school.`,
+          options: ['True', 'False'],
+          correctAnswer: 1,
+          explanation: `False! ${topic} is used in many real-world situations.`,
+        },
+      ],
+    })
+  }
+
+  // Summary slide
+  slides.push({
+    type: 'summary',
+    title: 'Great Job!',
+    content: `You've learned about ${topic}! Remember the key concepts we covered and try to apply them in your daily life.`,
+    narration: `Congratulations! You've completed the lesson on ${topic}. Keep exploring and learning!`,
+  })
+
+  return slides
+}
+
+server.tool(
+  'generate_lesson',
+  'Generate an interactive lesson on any topic. Creates a structured educational experience with slides, narration scripts, and optional quizzes.',
+  {
+    topic: z.string().describe('The topic to teach about (e.g., "Linear Algebra", "Photosynthesis", "World War 2")'),
+    grade_level: z.enum(['K-2', '3-5', '6-8', '9-12', 'adult']).optional().describe('Grade level (default: 9-12)'),
+    slide_count: z.number().min(4).max(20).optional().describe('Number of slides (default: 8)'),
+    include_quizzes: z.boolean().optional().describe('Include quiz questions (default: true)'),
+    add_to_board: z.boolean().optional().describe('Add lesson items to current board (default: true)'),
+  },
+  async ({ topic, grade_level, slide_count, include_quizzes, add_to_board }) => {
+    const gradeLevel = grade_level || '9-12'
+    const slideCount = slide_count || 8
+    const includeQuizzes = include_quizzes !== false
+    const addToBoard = add_to_board !== false
+
+    const slides = generateLessonSlides(topic, gradeLevel, slideCount, includeQuizzes)
+
+    if (!addToBoard) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ topic, gradeLevel, slides }, null, 2),
+        }],
+      }
+    }
+
+    // Add slides as items to the board
+    const state = readState()
+    if (!state.project) {
+      return { content: [{ type: 'text', text: 'No board found. Create a board first.' }] }
+    }
+
+    const vp = getActiveViewport(state)
+    if (!vp) {
+      return { content: [{ type: 'text', text: 'No viewport found.' }] }
+    }
+
+    // Add region for the lesson
+    const regionId = uuid()
+    vp.items.push({
+      kind: 'region',
+      id: regionId,
+      label: `Lesson: ${topic}`,
+      color: '#4CAF50',
+      fillColor: 'rgba(76, 175, 80, 0.04)',
+      borderWidth: 1.5,
+      borderStyle: 'dashed',
+      opacity: 0.2,
+      purpose: `${gradeLevel} lesson on ${topic}`,
+      importance: 'Educational content',
+      tags: ['lesson', topic.toLowerCase()],
+      locked: false,
+      pos: { x: 50, y: 50 },
+      size: { w: 600, h: slides.length * 120 + 100 },
+    })
+
+    // Add each slide as a note
+    slides.forEach((slide: any, idx: number) => {
+      const slideId = uuid()
+      const y = 100 + idx * 120
+
+      // Slide title
+      vp.items.push({
+        kind: 'note',
+        id: slideId,
+        text: `${idx + 1}. ${slide.title}`,
+        purpose: slide.type,
+        importance: slide.type === 'quiz' ? 'Quiz' : 'Content',
+        tags: ['lesson', slide.type],
+        pos: { x: 80, y },
+      })
+
+      // Slide content
+      if (slide.content) {
+        vp.items.push({
+          kind: 'text',
+          id: uuid(),
+          raw: slide.content,
+          pos: { x: 300, y },
+          size: { w: 320, h: 80 },
+        })
+      }
+    })
+
+    writeState(state)
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Generated ${slides.length}-slide lesson on "${topic}" for ${gradeLevel} level.\n\nSlides:\n${slides.map((s: any, i: number) => `${i + 1}. [${s.type}] ${s.title}`).join('\n')}\n\nLesson added to board with region and ${slides.length * 2} items.`,
+      }],
+    }
+  }
+)
+
 // ─── Start ──────────────────────────────────────────────────────────
 
 async function main() {

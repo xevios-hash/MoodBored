@@ -157,7 +157,7 @@ const KIND_COLORS: Record<string, string> = {
   text: '#8b7dc8', note: '#e8b840', image: '#e88098', link: '#6aa8d8',
   video: '#a888d8', palette: '#78c8a0', gradient: '#e89060', font: '#d87898',
   swatch: '#78b8d8', sizeguide: '#999999', container: '#78c8a0', connector: '#666688',
-  web: '#6aa8d8',
+  web: '#6aa8d8', region: '#4CAF50',
 }
 const RESIZE_HANDLE_SIZE = 8
 
@@ -414,8 +414,16 @@ export function Canvas() {
                  item.pos.y + h < viewTop || item.pos.y > viewBottom)
       }
 
+      // Draw regions first (send to back)
       for (const item of its) {
-        if (item.kind === 'connector' || item.kind === 'web' || !('pos' in item)) continue
+        if (item.kind !== 'region' || !('pos' in item)) continue
+        if (!isItemVisible(item)) continue
+        drawItem(ctx, item, sel.has(item.id), c.zoom)
+      }
+
+      // Draw all other items on top of regions
+      for (const item of its) {
+        if (item.kind === 'connector' || item.kind === 'web' || item.kind === 'region' || !('pos' in item)) continue
         if (!isItemVisible(item)) continue  // Cull off-screen items
         drawItem(ctx, item, sel.has(item.id), c.zoom)
       }
@@ -1092,6 +1100,58 @@ export function Canvas() {
       case 'new-note':
         state.addItem({ kind: 'note', id: crypto.randomUUID(), text: '', purpose: '', importance: '', tags: [], pos: { x: contextMenu.wx - 125, y: contextMenu.wy - 75 } })
         break
+      case 'arrange-grid':
+        state.arrangeGrid(4, 20)
+        showToast('Arranged in grid', 'success')
+        break
+      case 'arrange-stack-h':
+        state.arrangeStack('h', 20)
+        showToast('Arranged horizontally', 'success')
+        break
+      case 'arrange-stack-v':
+        state.arrangeStack('v', 20)
+        showToast('Arranged vertically', 'success')
+        break
+      case 'arrange-spiral':
+        state.arrangeSpiral(20)
+        showToast('Arranged in spiral', 'success')
+        break
+      case 'create-region': {
+        const regionId = crypto.randomUUID()
+        state.addItem({
+          kind: 'region',
+          id: regionId,
+          label: 'New Region',
+          color: '#8b7dc8',
+          fillColor: isDark() ? 'rgba(139,125,200,0.04)' : 'rgba(106,90,174,0.04)',
+          borderWidth: 1.5,
+          borderStyle: 'dashed',
+          opacity: 0.2,
+          purpose: '',
+          importance: '',
+          tags: [],
+          locked: false,
+          pos: { x: contextMenu.wx - 200, y: contextMenu.wy - 150 },
+          size: { w: 400, h: 300 },
+        })
+        showToast('Region created', 'success')
+        break
+      }
+      case 'present': {
+        // Convert board to lesson and enter presentation mode
+        import('@/lib/lesson').then(({ projectToLesson }) => {
+          const lesson = projectToLesson(state.project)
+          state.enterLessonMode(lesson)
+          showToast('Presentation mode started', 'success')
+        })
+        break
+      }
+      case 'create-lesson': {
+        // Open lesson generator modal
+        const event = new CustomEvent('moodbored:open-lesson-generator')
+        window.dispatchEvent(event)
+        break
+      }
     }
     setContextMenu(null)
   }
@@ -1531,6 +1591,30 @@ export function Canvas() {
           <CtxItem label="📋  Paste" shortcut="⌘V" onClick={() => handleContextAction('paste')} />
           <CtxItem label="🔍  Select All" shortcut="⌘A" onClick={() => handleContextAction('select-all')} />
 
+          <div className="status-divider" style={{ margin: '4px 0' }} />
+
+          {/* Arrange submenu */}
+          <details className="px-1">
+            <summary className="px-2 py-1.5 text-xs text-text-primary cursor-pointer hover:bg-surface-2 rounded flex items-center">
+              <span className="mr-2">📐</span> Arrange
+            </summary>
+            <div className="pl-2">
+              <CtxItem label="  Grid" onClick={() => { handleContextAction('arrange-grid'); setContextMenu(null) }} small />
+              <CtxItem label="  Stack Horizontal" onClick={() => { handleContextAction('arrange-stack-h'); setContextMenu(null) }} small />
+              <CtxItem label="  Stack Vertical" onClick={() => { handleContextAction('arrange-stack-v'); setContextMenu(null) }} small />
+              <CtxItem label="  Spiral" onClick={() => { handleContextAction('arrange-spiral'); setContextMenu(null) }} small />
+            </div>
+          </details>
+
+          {/* Create Region */}
+          <CtxItem label="🟦  Create Region" onClick={() => { handleContextAction('create-region'); setContextMenu(null) }} />
+
+          <div className="status-divider" style={{ margin: '4px 0' }} />
+
+          {/* Presentation */}
+          <CtxItem label="▶  Present" onClick={() => { handleContextAction('present'); setContextMenu(null) }} />
+          <CtxItem label="🎓  Create Lesson" onClick={() => { handleContextAction('create-lesson'); setContextMenu(null) }} />
+
           {contextMenu.itemId && (
             <>
               <div className="status-divider" style={{ margin: '4px 0' }} />
@@ -1804,6 +1888,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
     case 'container': drawContainerItem(ctx, item, x, y, w, h, zoom); break
     case 'link': drawLinkItem(ctx, item, x, y, w, h, zoom); break
     case 'web': drawWebItem(ctx, item as any, x, y, w, h, zoom); break
+    case 'region': drawRegionItem(ctx, item as any, x, y, w, h, zoom); break
     default: drawTextBasedItem(ctx, item, x, y, w, h, zoom); break
   }
   ctx.restore()
@@ -2094,6 +2179,56 @@ function drawTextBasedItem(ctx: CanvasRenderingContext2D, item: any, x: number, 
   if (tags.length > 0) {
     ctx.fillStyle = txtMuted(); ctx.font = '400 8px Inter, sans-serif'
     ctx.fillText(tags.slice(0, 3).join(', '), cx, tagsZone)
+  }
+}
+
+function drawRegionItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  const borderColor = item.color || '#8b7dc8'
+  const fillColor = item.fillColor || (isDark() ? 'rgba(139,125,200,0.05)' : 'rgba(106,90,174,0.05)')
+
+  // Full card is the region - subtle fill
+  ctx.fillStyle = fillColor
+  ctx.beginPath()
+  roundRect(ctx, x, y, w, h, 8)
+  ctx.fill()
+
+  // Border
+  ctx.strokeStyle = borderColor
+  ctx.lineWidth = (item.borderWidth || 1.5) / zoom
+  ctx.globalAlpha = 0.4
+  if (item.borderStyle === 'dashed') {
+    ctx.setLineDash([8 / zoom, 6 / zoom])
+  } else if (item.borderStyle === 'dotted') {
+    ctx.setLineDash([3 / zoom, 4 / zoom])
+  } else {
+    ctx.setLineDash([])
+  }
+  ctx.beginPath()
+  roundRect(ctx, x, y, w, h, 8)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.globalAlpha = 1
+
+  // Small label in top-left corner
+  if (item.label) {
+    const labelText = item.label.slice(0, 20)
+    ctx.font = '600 10px Inter, sans-serif'
+    const textW = ctx.measureText(labelText).width + 12
+    const labelH = 20
+    const lx = x + 8
+    const ly = y + 8
+
+    // Label background pill
+    ctx.fillStyle = borderColor
+    ctx.globalAlpha = 0.15
+    ctx.beginPath()
+    roundRect(ctx, lx, ly, textW, labelH, 4)
+    ctx.fill()
+    ctx.globalAlpha = 1
+
+    // Label text
+    ctx.fillStyle = borderColor
+    ctx.fillText(labelText, lx + 6, ly + 14)
   }
 }
 

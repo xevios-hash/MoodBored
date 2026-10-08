@@ -36,6 +36,7 @@ const IS_EMBED = URL_PARAMS.has('embed') || !!PATH_BOARD_ID
 const EMBED_READONLY = URL_PARAMS.has('readonly')
 const EMBED_THEME = URL_PARAMS.get('theme') as 'dark' | 'light' | null
 const EMBED_PROJECT_ID = URL_PARAMS.get('project')
+const START_LESSON = URL_PARAMS.has('lesson')
 
 // Detect if running inside an iframe (auto-enable embed if no explicit param)
 const IS_IFRAME = typeof window !== 'undefined' && window.self !== window.top
@@ -174,6 +175,21 @@ export default function App() {
         inspectorOpen: false,
       })
       setEmbedReady(true)
+
+      // Auto-start lesson mode if ?lesson=true
+      if (START_LESSON && EMBED_BOARD_ID) {
+        try {
+          const res = await fetch(`${window.location.origin}/api/board/${EMBED_BOARD_ID}/lesson`)
+          if (res.ok) {
+            const lesson = await res.json()
+            if (lesson && lesson.slides) {
+              useStore.getState().enterLessonMode(lesson)
+            }
+          }
+        } catch (err) {
+          console.error('[MoodBored] Failed to load lesson:', err)
+        }
+      }
     })()
   }, [isEmbed])
 
@@ -245,6 +261,13 @@ export default function App() {
     const handler = (e: CustomEvent) => setLightboxItem(e.detail)
     window.addEventListener('moodbored:lightbox' as any, handler)
     return () => window.removeEventListener('moodbored:lightbox' as any, handler)
+  }, [])
+
+  // ─── Lesson generator event ───
+  useEffect(() => {
+    const handler = () => setLessonGeneratorOpen(true)
+    window.addEventListener('moodbored:open-lesson-generator' as any, handler)
+    return () => window.removeEventListener('moodbored:open-lesson-generator' as any, handler)
   }, [])
 
   const handleSplashComplete = useCallback(() => setPhase('start'), [])

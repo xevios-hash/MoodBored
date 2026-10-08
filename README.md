@@ -184,11 +184,18 @@ Transform MoodBored into an interactive learning platform with AI-powered lesson
 | `web` | Live web page with browser controls and navigation history |
 
 ### AI
-- LLM chat with tool-calling (OpenRouter) — structured function invocations
+- LLM chat with tool-calling — structured function invocations
+- **14 AI providers** — OpenRouter, OpenAI, Anthropic, Gemini, Groq, Together, Mistral, Cohere, Perplexity, Fireworks, DeepSeek, Ollama, LM Studio, Custom
 - Image generation via server proxy (API keys stay server-side)
 - Multi-agent mode (6 specialist roles)
 - Semantic search — find items by meaning
 - Related items — find complementary items
+
+### Regions & Organization
+- **Regions** — colored, named boxes for organizing board areas
+- **Arrange tools** — grid, stack, spiral layouts via right-click menu
+- **Presentation mode** — convert boards to slideshows with narration
+- **Lesson generation** — create educational content via API/MCP
 
 ### Content Creation
 - **Unsplash search** — built-in image browser (via server proxy)
@@ -196,7 +203,7 @@ Transform MoodBored into an interactive learning platform with AI-powered lesson
 - **Export for Creation** — 8 creation types, 3 formats (Markdown, JSON, XML)
 
 ### MCP Server
-- 14 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`, `open_url`, `draw_connection`, `create_snapshot`, `list_snapshots`, `summarize_across`
+- 15 tools: `get_board`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`, `open_url`, `draw_connection`, `create_snapshot`, `list_snapshots`, `summarize_across`, `generate_lesson`
 - Stdio transport (Claude Desktop, Cursor) + SSE transport (OpenCode, web IDEs)
 - `/.well-known/mcp.json` discovery endpoint
 
@@ -209,7 +216,10 @@ GET    /api/board/:id/search?q=&tag=     — text search
 GET    /api/board/:id/semantic?q=        — semantic search
 POST   /api/board/:id/arrange            — layout arrangement
 GET    /api/board/:id/brief              — creative brief export
-POST   /api/ai/chat                      — AI chat (proxied)
+POST   /api/board/:id/lesson             — generate lesson
+GET    /api/board/:id/lesson             — get lesson data
+POST   /api/ai/chat                      — AI chat (multi-provider)
+GET    /api/ai/providers                 — list available providers
 POST   /api/ai/generate-image            — image generation (proxied)
 GET    /api/unsplash/search?q=           — image search (proxied)
 ```
@@ -224,11 +234,29 @@ GET    /api/unsplash/search?q=           — image search (proxied)
 - **Helmet** — security headers
 - **CORS** — restricted to known origins
 - **Rate limiting** — 100 req/15min API
-- **API keys server-side** — OpenRouter/Unsplash keys configured via `OPENROUTER_API_KEY` and `UNSPLASH_ACCESS_KEY` env vars, never sent to browser
+- **API keys server-side** — All provider keys configured via env vars, never sent to browser
 - **Board API auth** — `BOARD_API_TOKEN` required for mutating endpoints (POST/PUT/DELETE)
 - **Atomic file writes** — no data corruption
 - **Error handling** — graceful failure recovery
 - **Request logging** — morgan HTTP logs
+
+### AI Providers
+| Provider | Env Variable | Models |
+|----------|--------------|--------|
+| OpenRouter | `OPENROUTER_API_KEY` | 100+ models |
+| OpenAI | `OPENAI_API_KEY` | GPT-4, GPT-4o, GPT-3.5 |
+| Anthropic | `ANTHROPIC_API_KEY` | Claude 3.5, 3 Opus, 3 Haiku |
+| Google Gemini | `GEMINI_API_KEY` | Gemini Pro, 1.5 Pro/Flash |
+| Groq | `GROQ_API_KEY` | Llama 3, Mixtral |
+| Together AI | `TOGETHER_API_KEY` | Llama, Mixtral, CodeLlama |
+| Mistral AI | `MISTRAL_API_KEY` | Mistral Large/Medium/Small |
+| Cohere | `COHERE_API_KEY` | Command R+, Command R |
+| Perplexity | `PERPLEXITY_API_KEY` | Sonar models |
+| Fireworks AI | `FIREWORKS_API_KEY` | Llama, Mixtral |
+| DeepSeek | `DEEPSEEK_API_KEY` | DeepSeek Chat, Coder |
+| Ollama | *(local)* | llama3, mistral, codellama |
+| LM Studio | *(local)* | Any local model |
+| Custom | `CUSTOM_AI_URL` | Any OpenAI-compatible |
 
 ### Platform
 - Web (any browser)

@@ -1,7 +1,7 @@
 import { useStore } from '@/stores/useStore'
 import { X, Eye, EyeOff, Shield } from 'lucide-react'
-import { useState } from 'react'
-import { resetJevCounter } from '@/lib/api'
+import { useState, useEffect } from 'react'
+import { resetJevCounter, fetchAvailableProviders, getModelsForProvider, type AIProvider, type ProviderInfo } from '@/lib/api'
 import { showToast } from '@/lib/toasts'
 
 export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: () => void }) {
@@ -9,8 +9,13 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
   const updateSettings = useStore((s) => s.updateSettings)
   const toggleSettings = useStore((s) => s.toggleSettings)
   const [showApiKey, setShowApiKey] = useState(false)
+  const [providers, setProviders] = useState<ProviderInfo[]>([])
 
   const handleClose = onClose || toggleSettings
+
+  useEffect(() => {
+    fetchAvailableProviders().then(setProviders)
+  }, [])
 
   return (
     <div
@@ -34,18 +39,75 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
 
         <div className="p-4 space-y-5 max-h-[60vh] overflow-y-auto">
           {!embed && (<>
-          <Section title="API Configuration">
+          <Section title="AI Provider">
             <div className="p-3 rounded-lg border border-accent/15 bg-accent/5">
-              <p className="text-xs text-text-secondary">
-                AI features are powered by the server. The API key is configured server-side and never exposed to the browser.
+              <p className="text-xs text-text-secondary mb-3">
+                Select your AI provider and model. API keys are configured server-side and never exposed to the browser.
               </p>
+
+              {/* Provider Selection */}
+              <div className="mb-3">
+                <label className="text-xs text-text-muted block mb-1">Provider</label>
+                <select
+                  value={settings.defaultModel?.split('/')[0] || 'openrouter'}
+                  onChange={(e) => {
+                    const provider = e.target.value as AIProvider
+                    const models = getModelsForProvider(provider)
+                    updateSettings({ defaultModel: models[0] || '' })
+                  }}
+                  className="input w-full"
+                >
+                  <optgroup label="Cloud Providers">
+                    <option value="openrouter">OpenRouter (100+ models)</option>
+                    <option value="openai">OpenAI (GPT-4, GPT-4o)</option>
+                    <option value="anthropic">Anthropic (Claude)</option>
+                    <option value="gemini">Google Gemini</option>
+                    <option value="groq">Groq (Ultra-fast)</option>
+                    <option value="together">Together AI</option>
+                    <option value="mistral">Mistral AI</option>
+                    <option value="cohere">Cohere</option>
+                    <option value="perplexity">Perplexity</option>
+                    <option value="fireworks">Fireworks AI</option>
+                    <option value="deepseek">DeepSeek</option>
+                  </optgroup>
+                  <optgroup label="Local Providers">
+                    <option value="ollama">Ollama (Local)</option>
+                    <option value="lmstudio">LM Studio (Local)</option>
+                    <option value="custom">Custom Endpoint</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              {/* Model Selection */}
+              <div className="mb-3">
+                <label className="text-xs text-text-muted block mb-1">Model</label>
+                <select
+                  value={settings.defaultModel}
+                  onChange={(e) => updateSettings({ defaultModel: e.target.value })}
+                  className="input w-full"
+                >
+                  {getModelsForProvider((settings.defaultModel?.split('/')[0] || 'openrouter') as AIProvider).map(model => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Available Providers Status */}
+              <div className="mt-3">
+                <label className="text-xs text-text-muted block mb-2">Provider Status</label>
+                <div className="space-y-1">
+                  {providers.map(p => (
+                    <div key={p.name} className="flex items-center gap-2 text-xs">
+                      <span className={`w-2 h-2 rounded-full ${p.available ? 'bg-green-500' : 'bg-gray-400'}`} />
+                      <span className="text-text-secondary capitalize">{p.name}</span>
+                      {!p.available && p.envKey && (
+                        <span className="text-text-muted">({p.envKey})</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <Field
-              label="Default Model"
-              value={settings.defaultModel}
-              onChange={(v) => updateSettings({ defaultModel: v })}
-              placeholder="anthropic/claude-sonnet-4"
-            />
           </Section>
 
           <Section title="Agent — Jev Quality Gate">

@@ -364,6 +364,22 @@ export interface ConnectorItem {
   tags: string[]
 }
 
+// ─── Region (colored, named area for organization) ──────────────────
+
+export interface RegionItem extends ItemBase {
+  kind: 'region'
+  label: string
+  color: string           // border/outline color
+  fillColor: string       // background fill color (with alpha)
+  borderWidth: number
+  borderStyle: 'solid' | 'dashed' | 'dotted'
+  opacity: number         // 0-1 for fill opacity
+  purpose: string
+  importance: string
+  tags: string[]
+  locked: boolean         // prevent accidental moves
+}
+
 // ─── Union types ────────────────────────────────────────────────────
 
 export type BoardItem =
@@ -380,6 +396,7 @@ export type BoardItem =
   | ContainerItem
   | ConnectorItem
   | WebItem
+  | RegionItem
 
 export type PositionedItem = Exclude<BoardItem, ConnectorItem>
 
@@ -521,6 +538,11 @@ export function getDefaultPorts(kind: string): Port[] {
         { id: 'web-in', name: 'Context', type: 'reference', direction: 'input' },
         { id: 'web-out', name: 'Content', type: 'data', direction: 'output' },
         { id: 'web-ref', name: 'Reference', type: 'reference', direction: 'output' },
+      ]
+    case 'region':
+      return [
+        { id: 'region-in', name: 'Contains', type: 'any', direction: 'input' },
+        { id: 'region-out', name: 'Group', type: 'any', direction: 'output' },
       ]
     default:
       return []

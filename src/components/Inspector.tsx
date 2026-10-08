@@ -300,6 +300,51 @@ function renderKindFields(item: BoardItem, update: (u: Record<string, any>) => v
           Collapsed
         </label>
       </>
+    case 'region':
+      return <>
+        <Field label="Label" value={item.label} onChange={(v) => update({ label: v })} />
+        <div>
+          <label className="text-xs text-text-muted block mb-1">Border Color</label>
+          <input
+            type="color"
+            value={item.color}
+            onChange={(e) => update({ color: e.target.value })}
+            className="w-full h-8 rounded cursor-pointer"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-text-muted block mb-1">Fill Color</label>
+          <input
+            type="color"
+            value={item.fillColor?.replace(/rgba?\([^)]+\)/g, '') || '#8b7dc8'}
+            onChange={(e) => update({ fillColor: e.target.value + '1a' })}
+            className="w-full h-8 rounded cursor-pointer"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-text-muted block mb-1">Border Style</label>
+          <select
+            value={item.borderStyle}
+            onChange={(e) => update({ borderStyle: e.target.value })}
+            className="input w-full"
+          >
+            <option value="solid">Solid</option>
+            <option value="dashed">Dashed</option>
+            <option value="dotted">Dotted</option>
+          </select>
+        </div>
+        <Field label="Border Width" value={String(item.borderWidth)} onChange={(v) => update({ borderWidth: Number(v) })} />
+        <Field label="Purpose" value={item.purpose} onChange={(v) => update({ purpose: v })} />
+        <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+          <input
+            type="checkbox"
+            checked={item.locked}
+            onChange={(e) => update({ locked: e.target.checked })}
+            className="rounded"
+          />
+          Locked
+        </label>
+      </>
     case 'connector':
       return <>
         <Field label="Label" value={item.label} onChange={(v) => update({ label: v })} />

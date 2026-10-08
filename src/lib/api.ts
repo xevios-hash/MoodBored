@@ -3,7 +3,65 @@ import { getDefaultPorts } from '@/types'
 import { v4 as uuid } from 'uuid'
 import { findFreePosition } from './layout'
 
-const OPENROUTER_URL = '/api/ai/chat'  // Proxied through server to keep API key server-side
+// ─── Multi-Provider Support ─────────────────────────────────────────
+
+export type AIProvider =
+  | 'openrouter' | 'openai' | 'anthropic' | 'gemini'
+  | 'groq' | 'together' | 'mistral' | 'cohere'
+  | 'perplexity' | 'fireworks' | 'deepseek'
+  | 'ollama' | 'lmstudio' | 'custom'
+
+export const AI_MODELS: Record<AIProvider, string[]> = {
+  // Cloud providers
+  openrouter: [
+    'anthropic/claude-sonnet-4',
+    'openai/gpt-4',
+    'google/gemini-pro',
+    'meta-llama/llama-3-70b',
+    'mistralai/mistral-large',
+  ],
+  openai: ['gpt-4', 'gpt-4-turbo', 'gpt-4o', 'gpt-3.5-turbo'],
+  anthropic: ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'],
+  gemini: ['gemini-pro', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+  groq: ['llama3-70b-8192', 'mixtral-8x7b-32768', 'gemma-7b-it'],
+  together: ['meta-llama/Llama-3-70b-chat-hf', 'mistralai/Mixtral-8x7B-Instruct-v0.1'],
+  mistral: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'],
+  cohere: ['command-r-plus', 'command-r', 'command'],
+  perplexity: ['llama-3-sonar-large-32k-chat', 'llama-3-sonar-small-32k-chat'],
+  fireworks: ['accounts/fireworks/models/llama-v3-70b', 'accounts/fireworks/models/mixtral-8x7b'],
+  deepseek: ['deepseek-chat', 'deepseek-coder'],
+  // Local providers
+  ollama: ['llama3', 'mistral', 'codellama', 'phi3', 'gemma'],
+  lmstudio: ['local-model', 'default'],
+  custom: ['custom-model'],
+}
+
+export function detectProvider(model: string): AIProvider {
+  if (!model) return 'openrouter'
+  const lower = model.toLowerCase()
+  // Cloud providers
+  if (lower.startsWith('openai/') || lower.startsWith('gpt-')) return 'openai'
+  if (lower.startsWith('anthropic/') || lower.startsWith('claude')) return 'anthropic'
+  if (lower.startsWith('gemini/') || lower.startsWith('google/')) return 'gemini'
+  if (lower.startsWith('groq/') || lower.startsWith('llama3-70b-8192')) return 'groq'
+  if (lower.startsWith('together/') || lower.startsWith('meta-llama/')) return 'together'
+  if (lower.startsWith('mistral/') || lower.startsWith('mixtral/')) return 'mistral'
+  if (lower.startsWith('cohere/') || lower.startsWith('command')) return 'cohere'
+  if (lower.startsWith('perplexity/') || lower.startsWith('pplx-')) return 'perplexity'
+  if (lower.startsWith('fireworks/') || lower.startsWith('accounts/fireworks/')) return 'fireworks'
+  if (lower.startsWith('deepseek/') || lower.startsWith('deepseek')) return 'deepseek'
+  // Local providers
+  if (lower.startsWith('ollama/') || lower.startsWith('local/')) return 'ollama'
+  if (lower.startsWith('lmstudio/') || lower.startsWith('local-lm/')) return 'lmstudio'
+  if (lower.startsWith('custom/')) return 'custom'
+  return 'openrouter'
+}
+
+export function getProviderUrl(provider: AIProvider): string {
+  return `/api/ai/chat/${provider}`
+}
+
+const OPENROUTER_URL = '/api/ai/chat'  // Default provider endpoint
 
 // ─── Streaming ──────────────────────────────────────────────────────
 
@@ -15,8 +73,11 @@ export async function streamChat(
   onError: (err: string) => void,
   signal?: AbortSignal,
 ) {
+  const provider = detectProvider(model)
+  const url = getProviderUrl(provider)
+
   try {
-    const res = await fetch(OPENROUTER_URL, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -97,6 +158,8 @@ export async function streamChatWithTools(
   signal?: AbortSignal,
   maxIterations = 5,
 ) {
+  const provider = detectProvider(model)
+  const url = getProviderUrl(provider)
   let currentMessages = [...messages]
 
   for (let i = 0; i < maxIterations; i++) {
@@ -118,7 +181,7 @@ export async function streamChatWithTools(
     let finished = false
 
     try {
-      const res = await fetch(OPENROUTER_URL, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -945,4 +1008,38 @@ function getSearchText(item: BoardItem): string {
     case 'web': return `${item.title || ''} ${item.url || ''} ${item.content || ''} ${item.purpose || ''} ${item.importance || ''}`
     default: return ''
   }
+}
+
+// ─── Provider Management ────────────────────────────────────────────
+
+export interface ProviderInfo {
+  name: AIProvider
+  available: boolean
+  envKey: string | null
+  models: string[]
+}
+
+export async function fetchAvailableProviders(): Promise<ProviderInfo[]> {
+  try {
+    const res = await fetch('/api/ai/providers')
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.providers || []
+  } catch {
+    return []
+  }
+}
+
+export function getModelsForProvider(provider: AIProvider): string[] {
+  return AI_MODELS[provider] || []
+}
+
+export function getAllModels(): { provider: AIProvider; model: string }[] {
+  const models: { provider: AIProvider; model: string }[] = []
+  for (const [provider, providerModels] of Object.entries(AI_MODELS)) {
+    for (const model of providerModels) {
+      models.push({ provider: provider as AIProvider, model })
+    }
+  }
+  return models
 }

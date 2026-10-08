@@ -679,6 +679,226 @@ app.get('/api/board/:id/brief', (req, res) => {
   res.type('text').send(lines.join('\n'))
 })
 
+// ─── Lesson Generation ──────────────────────────────────────────────
+// Generates educational content and adds it to the board.
+
+function generateLessonSlides(topic, gradeLevel, slideCount, includeQuizzes) {
+  const slides = []
+  const level = gradeLevel.toLowerCase()
+  const isYoung = ['k-2', '3-5'].includes(level)
+
+  // Intro slide
+  slides.push({
+    type: 'concept',
+    title: `Welcome to ${topic}!`,
+    content: isYoung
+      ? `Hi there! Today we're going to learn about ${topic}. It's going to be fun!`
+      : `Let's explore ${topic}. This lesson will cover the key concepts and help you understand this important topic.`,
+    narration: isYoung
+      ? `Hi friends! Are you ready to learn about ${topic}? Let's get started!`
+      : `Welcome to this lesson on ${topic}. By the end, you'll have a solid understanding of the fundamentals.`,
+  })
+
+  // What is it slide
+  slides.push({
+    type: 'concept',
+    title: `What is ${topic}?`,
+    content: isYoung
+      ? `${topic} is something really cool that we use all the time. Let's find out what it is!`
+      : `${topic} is a fundamental concept that plays a key role in many areas. Understanding it opens doors to many applications.`,
+    narration: isYoung
+      ? `So what exactly is ${topic}? Let me explain it in a way that's easy to understand.`
+      : `Let's start by defining what ${topic} actually is and why it matters.`,
+  })
+
+  // Key concepts
+  const concepts = [
+    { title: `The Basics of ${topic}`, content: `Every topic has building blocks. For ${topic}, the foundational concepts are essential to understand before moving on to more complex ideas.` },
+    { title: `How ${topic} Works`, content: `Now that we know what ${topic} is, let's look at how it works. The mechanisms and principles behind it are fascinating.` },
+    { title: `Why ${topic} Matters`, content: `${topic} isn't just theoretical - it has real-world applications that affect our daily lives in many ways.` },
+    { title: `${topic} in Practice`, content: `Let's see how ${topic} is used in the real world. From science to technology, its applications are vast.` },
+    { title: `Key Principles of ${topic}`, content: `Understanding the core principles of ${topic} will help you apply this knowledge in different contexts.` },
+  ]
+
+  for (let i = 0; i < Math.min(slideCount - 4, concepts.length); i++) {
+    slides.push({
+      type: 'concept',
+      title: concepts[i].title,
+      content: concepts[i].content,
+      narration: `Let me tell you about ${concepts[i].title.toLowerCase()}.`,
+    })
+  }
+
+  // Quiz slides
+  if (includeQuizzes) {
+    slides.push({
+      type: 'quiz',
+      title: 'Quick Check!',
+      questions: [
+        {
+          question: `What is the main purpose of ${topic}?`,
+          options: ['To confuse people', 'To solve problems', 'To make things harder', 'None of the above'],
+          correctAnswer: 1,
+          explanation: `${topic} is used to solve problems and understand the world better!`,
+        },
+        {
+          question: `True or False: ${topic} is only useful in school.`,
+          options: ['True', 'False'],
+          correctAnswer: 1,
+          explanation: `False! ${topic} is used in many real-world situations.`,
+        },
+      ],
+    })
+  }
+
+  // Summary slide
+  slides.push({
+    type: 'summary',
+    title: 'Great Job!',
+    content: `You've learned about ${topic}! Remember the key concepts we covered and try to apply them in your daily life.`,
+    narration: `Congratulations! You've completed the lesson on ${topic}. Keep exploring and learning!`,
+  })
+
+  return slides
+}
+
+app.post('/api/board/:id/lesson', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const { topic, grade_level = '9-12', slide_count = 8, include_quizzes = true } = req.body || {}
+
+  if (!topic) {
+    res.status(400).json({ error: 'topic is required' })
+    return
+  }
+
+  const slides = generateLessonSlides(topic, grade_level, slide_count, include_quizzes)
+
+  // Add region for the lesson
+  const regionId = randomUUID()
+  vp.items.push({
+    kind: 'region',
+    id: regionId,
+    label: `Lesson: ${topic}`,
+    color: '#4CAF50',
+    fillColor: 'rgba(76, 175, 80, 0.04)',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    opacity: 0.2,
+    purpose: `${grade_level} lesson on ${topic}`,
+    importance: 'Educational content',
+    tags: ['lesson', topic.toLowerCase()],
+    locked: false,
+    pos: { x: 50, y: 50 },
+    size: { w: 600, h: slides.length * 120 + 100 },
+  })
+
+  // Build lesson object for presentation mode
+  const lessonSlides = slides.map((slide, idx) => {
+    const slideItems = []
+    const y = 100 + idx * 120
+
+    // Slide title as note
+    slideItems.push({
+      kind: 'note',
+      id: randomUUID(),
+      text: `${idx + 1}. ${slide.title}`,
+      purpose: slide.type,
+      importance: slide.type === 'quiz' ? 'Quiz' : 'Content',
+      tags: ['lesson', slide.type],
+      pos: { x: 80, y },
+    })
+
+    // Slide content as text
+    if (slide.content) {
+      slideItems.push({
+        kind: 'text',
+        id: randomUUID(),
+        raw: slide.content,
+        pos: { x: 300, y },
+        size: { w: 320, h: 80 },
+      })
+    }
+
+    // Add items to viewport
+    slideItems.forEach(item => vp.items.push(item))
+
+    return {
+      id: randomUUID(),
+      type: slide.type,
+      order: idx,
+      title: slide.title,
+      content: slideItems,
+      narration: {
+        script: slide.narration || '',
+        duration: 30,
+        rate: 0.85,
+        pitch: 1.0,
+        highlights: [],
+      },
+      interactions: [],
+      ...(slide.questions && { quiz: slide.questions }),
+    }
+  })
+
+  // Store lesson in board state for presentation mode
+  state.lesson = {
+    id: state.project?.id || randomUUID(),
+    name: topic,
+    viewports: state.project?.viewports || [],
+    components: state.project?.components || [],
+    settings: state.project?.settings || {
+      apiKey: '', defaultModel: 'anthropic/claude-sonnet-4',
+      jevThreshold: 0.2, multiAgent: false, theme: 'dark',
+      canvasBg: '#0c0814', canvasBgType: 'color', canvasBgVideo: '',
+      customBgUrls: [], customBgLabels: {},
+    },
+    snapshots: state.project?.snapshots || [],
+    annotations: state.project?.annotations || [],
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    metadata: {
+      title: topic,
+      subject: 'General',
+      gradeLevel: grade_level,
+      estimatedTime: `${slides.length * 2} minutes`,
+      learningObjectives: [`Understand ${topic}`],
+      author: 'AI Generated',
+      created: new Date().toISOString(),
+    },
+    slides: lessonSlides,
+    navigation: 'linear',
+  }
+
+  writeBoard(req.params.id, state)
+
+  res.json({
+    ok: true,
+    topic,
+    gradeLevel: grade_level,
+    slideCount: slides.length,
+    slides: slides.map((s, i) => ({ index: i + 1, type: s.type, title: s.title })),
+    lessonId: state.lesson.id,
+    presentationUrl: `/board/${req.params.id}?lesson=true`,
+  })
+})
+
+// Get lesson data for presentation
+app.get('/api/board/:id/lesson', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+
+  if (!state.lesson) {
+    res.status(404).json({ error: 'No lesson found on this board' })
+    return
+  }
+
+  res.json(state.lesson)
+})
+
 // ─── MCP SSE Transport ──────────────────────────────────────────────
 // Full parity with the stdio server + project management tools.
 
@@ -1166,6 +1386,326 @@ app.get('/api/unsplash/search', async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: `Unsplash error: ${err.message}` })
   }
+})
+
+// ─── Multi-Provider AI Chat ─────────────────────────────────────────
+// Unified endpoint that routes to different providers based on model prefix
+// Supports 12 providers for maximum global accessibility
+
+const AI_PROVIDERS = {
+  // ─── Cloud Providers ───────────────────────────────────────────────
+  openrouter: {
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    envKey: 'OPENROUTER_API_KEY',
+    headers: (key) => ({
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://moodbored.app',
+      'X-Title': 'MoodBored',
+    }),
+  },
+  openai: {
+    url: 'https://api.openai.com/v1/chat/completions',
+    envKey: 'OPENAI_API_KEY',
+    headers: (key) => ({
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    }),
+  },
+  anthropic: {
+    url: 'https://api.anthropic.com/v1/messages',
+    envKey: 'ANTHROPIC_API_KEY',
+    headers: (key) => ({
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    }),
+    transform: (body) => {
+      const messages = body.messages || []
+      const system = messages.find(m => m.role === 'system')?.content || ''
+      const userMessages = messages.filter(m => m.role !== 'system').map(m => ({
+        role: m.role,
+        content: m.content,
+      }))
+      return {
+        model: body.model?.replace('anthropic/', '') || 'claude-3-5-sonnet-20241022',
+        max_tokens: body.max_tokens || 4096,
+        messages: userMessages,
+        ...(system && { system }),
+        ...(body.temperature && { temperature: body.temperature }),
+      }
+    },
+    transformResponse: (data) => ({
+      choices: [{
+        message: { role: 'assistant', content: data.content?.[0]?.text || '' },
+        finish_reason: data.stop_reason,
+      }],
+      usage: data.usage,
+    }),
+  },
+  gemini: {
+    url: 'https://generativelanguage.googleapis.com/v1beta/models',
+    envKey: 'GEMINI_API_KEY',
+    headers: () => ({ 'Content-Type': 'application/json' }),
+    transform: (body) => {
+      const messages = body.messages || []
+      const system = messages.find(m => m.role === 'system')?.content || ''
+      const userMessages = messages.filter(m => m.role !== 'system').map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      }))
+      return {
+        contents: userMessages,
+        ...(system && { systemInstruction: { parts: [{ text: system }] } }),
+        generationConfig: {
+          ...(body.temperature && { temperature: body.temperature }),
+          ...(body.max_tokens && { maxOutputTokens: body.max_tokens }),
+        },
+      }
+    },
+    transformResponse: (data) => ({
+      choices: [{
+        message: { role: 'assistant', content: data.candidates?.[0]?.content?.parts?.[0]?.text || '' },
+        finish_reason: data.candidates?.[0]?.finishReason,
+      }],
+    }),
+  },
+  groq: {
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    envKey: 'GROQ_API_KEY',
+    headers: (key) => ({
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    }),
+  },
+  together: {
+    url: 'https://api.together.xyz/v1/chat/completions',
+    envKey: 'TOGETHER_API_KEY',
+    headers: (key) => ({
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    }),
+  },
+  mistral: {
+    url: 'https://api.mistral.ai/v1/chat/completions',
+    envKey: 'MISTRAL_API_KEY',
+    headers: (key) => ({
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    }),
+  },
+  cohere: {
+    url: 'https://api.cohere.ai/v1/chat',
+    envKey: 'COHERE_API_KEY',
+    headers: (key) => ({
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    }),
+    transform: (body) => ({
+      model: body.model || 'command-r-plus',
+      message: body.messages?.[body.messages.length - 1]?.content || '',
+      chat_history: body.messages?.slice(0, -1).map(m => ({
+        role: m.role === 'assistant' ? 'CHATBOT' : 'USER',
+        message: m.content,
+      })) || [],
+      ...(body.temperature && { temperature: body.temperature }),
+      ...(body.max_tokens && { max_tokens: body.max_tokens }),
+    }),
+    transformResponse: (data) => ({
+      choices: [{
+        message: { role: 'assistant', content: data.text || '' },
+        finish_reason: data.finish_reason,
+      }],
+    }),
+  },
+  perplexity: {
+    url: 'https://api.perplexity.ai/chat/completions',
+    envKey: 'PERPLEXITY_API_KEY',
+    headers: (key) => ({
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    }),
+  },
+  fireworks: {
+    url: 'https://api.fireworks.ai/inference/v1/chat/completions',
+    envKey: 'FIREWORKS_API_KEY',
+    headers: (key) => ({
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    }),
+  },
+  deepseek: {
+    url: 'https://api.deepseek.com/v1/chat/completions',
+    envKey: 'DEEPSEEK_API_KEY',
+    headers: (key) => ({
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    }),
+  },
+  // ─── Local Providers (no API key needed) ───────────────────────────
+  ollama: {
+    url: process.env.OLLAMA_URL || 'http://localhost:11434/api/chat',
+    envKey: null,
+    headers: () => ({ 'Content-Type': 'application/json' }),
+    transform: (body) => ({
+      model: body.model || 'llama3',
+      messages: body.messages || [],
+      stream: body.stream || false,
+      ...(body.temperature && { options: { temperature: body.temperature } }),
+    }),
+    transformResponse: (data) => ({
+      choices: [{
+        message: data.message || { role: 'assistant', content: '' },
+        finish_reason: data.done ? 'stop' : null,
+      }],
+    }),
+  },
+  lmstudio: {
+    url: process.env.LMSTUDIO_URL || 'http://localhost:1234/v1/chat/completions',
+    envKey: null,
+    headers: () => ({ 'Content-Type': 'application/json' }),
+  },
+  // ─── Catch-all for OpenAI-compatible endpoints ─────────────────────
+  custom: {
+    url: process.env.CUSTOM_AI_URL || 'http://localhost:8080/v1/chat/completions',
+    envKey: 'CUSTOM_AI_KEY',
+    headers: (key) => ({
+      ...(key && { 'Authorization': `Bearer ${key}` }),
+      'Content-Type': 'application/json',
+    }),
+  },
+}
+
+function detectProvider(model) {
+  if (!model) return 'openrouter'
+  const lower = model.toLowerCase()
+  // Cloud providers
+  if (lower.startsWith('openai/') || lower.startsWith('gpt-')) return 'openai'
+  if (lower.startsWith('anthropic/') || lower.startsWith('claude')) return 'anthropic'
+  if (lower.startsWith('gemini/') || lower.startsWith('google/')) return 'gemini'
+  if (lower.startsWith('groq/') || lower.startsWith('llama3-70b-8192')) return 'groq'
+  if (lower.startsWith('together/') || lower.startsWith('meta-llama/')) return 'together'
+  if (lower.startsWith('mistral/') || lower.startsWith('mixtral/')) return 'mistral'
+  if (lower.startsWith('cohere/') || lower.startsWith('command')) return 'cohere'
+  if (lower.startsWith('perplexity/') || lower.startsWith('pplx-')) return 'perplexity'
+  if (lower.startsWith('fireworks/') || lower.startsWith('accounts/fireworks/')) return 'fireworks'
+  if (lower.startsWith('deepseek/') || lower.startsWith('deepseek')) return 'deepseek'
+  // Local providers
+  if (lower.startsWith('ollama/') || lower.startsWith('local/')) return 'ollama'
+  if (lower.startsWith('lmstudio/') || lower.startsWith('local-lm/')) return 'lmstudio'
+  if (lower.startsWith('custom/')) return 'custom'
+  return 'openrouter'
+}
+
+function getProviderConfig(provider) {
+  return AI_PROVIDERS[provider] || AI_PROVIDERS.openrouter
+}
+
+app.post('/api/ai/chat', async (req, res) => {
+  const provider = detectProvider(req.body?.model)
+  const config = getProviderConfig(provider)
+  const apiKey = config.envKey ? (process.env[config.envKey] || '') : ''
+
+  if (config.envKey && !apiKey) {
+    res.status(501).json({
+      error: `${provider} requires ${config.envKey} environment variable`,
+      provider,
+      availableProviders: Object.keys(AI_PROVIDERS).filter(p => !AI_PROVIDERS[p].envKey || process.env[AI_PROVIDERS[p].envKey]),
+    })
+    return
+  }
+
+  const isStreaming = req.body?.stream === true
+
+  try {
+    // Transform request if needed
+    const requestBody = config.transform ? config.transform(req.body, req.body.model) : req.body
+    const url = config.transform
+      ? config.url // Anthropic/Gemini/Ollama use different URL patterns
+      : config.url
+
+    // Build full URL for providers that need it
+    let fullUrl = url
+    if (provider === 'gemini') {
+      const model = req.body.model?.replace('gemini/', '').replace('google/', '') || 'gemini-pro'
+      const action = isStreaming ? 'streamGenerateContent' : 'generateContent'
+      fullUrl = `${url}/${model}:${action}?key=${apiKey}`
+    }
+    if (provider === 'ollama') {
+      fullUrl = config.url
+    }
+
+    const headers = config.headers(apiKey)
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      const status = response.status
+      const errorText = await response.text().catch(() => '')
+      console.error(`[MoodBored] ${provider} API error ${status}:`, errorText.slice(0, 200))
+
+      if (status === 401) {
+        res.status(502).json({ error: `${provider} authentication failed. Check ${config.envKey}.` })
+      } else if (status === 429) {
+        res.status(429).json({ error: `${provider} rate limited. Try again later.` })
+      } else {
+        res.status(502).json({ error: `${provider} error (${status})` })
+      }
+      return
+    }
+
+    // Handle streaming
+    if (isStreaming && provider !== 'gemini') {
+      res.setHeader('Content-Type', 'text/event-stream')
+      res.setHeader('Cache-Control', 'no-cache')
+      res.setHeader('Connection', 'keep-alive')
+
+      const reader = response.body.getReader()
+      const pump = async () => {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          res.write(value)
+        }
+        res.end()
+      }
+      pump().catch(() => res.end())
+    } else {
+      const data = await response.json()
+      // Transform response if needed
+      const responseData = config.transformResponse ? config.transformResponse(data) : data
+      res.status(200).json(responseData)
+    }
+  } catch (err) {
+    res.status(502).json({ error: `${provider} proxy error: ${err.message}` })
+  }
+})
+
+// List available providers
+app.get('/api/ai/providers', (req, res) => {
+  const providers = Object.entries(AI_PROVIDERS).map(([name, config]) => ({
+    name,
+    available: !config.envKey || !!process.env[config.envKey],
+    envKey: config.envKey,
+    models: name === 'openrouter' ? ['anthropic/claude-sonnet-4', 'openai/gpt-4', 'google/gemini-pro', 'meta-llama/llama-3-70b', 'mistralai/mistral-large'] :
+            name === 'openai' ? ['gpt-4', 'gpt-4-turbo', 'gpt-4o', 'gpt-3.5-turbo'] :
+            name === 'anthropic' ? ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'] :
+            name === 'gemini' ? ['gemini-pro', 'gemini-1.5-pro', 'gemini-1.5-flash'] :
+            name === 'groq' ? ['llama3-70b-8192', 'mixtral-8x7b-32768', 'gemma-7b-it'] :
+            name === 'together' ? ['meta-llama/Llama-3-70b-chat-hf', 'mistralai/Mixtral-8x7B-Instruct-v0.1', 'codellama/CodeLlama-70b-Instruct-hf'] :
+            name === 'mistral' ? ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'] :
+            name === 'cohere' ? ['command-r-plus', 'command-r', 'command'] :
+            name === 'perplexity' ? ['llama-3-sonar-large-32k-chat', 'llama-3-sonar-small-32k-chat'] :
+            name === 'fireworks' ? ['accounts/fireworks/models/llama-v3-70b', 'accounts/fireworks/models/mixtral-8x7b'] :
+            name === 'deepseek' ? ['deepseek-chat', 'deepseek-coder'] :
+            name === 'ollama' ? ['llama3', 'mistral', 'codellama', 'phi3', 'gemma'] :
+            name === 'lmstudio' ? ['local-model', 'default'] :
+            name === 'custom' ? ['custom-model'] : [],
+  }))
+  res.json({ providers })
 })
 
 // ─── SPA Fallback (catch-all, last) ─────────────────────────────────
