@@ -7,6 +7,7 @@
     "start": "node server.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:desktop": "npm run build && npm run tauri build && node scripts/copy-desktop-files.js",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
