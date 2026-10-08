@@ -3,9 +3,16 @@
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::process::{Command, Child};
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use tauri::State;
+
+// ─── Server State ───────────────────────────────────────────────────
+
+struct ServerState {
+    child: Mutex<Option<Child>>,
+}
 
 // ─── Data Types ──────────────────────────────────────────────────────
 
@@ -479,6 +486,95 @@ fn uuid_simple() -> String {
     format!("{:x}", duration.as_nanos())
 }
 
+// ─── Server Commands ─────────────────────────────────────────────────
+
+#[tauri::command]
+fn start_server(state: State<ServerState>) -> Result<String, String> {
+    let mut child_guard = state.child.lock().map_err(|e| e.to_string())?;
+
+    // Check if server is already running
+    if let Some(ref mut child) = *child_guard {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                // Process exited, restart it
+            }
+            Ok(None) => {
+                return Ok("Server is already running".to_string());
+            }
+            Err(e) => {
+                return Err(format!("Failed to check server status: {}", e));
+            }
+        }
+    }
+
+    // Get the path to server.mjs
+    let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_dir = exe_path.parent().ok_or("Failed to get exe directory")?;
+
+    // Try to find server.mjs in various locations
+    let server_paths = vec![
+        exe_dir.join("server.mjs"),
+        exe_dir.join("..").join("server.mjs"),
+        exe_dir.join("..").join("..").join("server.mjs"),
+        PathBuf::from("server.mjs"),
+    ];
+
+    let mut server_path = None;
+    for path in &server_paths {
+        if path.exists() {
+            server_path = Some(path.clone());
+            break;
+        }
+    }
+
+    let server_path = server_path.ok_or("Could not find server.mjs")?;
+
+    // Start the server
+    let child = Command::new("node")
+        .arg(server_path.to_str().ok_or("Invalid path")?)
+        .env("PORT", "3000")
+        .spawn()
+        .map_err(|e| format!("Failed to start server: {}", e))?;
+
+    *child_guard = Some(child);
+    Ok("Server started on port 3000".to_string())
+}
+
+#[tauri::command]
+fn stop_server(state: State<ServerState>) -> Result<String, String> {
+    let mut child_guard = state.child.lock().map_err(|e| e.to_string())?;
+
+    if let Some(ref mut child) = *child_guard {
+        child.kill().map_err(|e| e.to_string())?;
+        *child_guard = None;
+        Ok("Server stopped".to_string())
+    } else {
+        Ok("Server is not running".to_string())
+    }
+}
+
+#[tauri::command]
+fn get_server_status(state: State<ServerState>) -> Result<String, String> {
+    let child_guard = state.child.lock().map_err(|e| e.to_string())?;
+
+    if let Some(ref _child) = *child_guard {
+        // Try to check if the server is responding
+        let client = reqwest::blocking::Client::new();
+        match client.get("http://localhost:3000/api/board/health").timeout(std::time::Duration::from_secs(2)).send() {
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    Ok("running".to_string())
+                } else {
+                    Ok("starting".to_string())
+                }
+            }
+            Err(_) => Ok("not_responding".to_string())
+        }
+    } else {
+        Ok("stopped".to_string())
+    }
+}
+
 // ─── Main ────────────────────────────────────────────────────────────
 
 fn main() {
@@ -490,6 +586,7 @@ fn main() {
 
     tauri::Builder::default()
         .manage(DbState { conn: Mutex::new(conn) })
+        .manage(ServerState { child: Mutex::new(None) })
         .invoke_handler(tauri::generate_handler![
             sync_board_state,
             read_board_state,
@@ -512,7 +609,45 @@ fn main() {
             get_chrome_tabs,
             log_action,
             get_action_history,
+            start_server,
+            stop_server,
+            get_server_status,
         ])
+        .setup(|_app| {
+            // Start the server on app launch in a background thread
+            std::thread::spawn(|| {
+                let exe_path = std::env::current_exe().unwrap();
+                let exe_dir = exe_path.parent().unwrap();
+
+                // Try to find server.mjs
+                let server_paths = vec![
+                    exe_dir.join("server.mjs"),
+                    exe_dir.join("..").join("server.mjs"),
+                    exe_dir.join("..").join("..").join("server.mjs"),
+                    PathBuf::from("server.mjs"),
+                ];
+
+                for path in &server_paths {
+                    if path.exists() {
+                        match Command::new("node")
+                            .arg(path.to_str().unwrap())
+                            .env("PORT", "3000")
+                            .spawn()
+                        {
+                            Ok(_child) => {
+                                println!("MoodBored server started on port 3000");
+                                break;
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to start server: {}", e);
+                            }
+                        }
+                    }
+                }
+            });
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

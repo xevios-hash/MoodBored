@@ -4,7 +4,7 @@
   "identifier": "com.moodbored.app",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:3000",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
@@ -15,7 +15,8 @@
         "width": 1280,
         "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "url": "http://localhost:3000"
       }
     ],
     "security": {
@@ -52,6 +53,11 @@
         {
           "name": "curl",
           "cmd": "curl",
+          "args": true
+        },
+        {
+          "name": "node",
+          "cmd": "node",
           "args": true
         }
       ]
