@@ -615,34 +615,38 @@ fn main() {
         ])
         .setup(|_app| {
             // Start the server on app launch in a background thread
+            // The exe should be run from the project root directory
             std::thread::spawn(|| {
-                let exe_path = std::env::current_exe().unwrap();
-                let exe_dir = exe_path.parent().unwrap();
-
-                // Try to find server.mjs
+                // Try to find server.mjs in current directory and parent directories
                 let server_paths = vec![
-                    exe_dir.join("server.mjs"),
-                    exe_dir.join("..").join("server.mjs"),
-                    exe_dir.join("..").join("..").join("server.mjs"),
                     PathBuf::from("server.mjs"),
+                    PathBuf::from("../server.mjs"),
+                    PathBuf::from("../../server.mjs"),
                 ];
 
+                let mut found_path = None;
                 for path in &server_paths {
                     if path.exists() {
-                        match Command::new("node")
-                            .arg(path.to_str().unwrap())
-                            .env("PORT", "3000")
-                            .spawn()
-                        {
-                            Ok(_child) => {
-                                println!("MoodBored server started on port 3000");
-                                break;
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to start server: {}", e);
-                            }
+                        found_path = Some(path.clone());
+                        break;
+                    }
+                }
+
+                if let Some(server_path) = found_path {
+                    match Command::new("node")
+                        .arg(server_path.to_str().unwrap())
+                        .env("PORT", "3000")
+                        .spawn()
+                    {
+                        Ok(_child) => {
+                            println!("MoodBored server started on port 3000");
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to start server: {}", e);
                         }
                     }
+                } else {
+                    eprintln!("Could not find server.mjs");
                 }
             });
 
