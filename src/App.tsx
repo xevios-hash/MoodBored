@@ -13,6 +13,7 @@ import { StartScreen } from '@/components/StartScreen'
 import { MobileLayout } from '@/components/MobileLayout'
 import { Lightbox } from '@/components/Lightbox'
 import { ExportModal } from '@/components/ExportModal'
+import { AIExportModal } from '@/components/AIExportModal'
 import { UnsplashSearch } from '@/components/UnsplashSearch'
 import { ShareModal } from '@/components/ShareModal'
 import { ColorPicker } from '@/components/ColorPicker'
@@ -138,6 +139,7 @@ export default function App() {
   const selectedIds = useStore((s) => s.selectedIds)
   const [lightboxItem, setLightboxItem] = useState<any>(null)
   const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [aiExportModalOpen, setAiExportModalOpen] = useState(false)
   const [unsplashOpen, setUnsplashOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -270,9 +272,17 @@ export default function App() {
     return () => window.removeEventListener('moodbored:open-lesson-generator' as any, handler)
   }, [])
 
+  // ─── AI export event ───
+  useEffect(() => {
+    const handler = () => setAiExportModalOpen(true)
+    window.addEventListener('moodbored:open-ai-export' as any, handler)
+    return () => window.removeEventListener('moodbored:open-ai-export' as any, handler)
+  }, [])
+
   const handleSplashComplete = useCallback(() => setPhase('start'), [])
   const handleProjectLoaded = useCallback(() => setPhase('workspace'), [])
   const handleExportForCreation = useCallback(() => setExportModalOpen(true), [])
+  const handleAIExport = useCallback(() => setAiExportModalOpen(true), [])
   const handleUnsplashSearch = useCallback(() => setUnsplashOpen(true), [])
   const handleShareOpen = useCallback(() => setShareOpen(true), [])
   const handleColorPickerOpen = useCallback(() => setColorPickerOpen(true), [])
@@ -447,6 +457,7 @@ export default function App() {
         {settingsOpen && <SettingsModal />}
         {searchOpen && <SearchOverlay />}
         {exportModalOpen && <ExportModalWrapper onClose={() => setExportModalOpen(false)} />}
+        {aiExportModalOpen && <AIExportModalWrapper onClose={() => setAiExportModalOpen(false)} />}
         {unsplashOpen && <UnsplashSearch onClose={() => setUnsplashOpen(false)} />}
         {shareOpen && <ShareModal onClose={() => setShareOpen(false)} />}
         {colorPickerOpen && <ColorPicker onClose={() => setColorPickerOpen(false)} />}
@@ -484,4 +495,15 @@ function ExportModalWrapper({ onClose }: { onClose: () => void }) {
   const selectedItems = allItems.filter(i => selectedIds.has(i.id))
   const items = selectedItems.length > 0 ? selectedItems : allItems
   return <ExportModal items={items} boardName={project.name} onClose={onClose} />
+}
+
+function AIExportModalWrapper({ onClose }: { onClose: () => void }) {
+  const project = useStore((s) => s.project)
+  const activeViewportId = useStore((s) => s.activeViewportId)
+  const selectedIds = useStore((s) => s.selectedIds)
+  const viewport = project.viewports.find(v => v.id === activeViewportId) ?? project.viewports[0]
+  const allItems = viewport?.items ?? []
+  const selectedItems = allItems.filter(i => selectedIds.has(i.id))
+  const items = selectedItems.length > 0 ? selectedItems : allItems
+  return <AIExportModal items={items} boardName={project.name} onClose={onClose} />
 }

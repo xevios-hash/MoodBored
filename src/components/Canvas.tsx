@@ -1454,6 +1454,12 @@ Example response:
         }
         break
       }
+      case 'ai-export': {
+        // Open AI export modal
+        const event = new CustomEvent('moodbored:open-ai-export')
+        window.dispatchEvent(event)
+        break
+      }
     }
     setContextMenu(null)
   }
@@ -1928,6 +1934,7 @@ Example response:
           {/* Presentation */}
           <CtxItem label="▶  Present" onClick={() => { handleContextAction('present'); setContextMenu(null) }} />
           <CtxItem label="🎓  Create Lesson" onClick={() => { handleContextAction('create-lesson'); setContextMenu(null) }} />
+          <CtxItem label="🤖  Export for AI" onClick={() => { handleContextAction('ai-export'); setContextMenu(null) }} />
 
           {contextMenu.itemId && (
             <>
