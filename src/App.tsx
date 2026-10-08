@@ -164,11 +164,23 @@ export default function App() {
   const channelRef = useRef<RealtimeChannel | null>(null)
   const [remoteUsers, setRemoteUsers] = useState<PresenceUser[]>([])
 
-  // ─── Theme ───
+  // ─── Theme with smooth transition ───
   useEffect(() => {
     const t = EMBED_THEME || theme
-    document.body.classList.remove('light', 'dark')
-    document.body.classList.add(t)
+
+    // Add transitioning class for smooth dimmer effect
+    document.body.classList.add('transitioning')
+
+    // Small delay to let the transition class take effect
+    requestAnimationFrame(() => {
+      document.body.classList.remove('light', 'dark')
+      document.body.classList.add(t)
+
+      // Remove transitioning class after animation completes
+      setTimeout(() => {
+        document.body.classList.remove('transitioning')
+      }, 1500)
+    })
   }, [theme, EMBED_THEME])
 
   // ─── Embed: auto-load project + init sync ───
