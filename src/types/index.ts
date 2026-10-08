@@ -425,6 +425,11 @@ export interface Settings {
   canvasBgVideo: string
   customBgUrls: string[]
   customBgLabels: Record<string, string>
+  // Local provider URLs
+  ollamaUrl?: string
+  lmstudioUrl?: string
+  customAiUrl?: string
+  customAiKey?: string
 }
 
 export interface Project {

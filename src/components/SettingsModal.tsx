@@ -92,6 +92,61 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                 </select>
               </div>
 
+              {/* Local Provider Configuration */}
+              {(settings.defaultModel?.startsWith('ollama/') || settings.defaultModel?.startsWith('local/')) && (
+                <div className="mb-3 p-3 rounded-lg border border-accent/15 bg-accent/5">
+                  <label className="text-xs text-text-muted block mb-1">Ollama URL</label>
+                  <input
+                    type="text"
+                    value={settings.ollamaUrl || 'http://localhost:11434'}
+                    onChange={(e) => updateSettings({ ollamaUrl: e.target.value })}
+                    placeholder="http://localhost:11434"
+                    className="input w-full"
+                  />
+                  <p className="text-2xs text-text-muted mt-1">Default: http://localhost:11434</p>
+                </div>
+              )}
+
+              {(settings.defaultModel?.startsWith('lmstudio/') || settings.defaultModel?.startsWith('local-lm/')) && (
+                <div className="mb-3 p-3 rounded-lg border border-accent/15 bg-accent/5">
+                  <label className="text-xs text-text-muted block mb-1">LM Studio URL</label>
+                  <input
+                    type="text"
+                    value={settings.lmstudioUrl || 'http://localhost:1234'}
+                    onChange={(e) => updateSettings({ lmstudioUrl: e.target.value })}
+                    placeholder="http://localhost:1234"
+                    className="input w-full"
+                  />
+                  <p className="text-2xs text-text-muted mt-1">Default: http://localhost:1234 (LM Studio local server)</p>
+                </div>
+              )}
+
+              {settings.defaultModel?.startsWith('custom/') && (
+                <div className="mb-3 p-3 rounded-lg border border-accent/15 bg-accent/5 space-y-3">
+                  <div>
+                    <label className="text-xs text-text-muted block mb-1">Custom Endpoint URL</label>
+                    <input
+                      type="text"
+                      value={settings.customAiUrl || ''}
+                      onChange={(e) => updateSettings({ customAiUrl: e.target.value })}
+                      placeholder="http://localhost:8080/v1/chat/completions"
+                      className="input w-full"
+                    />
+                    <p className="text-2xs text-text-muted mt-1">Any OpenAI-compatible endpoint (vLLM, text-generation-webui, etc.)</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-text-muted block mb-1">API Key (optional)</label>
+                    <input
+                      type="password"
+                      value={settings.customAiKey || ''}
+                      onChange={(e) => updateSettings({ customAiKey: e.target.value })}
+                      placeholder="Leave empty if no auth required"
+                      className="input w-full"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Available Providers Status */}
               <div className="mt-3">
                 <label className="text-xs text-text-muted block mb-2">Provider Status</label>

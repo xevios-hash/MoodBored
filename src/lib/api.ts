@@ -72,6 +72,7 @@ export async function streamChat(
   onDone: () => void,
   onError: (err: string) => void,
   signal?: AbortSignal,
+  providerSettings?: { ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
 ) {
   const provider = detectProvider(model)
   const url = getProviderUrl(provider)
@@ -88,6 +89,7 @@ export async function streamChat(
         stream: true,
         temperature: 0.8,
         max_tokens: 4096,
+        providerSettings,
       }),
       signal,
     })
@@ -157,6 +159,7 @@ export async function streamChatWithTools(
   onError: (err: string) => void,
   signal?: AbortSignal,
   maxIterations = 5,
+  providerSettings?: { ollamaUrl?: string; lmstudioUrl?: string; customAiUrl?: string; customAiKey?: string },
 ) {
   const provider = detectProvider(model)
   const url = getProviderUrl(provider)
@@ -169,6 +172,7 @@ export async function streamChatWithTools(
       stream: true,
       temperature: 0.8,
       max_tokens: 4096,
+      providerSettings,
     }
     if (tools.length > 0 && i === 0) {
       body.tools = tools

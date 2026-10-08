@@ -1604,9 +1604,27 @@ function getProviderConfig(provider) {
 app.post('/api/ai/chat', async (req, res) => {
   const provider = detectProvider(req.body?.model)
   const config = getProviderConfig(provider)
-  const apiKey = config.envKey ? (process.env[config.envKey] || '') : ''
 
-  if (config.envKey && !apiKey) {
+  // Get provider settings from request body (for local providers)
+  const providerSettings = req.body?.providerSettings || {}
+
+  // Use custom URLs from settings if provided
+  let providerUrl = config.url
+  if (provider === 'ollama' && providerSettings.ollamaUrl) {
+    providerUrl = providerSettings.ollamaUrl + '/api/chat'
+  }
+  if (provider === 'lmstudio' && providerSettings.lmstudioUrl) {
+    providerUrl = providerSettings.lmstudioUrl + '/v1/chat/completions'
+  }
+  if (provider === 'custom' && providerSettings.customAiUrl) {
+    providerUrl = providerSettings.customAiUrl
+  }
+
+  const apiKey = provider === 'custom' && providerSettings.customAiKey
+    ? providerSettings.customAiKey
+    : (config.envKey ? (process.env[config.envKey] || '') : '')
+
+  if (config.envKey && !apiKey && provider !== 'custom') {
     res.status(501).json({
       error: `${provider} requires ${config.envKey} environment variable`,
       provider,
@@ -1620,19 +1638,13 @@ app.post('/api/ai/chat', async (req, res) => {
   try {
     // Transform request if needed
     const requestBody = config.transform ? config.transform(req.body, req.body.model) : req.body
-    const url = config.transform
-      ? config.url // Anthropic/Gemini/Ollama use different URL patterns
-      : config.url
 
     // Build full URL for providers that need it
-    let fullUrl = url
+    let fullUrl = providerUrl
     if (provider === 'gemini') {
       const model = req.body.model?.replace('gemini/', '').replace('google/', '') || 'gemini-pro'
       const action = isStreaming ? 'streamGenerateContent' : 'generateContent'
-      fullUrl = `${url}/${model}:${action}?key=${apiKey}`
-    }
-    if (provider === 'ollama') {
-      fullUrl = config.url
+      fullUrl = `${providerUrl}/${model}:${action}?key=${apiKey}`
     }
 
     const headers = config.headers(apiKey)
