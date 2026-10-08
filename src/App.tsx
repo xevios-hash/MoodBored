@@ -14,6 +14,7 @@ import { MobileLayout } from '@/components/MobileLayout'
 import { Lightbox } from '@/components/Lightbox'
 import { ExportModal } from '@/components/ExportModal'
 import { AIExportModal } from '@/components/AIExportModal'
+import { AIConnectionModal } from '@/components/AIConnectionModal'
 import { UnsplashSearch } from '@/components/UnsplashSearch'
 import { ShareModal } from '@/components/ShareModal'
 import { ColorPicker } from '@/components/ColorPicker'
@@ -140,6 +141,7 @@ export default function App() {
   const [lightboxItem, setLightboxItem] = useState<any>(null)
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [aiExportModalOpen, setAiExportModalOpen] = useState(false)
+  const [aiConnectionOpen, setAiConnectionOpen] = useState(false)
   const [unsplashOpen, setUnsplashOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -279,10 +281,18 @@ export default function App() {
     return () => window.removeEventListener('moodbored:open-ai-export' as any, handler)
   }, [])
 
+  // ─── AI connection event ───
+  useEffect(() => {
+    const handler = () => setAiConnectionOpen(true)
+    window.addEventListener('moodbored:open-ai-connection' as any, handler)
+    return () => window.removeEventListener('moodbored:open-ai-connection' as any, handler)
+  }, [])
+
   const handleSplashComplete = useCallback(() => setPhase('start'), [])
   const handleProjectLoaded = useCallback(() => setPhase('workspace'), [])
   const handleExportForCreation = useCallback(() => setExportModalOpen(true), [])
   const handleAIExport = useCallback(() => setAiExportModalOpen(true), [])
+  const handleAIConnection = useCallback(() => setAiConnectionOpen(true), [])
   const handleUnsplashSearch = useCallback(() => setUnsplashOpen(true), [])
   const handleShareOpen = useCallback(() => setShareOpen(true), [])
   const handleColorPickerOpen = useCallback(() => setColorPickerOpen(true), [])
@@ -458,6 +468,7 @@ export default function App() {
         {searchOpen && <SearchOverlay />}
         {exportModalOpen && <ExportModalWrapper onClose={() => setExportModalOpen(false)} />}
         {aiExportModalOpen && <AIExportModalWrapper onClose={() => setAiExportModalOpen(false)} />}
+        {aiConnectionOpen && <AIConnectionModal onClose={() => setAiConnectionOpen(false)} />}
         {unsplashOpen && <UnsplashSearch onClose={() => setUnsplashOpen(false)} />}
         {shareOpen && <ShareModal onClose={() => setShareOpen(false)} />}
         {colorPickerOpen && <ColorPicker onClose={() => setColorPickerOpen(false)} />}

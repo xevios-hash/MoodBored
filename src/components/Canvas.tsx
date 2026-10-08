@@ -1460,6 +1460,12 @@ Example response:
         window.dispatchEvent(event)
         break
       }
+      case 'ai-generate': {
+        // Open AI connection modal for image generation
+        const event = new CustomEvent('moodbored:open-ai-connection')
+        window.dispatchEvent(event)
+        break
+      }
     }
     setContextMenu(null)
   }
@@ -1935,6 +1941,7 @@ Example response:
           <CtxItem label="▶  Present" onClick={() => { handleContextAction('present'); setContextMenu(null) }} />
           <CtxItem label="🎓  Create Lesson" onClick={() => { handleContextAction('create-lesson'); setContextMenu(null) }} />
           <CtxItem label="🤖  Export for AI" onClick={() => { handleContextAction('ai-export'); setContextMenu(null) }} />
+          <CtxItem label="⚡  Generate Image" onClick={() => { handleContextAction('ai-generate'); setContextMenu(null) }} />
 
           {contextMenu.itemId && (
             <>
