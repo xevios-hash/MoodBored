@@ -8,6 +8,13 @@ import { AnnotationLayer } from '@/components/AnnotationLayer'
 import { getDefaultPorts } from '@/types'
 import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner, WebItem, ConnectionType } from '@/types'
 
+// Simple X icon component
+const XIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+
 // ─── Item Creation Defaults ─────────────────────────────────────────
 // Shared between the floating toolbar and the right-click context menu.
 
@@ -262,6 +269,84 @@ export function Canvas() {
   const [canvasConversations, setCanvasConversations] = useState<Map<string, { parentId: string; responseIds: string[] }>>(new Map())
   const [isGeneratingResponse, setIsGeneratingResponse] = useState<Set<string>>(new Set())
 
+  // ─── Quick Input Box ──────────────────────────────────────────────
+  const [quickInputOpen, setQuickInputOpen] = useState(false)
+  const [quickInputValue, setQuickInputValue] = useState('')
+  const [quickInputPos, setQuickInputPos] = useState({ x: 0, y: 0 })
+  const quickInputRef = useRef<HTMLInputElement>(null)
+
+  // Smart node type detection based on input content
+  const detectNodeType = useCallback((input: string): { kind: string; extra?: any } => {
+    const trimmed = input.trim()
+
+    // URL detection
+    if (trimmed.match(/^https?:\/\//i)) {
+      return { kind: 'link', extra: { url: trimmed, title: '', summary: '' } }
+    }
+
+    // Color hex detection
+    if (trimmed.match(/^#[0-9a-fA-F]{3,8}$/)) {
+      return { kind: 'swatch', extra: { hex: trimmed, name: '' } }
+    }
+
+    // Multiple colors (palette)
+    if (trimmed.match(/(#[0-9a-fA-F]{3,8}[\s,]+){2,}/)) {
+      const colors = trimmed.match(/#[0-9a-fA-F]{3,8}/g) || []
+      return { kind: 'palette', extra: { label: 'Colors', colors: colors.map(hex => ({ hex, label: '' })) } }
+    }
+
+    // Question or search query (starts with ? or "search" or "find")
+    if (trimmed.startsWith('?') || trimmed.match(/^(search|find|look up|what is|how to|who is)/i)) {
+      return { kind: 'note', extra: { tags: ['query'] } }
+    }
+
+    // Task or todo (starts with - or * or "todo" or "task")
+    if (trimmed.match(/^[-*]\s/) || trimmed.match(/^(todo|task|do|remember|note to self)/i)) {
+      return { kind: 'note', extra: { tags: ['task', 'todo'] } }
+    }
+
+    // Image description (starts with "image:" or "img:" or "picture:")
+    if (trimmed.match(/^(image|img|picture|photo|screenshot)/i)) {
+      return { kind: 'image', extra: { description: trimmed.replace(/^(image|img|picture|photo|screenshot):?\s*/i, '') } }
+    }
+
+    // Default to note
+    return { kind: 'note' }
+  }, [])
+
+  // Toggle quick input with keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger when typing in inputs
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+
+      // Press '/' or 'Space' to open quick input
+      if (e.key === '/' || (e.key === ' ' && !quickInputOpen)) {
+        e.preventDefault()
+        const state = useStore.getState()
+        const rect = canvasRef.current?.getBoundingClientRect()
+        if (rect) {
+          // Position at center of viewport
+          const cx = (rect.width / 2 - state.canvas.panX) / state.canvas.zoom
+          const cy = (rect.height / 2 - state.canvas.panY) / state.canvas.zoom
+          setQuickInputPos({ x: cx - 150, y: cy - 100 })
+        }
+        setQuickInputOpen(true)
+        setTimeout(() => quickInputRef.current?.focus(), 50)
+      }
+
+      // Escape to close
+      if (e.key === 'Escape' && quickInputOpen) {
+        setQuickInputOpen(false)
+        setQuickInputValue('')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [quickInputOpen])
+
   const project = useStore((s) => s.project)
   const activeViewportId = useStore((s) => s.activeViewportId)
   const canvas = useStore((s) => s.canvas)
@@ -311,7 +396,7 @@ export function Canvas() {
   const requestCanvasResponse = useCallback(async (noteItem: any) => {
     if (isGeneratingResponse.has(noteItem.id)) return
 
-    const noteText = noteItem.text || ''
+    const noteText = noteItem.text || noteItem.raw || ''
     if (!noteText.trim()) return
 
     setIsGeneratingResponse(prev => new Set([...prev, noteItem.id]))
@@ -323,15 +408,15 @@ export function Canvas() {
       // Build a prompt that asks for a canvas response
       const systemPrompt = `You are a creative assistant on a visual mood board. The user has created a note on the canvas. Respond with helpful, creative content that builds on their idea.
 
-IMPORTANT: Respond with a JSON array of items to add to the canvas. Each item should have:
-- kind: "note", "text", or "link"
-- text/raw/title: The content
-- purpose: Why this relates to the user's note
+IMPORTANT RULES:
+1. Respond with ONLY a valid JSON array - no markdown, no explanation, no code blocks
+2. Each item should have: kind, text/raw/title, purpose
+3. Maximum 3 items
+4. Keep text concise but complete (under 150 chars per item)
+5. Ensure your JSON is complete and valid - do not truncate
 
 Example response:
-[{"kind":"note","text":"Great idea! Consider...","purpose":"Building on your thought"},{"kind":"text","raw":"Additional details...","purpose":"Supporting info"}]
-
-Keep responses concise and creative. Maximum 3 items.`
+[{"kind":"note","text":"Great idea! Consider...","purpose":"Building on your thought"},{"kind":"text","raw":"Additional details...","purpose":"Supporting info"}]`
 
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
@@ -340,10 +425,10 @@ Keep responses concise and creative. Maximum 3 items.`
           model: settings.defaultModel || 'anthropic/claude-sonnet-4',
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: `My note says: "${noteText}"\n\nRespond with related items for the canvas.` },
+            { role: 'user', content: `My note says: "${noteText}"\n\nRespond with related items for the canvas. Return ONLY valid JSON array.` },
           ],
           temperature: 0.7,
-          max_tokens: 1000,
+          max_tokens: 2000,
         }),
       })
 
@@ -355,14 +440,23 @@ Keep responses concise and creative. Maximum 3 items.`
       // Parse the response to extract items
       let items: any[] = []
       try {
+        // Clean the response - remove markdown code blocks if present
+        let cleanContent = content.trim()
+        if (cleanContent.startsWith('```json')) cleanContent = cleanContent.slice(7)
+        if (cleanContent.startsWith('```')) cleanContent = cleanContent.slice(3)
+        if (cleanContent.endsWith('```')) cleanContent = cleanContent.slice(0, -3)
+        cleanContent = cleanContent.trim()
+
         // Try to parse JSON from the response
-        const jsonMatch = content.match(/\[[\s\S]*\]/)
+        const jsonMatch = cleanContent.match(/\[[\s\S]*\]/)
         if (jsonMatch) {
           items = JSON.parse(jsonMatch[0])
         }
-      } catch {
+      } catch (e) {
         // If JSON parsing fails, create a single note with the response
-        items = [{ kind: 'note', text: content.slice(0, 200), purpose: 'AI Response' }]
+        // Truncate to reasonable length but don't cut mid-word
+        const truncated = content.length > 300 ? content.slice(0, 300).replace(/\s+\S*$/, '') + '...' : content
+        items = [{ kind: 'note', text: truncated || 'AI response generated', purpose: 'AI Response' }]
       }
 
       // Create response items near the original note
@@ -439,6 +533,66 @@ Keep responses concise and creative. Maximum 3 items.`
 
     await requestCanvasResponse(tempNote)
   }, [requestCanvasResponse])
+
+  // Submit quick input - creates node and triggers AI response
+  const handleQuickInputSubmit = useCallback(async () => {
+    const trimmed = quickInputValue.trim()
+    if (!trimmed) return
+
+    const state = useStore.getState()
+    const { kind, extra } = detectNodeType(trimmed)
+
+    // Create the node
+    const newItem: any = {
+      kind,
+      id: crypto.randomUUID(),
+      pos: { x: quickInputPos.x, y: quickInputPos.y },
+      size: { w: 300, h: 200 },
+      tags: [],
+      purpose: '',
+      importance: '',
+    }
+
+    // Set content based on type
+    switch (kind) {
+      case 'note':
+        newItem.text = trimmed
+        newItem.tags = [...(extra?.tags || [])]
+        break
+      case 'text':
+        newItem.raw = trimmed
+        break
+      case 'link':
+        newItem.url = extra?.url || trimmed
+        newItem.title = extra?.title || ''
+        newItem.summary = extra?.summary || ''
+        break
+      case 'swatch':
+        newItem.hex = extra?.hex || '#8b7dc8'
+        newItem.name = extra?.name || ''
+        break
+      case 'palette':
+        newItem.label = extra?.label || 'Colors'
+        newItem.colors = extra?.colors || []
+        break
+      case 'image':
+        newItem.description = extra?.description || ''
+        newItem.thumbnail = ''
+        newItem.fullSource = ''
+        break
+      default:
+        newItem.text = trimmed
+    }
+
+    state.addItem(newItem)
+
+    // Close input and clear
+    setQuickInputOpen(false)
+    setQuickInputValue('')
+
+    // Trigger AI response automatically
+    await requestCanvasResponse(newItem)
+  }, [quickInputValue, quickInputPos, detectNodeType, requestCanvasResponse])
 
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
@@ -1689,6 +1843,18 @@ Keep responses concise and creative. Maximum 3 items.`
         <LayersPanel items={items} onClose={() => setShowLayers(false)} />
       )}
 
+      {/* Quick Input Box */}
+      {quickInputOpen && (
+        <QuickInputBox
+          value={quickInputValue}
+          onChange={setQuickInputValue}
+          onSubmit={handleQuickInputSubmit}
+          onClose={() => { setQuickInputOpen(false); setQuickInputValue('') }}
+          position={quickInputPos}
+          inputRef={quickInputRef}
+        />
+      )}
+
       {/* Context menu */}
       {contextMenu && (
         <div
@@ -1848,6 +2014,83 @@ function CtxItem({ label, shortcut, onClick, danger, small }: { label: string; s
       <span>{label}</span>
       {shortcut && <span className="text-2xs text-text-muted ml-2">{shortcut}</span>}
     </button>
+  )
+}
+
+// ─── Quick Input Box ────────────────────────────────────────────────
+
+function QuickInputBox({
+  value,
+  onChange,
+  onSubmit,
+  onClose,
+  position,
+  inputRef,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onSubmit: () => void
+  onClose: () => void
+  position: { x: number; y: number }
+  inputRef: React.RefObject<any>
+}) {
+  return (
+    <div
+      className="fixed z-[200] animate-fadeIn"
+      style={{
+        left: '50%',
+        top: '20%',
+        transform: 'translateX(-50%)',
+      }}
+    >
+      <div className="glass-card rounded-xl shadow-2xl border border-white/10 overflow-hidden" style={{ width: 500 }}>
+        <div className="flex items-center px-4 py-3">
+          <div className="flex items-center gap-2 text-text-muted mr-3">
+            <span className="text-sm">💬</span>
+          </div>
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                onSubmit()
+              }
+              if (e.key === 'Escape') {
+                onClose()
+              }
+            }}
+            placeholder="Type a note, URL, question, or idea... (Enter to create & get AI response)"
+            className="flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
+            autoFocus
+          />
+          <div className="flex items-center gap-2 ml-3">
+            <button
+              onClick={onSubmit}
+              className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 transition-colors"
+            >
+              Create
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted transition-colors"
+            >
+              <XIcon size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="px-4 py-2 border-t border-white/5 bg-white/[0.02]">
+          <div className="flex items-center gap-4 text-2xs text-text-muted">
+            <span>💡 Type anything — becomes a note</span>
+            <span>🔗 Paste a URL — becomes a link</span>
+            <span>🎨 Type hex colors — becomes a palette</span>
+            <span>❓ Start with ? — asks AI</span>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
