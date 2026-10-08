@@ -1944,6 +1944,180 @@ app.get('/api/ai/status/:provider', async (req, res) => {
   }
 })
 
+// ─── Native Model Scanner ──────────────────────────────────────────
+// Scans local filesystem for AI models
+
+import { statSync } from 'fs'
+import { homedir } from 'os'
+
+const MODEL_EXTENSIONS = {
+  llm: ['.gguf', '.ggml', '.bin'],
+  checkpoint: ['.safetensors', '.ckpt', '.pt', '.pth'],
+  lora: ['.safetensors'],
+  vae: ['.safetensors', '.pt', '.pth'],
+  controlnet: ['.safetensors', '.pth'],
+  video: ['.safetensors', '.pth', '.pt'],
+}
+
+const MODEL_PATTERNS = {
+  llm: /llama|mistral|phi|gemma|qwen|falcon|vicuna|wizard|codellama|deepseek/i,
+  checkpoint: /sd[_-]?v?[\d.]+|sdxl|stable.?diffusion|dreamshaper|flux|sd3/i,
+  lora: /lora|lycoris|loha|lokr/i,
+  vae: /vae|autoencoder/i,
+  controlnet: /controlnet|canny|depth|pose/i,
+  video: /video|animate|svd|cogvideo/i,
+}
+
+function scanDirectory(dirPath, depth = 0, maxDepth = 4, minSize = 10 * 1024 * 1024) {
+  const models = []
+
+  if (depth > maxDepth) return models
+
+  try {
+    const entries = readdirSync(dirPath, { withFileTypes: true })
+
+    for (const entry of entries) {
+      const fullPath = join(dirPath, entry.name)
+
+      if (entry.isDirectory()) {
+        // Recurse into subdirectories
+        models.push(...scanDirectory(fullPath, depth + 1, maxDepth, minSize))
+      } else if (entry.isFile()) {
+        const ext = entry.name.substring(entry.name.lastIndexOf('.')).toLowerCase()
+
+        // Check if it's a model file
+        let isModel = false
+        for (const extensions of Object.values(MODEL_EXTENSIONS)) {
+          if (extensions.includes(ext)) {
+            isModel = true
+            break
+          }
+        }
+
+        if (!isModel) continue
+
+        try {
+          const stat = statSync(fullPath)
+
+          // Skip small files
+          if (stat.size < minSize) continue
+
+          // Detect model type
+          let type = 'unknown'
+          for (const [t, pattern] of Object.entries(MODEL_PATTERNS)) {
+            if (pattern.test(entry.name)) {
+              type = t
+              break
+            }
+          }
+
+          // If still unknown, guess by extension
+          if (type === 'unknown') {
+            if (ext === '.gguf' || ext === '.ggml') type = 'llm'
+            else if (ext === '.safetensors' && stat.size > 1e9) type = 'checkpoint'
+          }
+
+          // Extract metadata from filename
+          const metadata = {}
+          const quantMatch = entry.name.match(/[QF]\d[_\w]*/i)
+          if (quantMatch) metadata.quantization = quantMatch[0].toUpperCase()
+
+          const paramMatch = entry.name.match(/(\d+\.?\d*)[bB]/)
+          if (paramMatch) metadata.parameters = paramMatch[0].toUpperCase()
+
+          // Estimate VRAM
+          let vramEstimate = Math.ceil(stat.size / (1024 * 1024))
+          if (ext === '.safetensors') vramEstimate = Math.ceil(vramEstimate * 1.5)
+
+          models.push({
+            id: fullPath.replace(/[^a-zA-Z0-9]/g, '_'),
+            name: entry.name,
+            path: fullPath,
+            type,
+            format: ext === '.gguf' ? 'gguf' : ext === '.safetensors' ? 'safetensors' : 'bin',
+            size: stat.size,
+            sizeFormatted: formatBytes(stat.size),
+            vramEstimate,
+            metadata,
+            lastModified: stat.mtime.toISOString(),
+            addedAt: new Date().toISOString(),
+          })
+        } catch {}
+      }
+    }
+  } catch {}
+
+  return models
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+// Model scan endpoint
+app.post('/api/scan/models', (req, res) => {
+  const { folder, depth = 4, minSize = 10 * 1024 * 1024 } = req.body || {}
+
+  if (!folder) {
+    return res.status(400).json({ error: 'folder is required' })
+  }
+
+  try {
+    const startTime = Date.now()
+    const models = scanDirectory(folder, 0, depth, minSize)
+    const scanTime = Date.now() - startTime
+
+    res.json({
+      success: true,
+      folder,
+      models,
+      count: models.length,
+      scanTime,
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Auto-scan common locations
+app.get('/api/scan/auto', (req, res) => {
+  const home = homedir()
+  const platform = process.platform
+
+  const commonFolders = platform === 'win32'
+    ? [
+        `${home}\\.cache\\huggingface\\hub`,
+        `${home}\\.ollama\\models`,
+        `${home}\\.lmstudio\\models`,
+        'C:\\AI\\models',
+      ]
+    : [
+        `${home}/.cache/huggingface/hub`,
+        `${home}/.ollama/models`,
+        `${home}/.lmstudio/models`,
+        `${home}/ComfyUI/models`,
+      ]
+
+  const allModels = []
+  for (const folder of commonFolders) {
+    try {
+      const models = scanDirectory(folder, 0, 3)
+      allModels.push(...models)
+    } catch {}
+  }
+
+  res.json({
+    success: true,
+    models: allModels,
+    count: allModels.length,
+    foldersScanned: commonFolders.length,
+  })
+})
+
 // ─── SPA Fallback (catch-all, last) ─────────────────────────────────
 
 // Serve static files with proper caching
