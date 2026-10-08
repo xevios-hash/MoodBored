@@ -3,6 +3,7 @@ import { useStore } from '@/stores/useStore'
 import { listProjects, createProject, migrateFromLocalStorage, type ProjectMeta } from '@/lib/storage'
 import { TEMPLATES } from '@/lib/templates'
 import { Plus, FolderOpen, Clock, Trash2 } from 'lucide-react'
+import { getRandomVideoBackground } from '@/lib/videoBackgrounds'
 
 interface StartScreenProps {
   onProjectLoaded: () => void
@@ -15,6 +16,18 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const setProject = useStore((s) => s.setProject)
   const importProject = useStore((s) => s.importProject)
+
+  // Get session video (same as splash screen)
+  const getSessionVideo = () => {
+    const stored = sessionStorage.getItem('moodbored-session-video')
+    if (stored) {
+      try { return JSON.parse(stored) } catch {}
+    }
+    const video = getRandomVideoBackground()
+    sessionStorage.setItem('moodbored-session-video', JSON.stringify(video))
+    return video
+  }
+  const sessionVideo = getSessionVideo()
 
   useEffect(() => {
     migrateFromLocalStorage().then(() => {
@@ -80,7 +93,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
       }}>
         {/* Video background */}
         <video autoPlay loop muted playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}>
-          <source src="/sky-day.mp4" type="video/mp4" />
+          <source src={sessionVideo.url} type="video/mp4" />
         </video>
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', zIndex: 1 }} />
 
@@ -179,7 +192,7 @@ export function StartScreen({ onProjectLoaded }: StartScreenProps) {
     }}>
       {/* Video background */}
       <video autoPlay loop muted playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}>
-        <source src="/sky-day.mp4" type="video/mp4" />
+        <source src={sessionVideo.url} type="video/mp4" />
       </video>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.75)', zIndex: 1 }} />
 

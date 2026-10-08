@@ -1,10 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '@/stores/useStore'
+import { getRandomVideoBackground } from '@/lib/videoBackgrounds'
 
 export function SplashScreen({ onComplete }: { onComplete: () => void }) {
   const [fadeOut, setFadeOut] = useState(false)
   const theme = useStore((s) => s.project.settings.theme)
   const isDark = theme === 'dark'
+
+  // Get or create session video (random on each app load)
+  const getSessionVideo = () => {
+    const stored = sessionStorage.getItem('moodbored-session-video')
+    if (stored) {
+      try { return JSON.parse(stored) } catch {}
+    }
+    const video = getRandomVideoBackground()
+    sessionStorage.setItem('moodbored-session-video', JSON.stringify(video))
+    return video
+  }
+
+  const sessionVideo = getSessionVideo()
 
   useEffect(() => {
     const timer = setTimeout(() => setFadeOut(true), 800)
@@ -22,7 +36,7 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
     }
   }, [onComplete])
 
-  const videoSrc = '/sky-day.mp4'  // sky-night.mp4 doesn't exist
+  const videoSrc = sessionVideo.url
 
   return (
     <div

@@ -501,6 +501,17 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { url: '/sky-day.mp4', label: 'Daytime Sky' },
+                      { url: '/videos/tropical-jungle.mp4', label: 'Tropical Jungle' },
+                      { url: '/videos/luminous-particles.mp4', label: 'Luminous Particles' },
+                      { url: '/videos/geometric-vj.mp4', label: 'Geometric VJ' },
+                      { url: '/videos/light-waves.mp4', label: 'Light Waves' },
+                      { url: '/videos/black-white-maze.mp4', label: 'B&W Maze' },
+                      { url: '/videos/fractal-animation.mp4', label: 'Fractal Animation' },
+                      { url: '/videos/cg-vj-loop.mp4', label: 'CG VJ Loop' },
+                      { url: '/videos/red-spheres-tunnel.mp4', label: 'Red Spheres' },
+                      { url: '/videos/organic-formations.mp4', label: 'Organic Forms' },
+                      { url: '/videos/neon-space.mp4', label: 'Neon Space' },
+                      { url: '/videos/blue-digital-tunnel.mp4', label: 'Blue Tunnel' },
                     ].map((bg) => (
                       <button
                         key={bg.url}
@@ -604,6 +615,34 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                   </div>
                 </div>
               )}
+            </div>
+          </Section>
+
+          {/* Video Credits */}
+          <Section title="Video Credits">
+            <div className="p-3 rounded-lg border border-accent/15 bg-accent/5">
+              <p className="text-xs text-text-secondary mb-2">
+                Video backgrounds are provided by Pexels under the Pexels License (free for personal and commercial use).
+              </p>
+              <div className="space-y-1 text-2xs text-text-muted">
+                <p>• <strong>Tropical Jungle</strong> — Pexels</p>
+                <p>• <strong>Luminous Particles</strong> — Pexels</p>
+                <p>• <strong>Geometric VJ</strong> — Pexels</p>
+                <p>• <strong>Light Waves</strong> — Pexels</p>
+                <p>• <strong>Black & White Maze</strong> — Pexels</p>
+                <p>• <strong>Fractal Animation</strong> — Pexels</p>
+                <p>• <strong>CG VJ Loop</strong> — Pexels</p>
+                <p>• <strong>Red Spheres Tunnel</strong> — Pexels</p>
+                <p>• <strong>Organic Formations</strong> — Pexels</p>
+                <p>• <strong>Neon Space</strong> — Pexels</p>
+                <p>• <strong>Blue Digital Tunnel</strong> — Pexels</p>
+                <p>• <strong>Daytime Sky</strong> — MoodBored (Original)</p>
+              </div>
+              <p className="text-2xs text-text-muted mt-2">
+                <a href="https://www.pexels.com/license/" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                  Pexels License
+                </a> — Free for personal and commercial use, no attribution required.
+              </p>
             </div>
           </Section>
         </div>
