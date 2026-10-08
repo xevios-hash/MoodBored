@@ -417,6 +417,7 @@ export interface Viewport {
 export interface Settings {
   apiKey: string
   defaultModel: string
+  provider?: string  // AI provider: 'openrouter', 'openai', 'anthropic', etc.
   jevThreshold: number
   multiAgent: boolean
   theme: 'dark' | 'light'
@@ -473,6 +474,7 @@ export interface SearchResult {
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
   defaultModel: 'anthropic/claude-sonnet-4',
+  provider: 'openrouter',
   jevThreshold: 0.2,
   multiAgent: false,
   theme: 'light',

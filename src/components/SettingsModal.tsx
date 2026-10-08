@@ -49,11 +49,11 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
               <div className="mb-3">
                 <label className="text-xs text-text-muted block mb-1">Provider</label>
                 <select
-                  value={settings.defaultModel?.split('/')[0] || 'openrouter'}
+                  value={settings.provider || 'openrouter'}
                   onChange={(e) => {
                     const provider = e.target.value as AIProvider
                     const models = getModelsForProvider(provider)
-                    updateSettings({ defaultModel: models[0] || '' })
+                    updateSettings({ provider, defaultModel: models[0] || '' })
                   }}
                   className="input w-full"
                 >
@@ -86,14 +86,14 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                   onChange={(e) => updateSettings({ defaultModel: e.target.value })}
                   className="input w-full"
                 >
-                  {getModelsForProvider((settings.defaultModel?.split('/')[0] || 'openrouter') as AIProvider).map(model => (
+                  {getModelsForProvider((settings.provider || 'openrouter') as AIProvider).map(model => (
                     <option key={model} value={model}>{model}</option>
                   ))}
                 </select>
               </div>
 
               {/* Local Provider Configuration */}
-              {(settings.defaultModel?.startsWith('ollama/') || settings.defaultModel?.startsWith('local/')) && (
+              {(settings.provider || 'openrouter') === 'ollama' && (
                 <div className="mb-3 p-3 rounded-lg border border-accent/15 bg-accent/5">
                   <label className="text-xs text-text-muted block mb-1">Ollama URL</label>
                   <input
@@ -107,7 +107,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                 </div>
               )}
 
-              {(settings.defaultModel?.startsWith('lmstudio/') || settings.defaultModel?.startsWith('local-lm/')) && (
+              {(settings.provider || 'openrouter') === 'lmstudio' && (
                 <div className="mb-3 p-3 rounded-lg border border-accent/15 bg-accent/5">
                   <label className="text-xs text-text-muted block mb-1">LM Studio URL</label>
                   <input
@@ -121,7 +121,7 @@ export function SettingsModal({ embed, onClose }: { embed?: boolean; onClose?: (
                 </div>
               )}
 
-              {settings.defaultModel?.startsWith('custom/') && (
+              {(settings.provider || 'openrouter') === 'custom' && (
                 <div className="mb-3 p-3 rounded-lg border border-accent/15 bg-accent/5 space-y-3">
                   <div>
                     <label className="text-xs text-text-muted block mb-1">Custom Endpoint URL</label>
