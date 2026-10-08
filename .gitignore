@@ -8,3 +8,6 @@ ios/
 .env
 .env.*
 !.env.example.github/workflows/
+
+# Video files (too large for git)
+public/videos/*.mp4
