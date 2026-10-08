@@ -2340,6 +2340,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
     case 'link': drawLinkItem(ctx, item, x, y, w, h, zoom); break
     case 'web': drawWebItem(ctx, item as any, x, y, w, h, zoom); break
     case 'region': drawRegionItem(ctx, item as any, x, y, w, h, zoom); break
+    case 'file': drawFileItem(ctx, item as any, x, y, w, h, zoom); break
     default: drawTextBasedItem(ctx, item, x, y, w, h, zoom); break
   }
   ctx.restore()
@@ -2696,6 +2697,111 @@ function drawRegionItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: 
     ctx.fillStyle = borderColor
     ctx.fillText(labelText, lx + 6, ly + 14)
   }
+}
+
+function drawFileItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  const maxBot = y + h - PAD
+  let cy = y + PAD
+
+  // Language badge with color
+  const langColors: Record<string, string> = {
+    typescript: '#3178c6', javascript: '#f7df1e', python: '#3776ab',
+    rust: '#ce422b', go: '#00add8', java: '#ed8b00', html: '#e34c26',
+    css: '#1572b6', json: '#292929', markdown: '#083fa1',
+  }
+  const langColor = langColors[item.language] || '#8b7dc8'
+
+  // File icon and language badge
+  ctx.fillStyle = langColor
+  ctx.font = '600 9px Inter, sans-serif'
+  ctx.fillText('FILE', x + PAD, cy + 9)
+
+  // Language badge
+  const langText = item.language?.toUpperCase() || 'TEXT'
+  ctx.font = '600 8px Inter, sans-serif'
+  const langW = ctx.measureText(langText).width + 8
+  ctx.fillStyle = langColor + '33'
+  ctx.beginPath()
+  roundRect(ctx, x + w - PAD - langW - 4, cy, langW + 4, 16, 3)
+  ctx.fill()
+  ctx.fillStyle = langColor
+  ctx.fillText(langText, x + w - PAD - langW, cy + 11)
+  cy += 20
+
+  // File name
+  ctx.fillStyle = txtPrimary()
+  ctx.font = '600 12px Inter, sans-serif'
+  ctx.fillText(item.fileName?.slice(0, 30) || 'Untitled', x + PAD, cy + 2)
+  cy += 18
+
+  // File path (truncated)
+  if (item.filePath) {
+    ctx.fillStyle = txtMuted()
+    ctx.font = '8px Inter, sans-serif'
+    const pathText = item.filePath.length > 40 ? '...' + item.filePath.slice(-37) : item.filePath
+    ctx.fillText(pathText, x + PAD, cy)
+    cy += 14
+  }
+
+  // File size and modified date
+  ctx.fillStyle = txtMuted()
+  ctx.font = '8px Inter, sans-serif'
+  const sizeText = item.fileSize ? formatFileSize(item.fileSize) : ''
+  const modifiedText = item.lastModified ? new Date(item.lastModified).toLocaleDateString() : ''
+  ctx.fillText(`${sizeText} · ${modifiedText}`, x + PAD, cy)
+  cy += 14
+
+  // Content preview with syntax highlighting simulation
+  if (item.content && cy < maxBot - 20) {
+    const previewH = maxBot - cy - 10
+    const previewW = w - PAD * 2
+
+    // Code background
+    ctx.fillStyle = isDark() ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)'
+    ctx.beginPath()
+    roundRect(ctx, x + PAD, cy, previewW, previewH, 4)
+    ctx.fill()
+
+    // Line numbers
+    const lines = item.content.split('\n')
+    const lineHeight = 14
+    const maxLines = Math.floor(previewH / lineHeight)
+    const lineNumW = 24
+
+    ctx.fillStyle = txtMuted()
+    ctx.font = '9px monospace'
+
+    for (let i = 0; i < Math.min(lines.length, maxLines); i++) {
+      const ly = cy + 12 + i * lineHeight
+      if (ly + lineHeight > maxBot - 10) break
+
+      // Line number
+      ctx.fillStyle = txtMuted()
+      ctx.textAlign = 'right'
+      ctx.fillText(String(i + 1), x + PAD + lineNumW - 4, ly)
+      ctx.textAlign = 'start'
+
+      // Code line (truncated)
+      ctx.fillStyle = txtPrimary()
+      const lineText = lines[i].slice(0, 50)
+      ctx.fillText(lineText, x + PAD + lineNumW + 4, ly)
+    }
+
+    // Dirty indicator
+    if (item.isDirty) {
+      ctx.fillStyle = '#f59e0b'
+      ctx.font = '600 10px Inter, sans-serif'
+      ctx.fillText('●', x + w - PAD - 12, y + PAD + 9)
+    }
+  }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

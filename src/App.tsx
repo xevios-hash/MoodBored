@@ -16,6 +16,7 @@ import { ExportModal } from '@/components/ExportModal'
 import { AIExportModal } from '@/components/AIExportModal'
 import { AIConnectionModal } from '@/components/AIConnectionModal'
 import { ModelManager } from '@/components/ModelManager'
+import { AgentDashboard } from '@/components/AgentDashboard'
 import { UnsplashSearch } from '@/components/UnsplashSearch'
 import { ShareModal } from '@/components/ShareModal'
 import { ColorPicker } from '@/components/ColorPicker'
@@ -144,6 +145,7 @@ export default function App() {
   const [aiExportModalOpen, setAiExportModalOpen] = useState(false)
   const [aiConnectionOpen, setAiConnectionOpen] = useState(false)
   const [modelManagerOpen, setModelManagerOpen] = useState(false)
+  const [agentDashboardOpen, setAgentDashboardOpen] = useState(false)
   const [unsplashOpen, setUnsplashOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -297,12 +299,20 @@ export default function App() {
     return () => window.removeEventListener('moodbored:open-model-manager' as any, handler)
   }, [])
 
+  // ─── Agent dashboard event ───
+  useEffect(() => {
+    const handler = () => setAgentDashboardOpen(true)
+    window.addEventListener('moodbored:open-agent-dashboard' as any, handler)
+    return () => window.removeEventListener('moodbored:open-agent-dashboard' as any, handler)
+  }, [])
+
   const handleSplashComplete = useCallback(() => setPhase('start'), [])
   const handleProjectLoaded = useCallback(() => setPhase('workspace'), [])
   const handleExportForCreation = useCallback(() => setExportModalOpen(true), [])
   const handleAIExport = useCallback(() => setAiExportModalOpen(true), [])
   const handleAIConnection = useCallback(() => setAiConnectionOpen(true), [])
   const handleModelManager = useCallback(() => setModelManagerOpen(true), [])
+  const handleAgentDashboard = useCallback(() => setAgentDashboardOpen(true), [])
   const handleUnsplashSearch = useCallback(() => setUnsplashOpen(true), [])
   const handleShareOpen = useCallback(() => setShareOpen(true), [])
   const handleColorPickerOpen = useCallback(() => setColorPickerOpen(true), [])
@@ -480,6 +490,7 @@ export default function App() {
         {aiExportModalOpen && <AIExportModalWrapper onClose={() => setAiExportModalOpen(false)} />}
         {aiConnectionOpen && <AIConnectionModal onClose={() => setAiConnectionOpen(false)} />}
         {modelManagerOpen && <ModelManager onClose={() => setModelManagerOpen(false)} />}
+        {agentDashboardOpen && <AgentDashboard onClose={() => setAgentDashboardOpen(false)} />}
         {unsplashOpen && <UnsplashSearch onClose={() => setUnsplashOpen(false)} />}
         {shareOpen && <ShareModal onClose={() => setShareOpen(false)} />}
         {colorPickerOpen && <ColorPicker onClose={() => setColorPickerOpen(false)} />}

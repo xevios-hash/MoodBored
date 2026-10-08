@@ -811,6 +811,283 @@ server.tool(
   }
 )
 
+// ─── File Tools (IDE Layer) ─────────────────────────────────────────
+
+import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, unlinkSync, renameSync, watch } from 'fs'
+import { join, basename, extname, relative } from 'path'
+
+function detectLanguage(ext: string): string {
+  const langMap: Record<string, string> = {
+    '.ts': 'typescript', '.tsx': 'typescriptreact', '.js': 'javascript', '.jsx': 'javascriptreact',
+    '.py': 'python', '.rs': 'rust', '.go': 'go', '.java': 'java', '.c': 'c', '.cpp': 'cpp',
+    '.h': 'c', '.hpp': 'cpp', '.cs': 'csharp', '.rb': 'ruby', '.php': 'php', '.swift': 'swift',
+    '.kt': 'kotlin', '.scala': 'scala', '.ex': 'elixir', '.exs': 'elixir', '.erl': 'erlang',
+    '.hs': 'haskell', '.ml': 'ocaml', '.r': 'r', '.R': 'r', '.m': 'matlab', '.sql': 'sql',
+    '.html': 'html', '.htm': 'html', '.css': 'css', '.scss': 'scss', '.less': 'less',
+    '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml', '.toml': 'toml', '.xml': 'xml',
+    '.md': 'markdown', '.mdx': 'mdx', '.txt': 'plaintext', '.sh': 'bash', '.bash': 'bash',
+    '.zsh': 'zsh', '.fish': 'fish', '.ps1': 'powershell', '.bat': 'batch', '.cmd': 'batch',
+    '.dockerfile': 'dockerfile', '.docker': 'dockerfile', '.graphql': 'graphql', '.gql': 'graphql',
+    '.prisma': 'prisma', '.proto': 'protobuf', '.tf': 'terraform', '.hcl': 'hcl',
+    '.vue': 'vue', '.svelte': 'svelte', '.astro': 'astro',
+  }
+  return langMap[ext.toLowerCase()] || 'plaintext'
+}
+
+server.tool(
+  'read_file',
+  'Read a file from disk and optionally add it as a node on the board',
+  {
+    path: z.string().describe('Absolute or relative path to the file'),
+    add_to_board: z.boolean().optional().describe('Add as a file node on the board (default: true)'),
+    preview_lines: z.number().optional().describe('Number of lines to show in preview (default: 50)'),
+  },
+  async ({ path: filePath, add_to_board = true, preview_lines = 50 }) => {
+    try {
+      if (!existsSync(filePath)) {
+        return { content: [{ type: 'text', text: `File not found: ${filePath}` }] }
+      }
+
+      const stat = statSync(filePath)
+      const content = readFileSync(filePath, 'utf-8')
+      const ext = extname(filePath)
+      const fileName = basename(filePath)
+      const language = detectLanguage(ext)
+      const preview = content.split('\n').slice(0, preview_lines).join('\n')
+
+      if (add_to_board) {
+        const state = readState()
+        const vp = getActiveViewport(state)
+        if (vp) {
+          const item = {
+            kind: 'file',
+            id: uuid(),
+            filePath,
+            fileName,
+            fileExtension: ext.slice(1),
+            language,
+            fileSize: stat.size,
+            lastModified: stat.mtime.toISOString(),
+            content: preview,
+            previewLines: preview_lines,
+            isEditing: false,
+            isDirty: false,
+            purpose: '',
+            importance: '',
+            tags: [],
+            pos: { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 },
+            size: { w: 400, h: 300 },
+          }
+          vp.items.push(item)
+          writeState(state)
+        }
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            path: filePath,
+            fileName,
+            language,
+            size: stat.size,
+            modified: stat.mtime.toISOString(),
+            lines: content.split('\n').length,
+            preview,
+            addedToBoard: add_to_board,
+          }, null, 2),
+        }],
+      }
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Error reading file: ${err.message}` }] }
+    }
+  }
+)
+
+server.tool(
+  'write_file',
+  'Write content to a file on disk. Supports chunked writes for large content.',
+  {
+    path: z.string().describe('Absolute or relative path to the file'),
+    content: z.string().describe('File content to write'),
+    chunk_id: z.string().optional().describe('Chunk ID for chunked writes'),
+    chunk_sequence: z.number().optional().describe('Chunk sequence number (0-based)'),
+    total_chunks: z.number().optional().describe('Total number of chunks (-1 if unknown)'),
+    is_final: z.boolean().optional().describe('Whether this is the final chunk'),
+  },
+  async ({ path: filePath, content, chunk_id, chunk_sequence, total_chunks, is_final }) => {
+    try {
+      // Handle chunked writes
+      if (chunk_id && chunk_sequence !== undefined) {
+        const chunk: any = {
+          metadata: {
+            chunkId: chunk_id,
+            streamId: chunk_id.split('-').slice(0, -1).join('-'),
+            sequence: chunk_sequence,
+            totalChunks: total_chunks || -1,
+            totalBytes: -1,
+            contentType: 'text',
+            source: 'mcp',
+            created: new Date().toISOString(),
+          },
+          data: content,
+          isFinal: is_final || false,
+        }
+
+        // For now, just write directly (chunking handled client-side)
+        writeFileSync(filePath, content, 'utf-8')
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              path: filePath,
+              chunk: chunk_sequence,
+              totalChunks: total_chunks,
+              isFinal: is_final,
+            }),
+          }],
+        }
+      }
+
+      // Direct write
+      writeFileSync(filePath, content, 'utf-8')
+      const stat = statSync(filePath)
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            success: true,
+            path: filePath,
+            size: stat.size,
+            modified: stat.mtime.toISOString(),
+          }),
+        }],
+      }
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Error writing file: ${err.message}` }] }
+    }
+  }
+)
+
+server.tool(
+  'list_files',
+  'List files in a directory',
+  {
+    path: z.string().describe('Directory path to list'),
+    pattern: z.string().optional().describe('Glob pattern to filter files (e.g., "*.ts")'),
+    recursive: z.boolean().optional().describe('List files recursively (default: false)'),
+    max_depth: z.number().optional().describe('Maximum recursion depth (default: 3)'),
+  },
+  async ({ path: dirPath, pattern, recursive = false, max_depth = 3 }) => {
+    try {
+      if (!existsSync(dirPath)) {
+        return { content: [{ type: 'text', text: `Directory not found: ${dirPath}` }] }
+      }
+
+      const files: any[] = []
+
+      function scanDir(dir: string, depth: number) {
+        if (depth > max_depth) return
+
+        const entries = readdirSync(dir, { withFileTypes: true })
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name)
+
+          if (entry.isDirectory() && recursive) {
+            scanDir(fullPath, depth + 1)
+          } else if (entry.isFile()) {
+            // Simple pattern matching
+            if (pattern && !entry.name.match(new RegExp(pattern.replace('*', '.*')))) {
+              continue
+            }
+
+            const stat = statSync(fullPath)
+            files.push({
+              path: fullPath,
+              name: entry.name,
+              extension: extname(entry.name),
+              size: stat.size,
+              modified: stat.mtime.toISOString(),
+              language: detectLanguage(extname(entry.name)),
+            })
+          }
+        }
+      }
+
+      scanDir(dirPath, 0)
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            directory: dirPath,
+            count: files.length,
+            files: files.slice(0, 100), // Limit to 100 files
+          }, null, 2),
+        }],
+      }
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Error listing files: ${err.message}` }] }
+    }
+  }
+)
+
+server.tool(
+  'delete_file',
+  'Delete a file from disk',
+  {
+    path: z.string().describe('Path to the file to delete'),
+  },
+  async ({ path: filePath }) => {
+    try {
+      if (!existsSync(filePath)) {
+        return { content: [{ type: 'text', text: `File not found: ${filePath}` }] }
+      }
+
+      unlinkSync(filePath)
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ success: true, deleted: filePath }),
+        }],
+      }
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Error deleting file: ${err.message}` }] }
+    }
+  }
+)
+
+server.tool(
+  'rename_file',
+  'Rename or move a file',
+  {
+    old_path: z.string().describe('Current file path'),
+    new_path: z.string().describe('New file path'),
+  },
+  async ({ old_path, new_path }) => {
+    try {
+      if (!existsSync(old_path)) {
+        return { content: [{ type: 'text', text: `File not found: ${old_path}` }] }
+      }
+
+      renameSync(old_path, new_path)
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ success: true, oldPath: old_path, newPath: new_path }),
+        }],
+      }
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Error renaming file: ${err.message}` }] }
+    }
+  }
+)
+
 // ─── Start ──────────────────────────────────────────────────────────
 
 async function main() {

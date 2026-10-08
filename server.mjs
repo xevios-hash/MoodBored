@@ -2086,6 +2086,105 @@ app.get('/{*splat}', (req, res, next) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'))
 })
 
+// ─── Agent Observability ────────────────────────────────────────────
+
+// In-memory agent registry and operation log for observability
+const agents = new Map()
+const operations = []
+const conflicts = []
+
+// Agent endpoints
+app.get('/api/agents', (req, res) => {
+  res.json({ agents: [...agents.values()] })
+})
+
+app.post('/api/agents/register', (req, res) => {
+  const { id, name, type = 'mcp' } = req.body || {}
+  if (!id || !name) {
+    return res.status(400).json({ error: 'id and name are required' })
+  }
+
+  const agent = {
+    id,
+    name,
+    type,
+    connectedAt: new Date().toISOString(),
+    lastActivity: new Date().toISOString(),
+    operationsCount: 0,
+    status: 'active',
+  }
+  agents.set(id, agent)
+  res.json(agent)
+})
+
+app.post('/api/agents/:id/heartbeat', (req, res) => {
+  const agent = agents.get(req.params.id)
+  if (agent) {
+    agent.lastActivity = new Date().toISOString()
+    agent.status = 'active'
+    res.json(agent)
+  } else {
+    res.status(404).json({ error: 'Agent not found' })
+  }
+})
+
+// Operations endpoint
+app.get('/api/operations', (req, res) => {
+  const limit = parseInt(req.query.limit) || 50
+  res.json({ operations: operations.slice(-limit) })
+})
+
+app.post('/api/operations', (req, res) => {
+  const op = {
+    id: randomUUID(),
+    ...req.body,
+    timestamp: new Date().toISOString(),
+  }
+  operations.push(op)
+
+  // Keep only last 1000 operations
+  if (operations.length > 1000) {
+    operations.splice(0, operations.length - 1000)
+  }
+
+  // Update agent stats
+  if (op.agentId && agents.has(op.agentId)) {
+    const agent = agents.get(op.agentId)
+    agent.operationsCount++
+    agent.lastActivity = new Date().toISOString()
+  }
+
+  res.json(op)
+})
+
+// Conflicts endpoint
+app.get('/api/conflicts', (req, res) => {
+  res.json({ conflicts })
+})
+
+app.post('/api/conflicts', (req, res) => {
+  const conflict = {
+    id: randomUUID(),
+    ...req.body,
+    resolved: false,
+  }
+  conflicts.push(conflict)
+  res.json(conflict)
+})
+
+app.post('/api/conflicts/:id/resolve', (req, res) => {
+  const conflict = conflicts.find(c => c.id === req.params.id)
+  if (conflict) {
+    conflict.resolved = true
+    conflict.resolution = req.body.resolution || 'manual'
+    conflict.resolvedBy = req.body.resolvedBy || 'user'
+    conflict.resolvedAt = new Date().toISOString()
+    res.json(conflict)
+  } else {
+    res.status(404).json({ error: 'Conflict not found' })
+  }
+})
+
 // ─── Start ──────────────────────────────────────────────────────────
 
 ensureDir(BOARDS_DIR)

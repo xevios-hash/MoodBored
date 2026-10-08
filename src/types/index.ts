@@ -380,6 +380,27 @@ export interface RegionItem extends ItemBase {
   locked: boolean         // prevent accidental moves
 }
 
+// ─── File Node (IDE layer) ──────────────────────────────────────────
+
+export interface FileItem extends ItemBase {
+  kind: 'file'
+  filePath: string        // Absolute or relative path on disk
+  fileName: string        // Display name
+  fileExtension: string   // e.g., 'ts', 'py', 'json'
+  language: string        // Detected language for syntax highlighting
+  fileSize: number        // bytes
+  lastModified: string    // ISO timestamp
+  content: string         // File content (or preview snippet)
+  previewLines: number    // How many lines to show in preview
+  isEditing: boolean      // Full editor mode
+  isDirty: boolean        // Unsaved changes
+  chunkedContent?: string // For large files arriving in chunks
+  streamId?: string       // Chunk assembly stream ID
+  purpose: string
+  importance: string
+  tags: string[]
+}
+
 // ─── Union types ────────────────────────────────────────────────────
 
 export type BoardItem =
@@ -397,6 +418,7 @@ export type BoardItem =
   | ConnectorItem
   | WebItem
   | RegionItem
+  | FileItem
 
 export type PositionedItem = Exclude<BoardItem, ConnectorItem>
 
@@ -550,6 +572,11 @@ export function getDefaultPorts(kind: string): Port[] {
       return [
         { id: 'region-in', name: 'Contains', type: 'any', direction: 'input' },
         { id: 'region-out', name: 'Group', type: 'any', direction: 'output' },
+      ]
+    case 'file':
+      return [
+        { id: 'file-in', name: 'Input', type: 'data', direction: 'input' },
+        { id: 'file-out', name: 'Content', type: 'data', direction: 'output' },
       ]
     default:
       return []
