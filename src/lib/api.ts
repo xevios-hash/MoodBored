@@ -102,7 +102,7 @@ export async function streamChat(
         messages,
         stream: true,
         temperature: 0.8,
-        max_tokens: 4096,
+        max_tokens: 8192,
         providerSettings,
       }),
       signal,
@@ -188,7 +188,7 @@ export async function streamChatWithTools(
       messages: currentMessages,
       stream: true,
       temperature: 0.8,
-      max_tokens: 4096,
+      max_tokens: 8192,
       providerSettings,
     }
     if (tools.length > 0 && i === 0) {
@@ -1066,3 +1066,4 @@ export function getAllModels(): { provider: AIProvider; model: string }[] {
   }
   return models
 }
+

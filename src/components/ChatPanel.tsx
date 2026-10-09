@@ -12,6 +12,23 @@ import { v4 as uuid } from 'uuid'
 import type { ChatMessage, AgentAction } from '@/types'
 import { showToast } from '@/lib/toasts'
 
+// Helper to safely truncate tool responses
+function truncateResponse(text: string, maxLength: number = 2000): string {
+  if (!text) return ''
+  if (text.length <= maxLength) return text
+  
+  // Find a good break point (newline or space)
+  let cutPoint = text.lastIndexOf('\n', maxLength)
+  if (cutPoint < maxLength * 0.8) {
+    cutPoint = text.lastIndexOf(' ', maxLength)
+  }
+  if (cutPoint < maxLength * 0.8) {
+    cutPoint = maxLength
+  }
+  
+  return text.slice(0, cutPoint) + '\n\n[... truncated - full content available on canvas]'
+}
+
 function cleanContent(content: string): string {
   let cleaned = content.replace(/```json\s*[\s\S]*?```/g, '')
   cleaned = cleaned.replace(/```JSON\s*[\s\S]*?```/g, '')
@@ -247,7 +264,7 @@ export function ChatPanel() {
                       const readData = await readRes.json()
                       results.push({
                         tool_call_id: group.toolCallId,
-                        content: `File: ${filePath}\n\n${readData.content?.slice(0, 1000) || ''}${readData.content?.length > 1000 ? '\n...' : ''}`,
+                        content: truncateResponse(`File: ${filePath}\n\n${readData.content || ''}`, 3000),
                       })
                     } else {
                       results.push({ tool_call_id: group.toolCallId, content: `File not found: ${filePath}` })
@@ -290,7 +307,7 @@ export function ChatPanel() {
                         f.type === 'directory' ? `📁 ${f.path}` : `📄 ${f.path}`
                       ).join('\n') || 'No files found'
 
-                      results.push({ tool_call_id: group.toolCallId, content: `Files in ${filePath || 'workspace'}:\n\n${fileList}` })
+                      results.push({ tool_call_id: group.toolCallId, content: truncateResponse(`Files in ${filePath || 'workspace'}:\n\n${fileList}`, 2000) })
                     }
                   } else if (action.type === 'clear_board') {
                     const s = useStore.getState()
@@ -335,7 +352,7 @@ export function ChatPanel() {
 
                     results.push({
                       tool_call_id: group.toolCallId,
-                      content: `Summary of ${targetItems.length} items${(action as any).focus ? ` (focus: ${(action as any).focus})` : ''}:\n${summary}`,
+                      content: truncateResponse(`Summary of ${targetItems.length} items${(action as any).focus ? ` (focus: ${(action as any).focus})` : ''}:\n${summary}`, 2000),
                     })
                   } else if (action.type === 'search_semantic' && (action as any).query) {
                     // Use text search as fallback for semantic search
