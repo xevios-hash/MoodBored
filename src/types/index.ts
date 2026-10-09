@@ -256,15 +256,35 @@ export interface NoteItem extends ItemBase {
 
 export interface VideoItem extends ItemBase {
   kind: 'video'
-  source: string
-  startTs: number
-  duration: number
+  // Source reference (file path or URL - never embed video data)
+  source: string           // Local file path or remote URL
+  sourceType: 'file' | 'url' | 'youtube' | 'vimeo'
+  // Metadata
+  title: string
   subjectDesc: string
   motionDesc: string
+  duration: number         // seconds
+  resolution?: { width: number; height: number }
+  fps?: number
+  codec?: string
+  fileSize?: number        // bytes
+  // Playback state
+  startTs: number          // start timestamp in seconds
+  endTs?: number           // end timestamp (for clips)
+  currentTime?: number     // current playback position
+  muted: boolean           // default: true
+  autoplay: boolean        // default: false
+  loop: boolean            // default: true
+  // Purpose & context
   purpose: string
   importance: string
-  sourceUrl: string
   tags: string[]
+  // Timestamps for key moments
+  timestamps?: Array<{
+    time: number           // seconds
+    label: string
+    description?: string
+  }>
 }
 
 export interface ColorStop {

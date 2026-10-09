@@ -167,7 +167,7 @@ export function compileCreationBrief(
       videos.push({
         subject: item.subjectDesc,
         motion: item.motionDesc,
-        source: item.sourceUrl || '',
+        source: item.source || '',
       })
     }
   }

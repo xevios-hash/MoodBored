@@ -56,7 +56,7 @@ function createDefaultItem(kind: string, pos: Position): BoardItem {
     swatch: { kind: 'swatch', id: crypto.randomUUID(), hex: '#8b7dc8', name: '', usage: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 160, h: 180 }, ports: getDefaultPorts('swatch') },
     sizeguide: { kind: 'sizeguide', id: crypto.randomUUID(), width: 1920, height: 1080, unit: 'px', label: '', orientation: 'landscape', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 200, h: 160 }, ports: getDefaultPorts('sizeguide') },
     container: { kind: 'container', id: crypto.randomUUID(), label: 'New Group', children: [], layout: 'free', gap: 8, collapsed: false, purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 400, h: 300 }, ports: getDefaultPorts('container') },
-    video: { kind: 'video', id: crypto.randomUUID(), source: '', sourceUrl: '', startTs: 0, duration: 0, subjectDesc: '', motionDesc: '', purpose: '', importance: '', tags: [], pos: { x: cx, y: cy }, size: { w: 320, h: 240 }, ports: getDefaultPorts('video') },
+    video: { kind: 'video', id: crypto.randomUUID(), source: '', sourceType: 'file', title: '', subjectDesc: '', motionDesc: '', duration: 0, startTs: 0, muted: true, autoplay: false, loop: true, purpose: '', importance: '', tags: [], timestamps: [], pos: { x: cx, y: cy }, size: { w: 320, h: 240 }, ports: getDefaultPorts('video') },
   }
   return defaults[kind] || defaults.note
 }
@@ -1117,7 +1117,7 @@ Example response:
         state.addItem({ kind: 'image', id: crypto.randomUUID(), thumbnail: url, fullSource: url, description: file.name, purpose: 'Dropped by user', importance: 'User reference', source: `file:${file.name}`, tags: [], pos: { x: wx, y: wy }, size: { w: 300, h: 200 } })
       } else if (file.type.startsWith('video/')) {
         const url = URL.createObjectURL(file); blobUrls.add(url)
-        state.addItem({ kind: 'video', id: crypto.randomUUID(), source: url, sourceUrl: url, startTs: 0, duration: 0, subjectDesc: file.name, motionDesc: '', purpose: 'Dropped by user', importance: 'User video', tags: [], pos: { x: wx, y: wy }, size: { w: 320, h: 240 } })
+        state.addItem({ kind: 'video', id: crypto.randomUUID(), source: url, sourceType: 'file', title: file.name, subjectDesc: file.name, motionDesc: '', duration: 0, startTs: 0, muted: true, autoplay: false, loop: true, purpose: 'Dropped by user', importance: 'User video', tags: [], pos: { x: wx, y: wy }, size: { w: 320, h: 240 } })
       } else {
         state.addItem({ kind: 'note', id: crypto.randomUUID(), text: `File: ${file.name}`, purpose: 'Dropped file', importance: 'User file', tags: [`file:${file.name}`], pos: { x: wx, y: wy } })
       }
@@ -1807,7 +1807,7 @@ Example response:
         const y = item.pos.y * canvas.zoom + canvas.panY
         const w = (item.size?.w ?? 250) * canvas.zoom
         const h = (item.size?.h ?? 150) * canvas.zoom
-        if (item.kind === 'video') return <video key={item.id} src={item.source || item.sourceUrl} autoPlay loop muted playsInline style={{ position: 'absolute', left: x, top: y, width: w, height: h, objectFit: 'cover', borderRadius: 10, pointerEvents: 'none', zIndex: 2 }} />
+        if (item.kind === 'video') return <video key={item.id} src={item.source || item.source} autoPlay loop muted playsInline style={{ position: 'absolute', left: x, top: y, width: w, height: h, objectFit: 'cover', borderRadius: 10, pointerEvents: 'none', zIndex: 2 }} />
         if (item.kind === 'image') return <img key={item.id} src={item.thumbnail || item.fullSource} alt={item.description} style={{ position: 'absolute', left: x, top: y, width: w, height: h, objectFit: 'cover', borderRadius: 10, pointerEvents: 'none', zIndex: 2 }} />
         return null
       })}
@@ -2471,6 +2471,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, selected: bool
     case 'sizeguide': drawSizeGuideItem(ctx, item, x, y, w, h, zoom); break
     case 'container': drawContainerItem(ctx, item, x, y, w, h, zoom); break
     case 'link': drawLinkItem(ctx, item, x, y, w, h, zoom); break
+    case 'video': drawVideoItem(ctx, item as any, x, y, w, h, zoom); break
     case 'web': drawWebItem(ctx, item as any, x, y, w, h, zoom); break
     case 'region': drawRegionItem(ctx, item as any, x, y, w, h, zoom); break
     case 'file': drawFileItem(ctx, item as any, x, y, w, h, zoom); break
@@ -2926,6 +2927,114 @@ function drawFileItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: nu
       ctx.font = '600 10px Inter, sans-serif'
       ctx.fillText('●', x + w - PAD - 12, y + PAD + 9)
     }
+  }
+}
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+function drawVideoItem(ctx: CanvasRenderingContext2D, item: any, x: number, y: number, w: number, h: number, zoom: number) {
+  const maxBot = y + h - PAD
+  let cy = y + PAD
+
+  // Video badge
+  ctx.fillStyle = '#a888d8'
+  ctx.font = '600 9px Inter, sans-serif'
+  ctx.fillText('VIDEO', x + PAD, cy + 9)
+
+  // Duration badge
+  if (item.duration) {
+    const durText = formatDuration(item.duration)
+    ctx.font = '600 8px Inter, sans-serif'
+    const durW = ctx.measureText(durText).width + 8
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'
+    ctx.beginPath()
+    roundRect(ctx, x + w - PAD - durW - 4, cy, durW + 4, 16, 3)
+    ctx.fill()
+    ctx.fillStyle = '#fff'
+    ctx.fillText(durText, x + w - PAD - durW, cy + 11)
+  }
+  cy += 20
+
+  // Video title
+  ctx.fillStyle = txtPrimary()
+  ctx.font = '600 12px Inter, sans-serif'
+  ctx.fillText((item.title || item.subjectDesc || 'Untitled').slice(0, 35), x + PAD, cy + 2)
+  cy += 18
+
+  // Source type badge
+  const sourceType = item.sourceType || 'file'
+  const sourceColors: Record<string, string> = {
+    file: '#4CAF50', url: '#2196F3', youtube: '#FF0000', vimeo: '#1AB7EA'
+  }
+  const sourceColor = sourceColors[sourceType] || '#8b7dc8'
+  ctx.font = '600 7px Inter, sans-serif'
+  const sourceW = ctx.measureText(sourceType.toUpperCase()).width + 6
+  ctx.fillStyle = sourceColor + '33'
+  ctx.beginPath()
+  roundRect(ctx, x + PAD, cy, sourceW + 4, 14, 2)
+  ctx.fill()
+  ctx.fillStyle = sourceColor
+  ctx.fillText(sourceType.toUpperCase(), x + PAD + 3, cy + 10)
+  cy += 18
+
+  // Video preview area (simulated)
+  if (cy < maxBot - 60) {
+    const previewH = Math.min(120, maxBot - cy - 50)
+    const previewW = w - PAD * 2
+
+    // Dark preview background
+    ctx.fillStyle = isDark() ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.08)'
+    ctx.beginPath()
+    roundRect(ctx, x + PAD, cy, previewW, previewH, 6)
+    ctx.fill()
+
+    // Play button overlay
+    const playSize = 24
+    const playX = x + PAD + previewW / 2 - playSize / 2
+    const playY = cy + previewH / 2 - playSize / 2
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'
+    ctx.beginPath()
+    ctx.moveTo(playX, playY)
+    ctx.lineTo(playX + playSize, playY + playSize / 2)
+    ctx.lineTo(playX, playY + playSize)
+    ctx.closePath()
+    ctx.fill()
+
+    // Mute indicator
+    if (item.muted) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'
+      ctx.beginPath()
+      roundRect(ctx, x + PAD + 4, cy + 4, 20, 14, 3)
+      ctx.fill()
+      ctx.fillStyle = '#fff'
+      ctx.font = '600 7px Inter, sans-serif'
+      ctx.fillText('MUTE', x + PAD + 6, cy + 13)
+    }
+
+    cy += previewH + 8
+  }
+
+  // Metadata
+  if (cy < maxBot - 30) {
+    ctx.fillStyle = txtMuted()
+    ctx.font = '8px Inter, sans-serif'
+    const metadata = []
+    if (item.resolution) metadata.push(`${item.resolution.width}x${item.resolution.height}`)
+    if (item.fps) metadata.push(`${item.fps}fps`)
+    if (item.fileSize) metadata.push(formatFileSize(item.fileSize))
+    ctx.fillText(metadata.join(' · '), x + PAD, cy)
+    cy += 12
+  }
+
+  // Subject description
+  if (item.subjectDesc && cy < maxBot - 10) {
+    ctx.fillStyle = txtSecondary()
+    ctx.font = '9px Inter, sans-serif'
+    wrapText(ctx, item.subjectDesc.slice(0, 100), x + PAD, cy, w - PAD * 2, 12, maxBot - cy)
   }
 }
 

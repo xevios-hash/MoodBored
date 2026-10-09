@@ -613,26 +613,17 @@ fn main() {
             stop_server,
             get_server_status,
         ])
-        .setup(|_app| {
-            // Start the server on app launch in a background thread
+        .setup(|app| {
+            // Start the server synchronously before window loads
             let exe_dir = std::env::current_exe()
                 .ok()
                 .and_then(|p| p.parent().map(|p| p.to_path_buf()))
                 .unwrap_or_else(|| PathBuf::from("."));
 
-            println!("Exe directory: {:?}", exe_dir);
+            let server_path = exe_dir.join("server.mjs");
 
-            std::thread::spawn(move || {
-                let server_path = exe_dir.join("server.mjs");
-
-                if !server_path.exists() {
-                    eprintln!("server.mjs not found at {:?}", server_path);
-                    return;
-                }
-
-                println!("Starting server from: {:?}", server_path);
-
-                // Try to find node in common locations
+            if server_path.exists() {
+                // Try to find node
                 let node_paths = vec![
                     "node",
                     "C:\\Program Files\\nodejs\\node.exe",
@@ -640,16 +631,15 @@ fn main() {
                     "/usr/bin/node",
                 ];
 
-                let mut node_cmd = None;
+                let mut node_exe = "node".to_string();
                 for path in &node_paths {
                     if Command::new(path).arg("--version").output().is_ok() {
-                        node_cmd = Some(path.to_string());
+                        node_exe = path.to_string();
                         break;
                     }
                 }
 
-                let node_exe = node_cmd.unwrap_or_else(|| "node".to_string());
-
+                // Start server
                 match Command::new(&node_exe)
                     .arg(server_path.to_str().unwrap())
                     .env("PORT", "3000")
@@ -657,24 +647,21 @@ fn main() {
                     .spawn()
                 {
                     Ok(_child) => {
-                        println!("MoodBored server started on port 3000");
-                        // Wait for server to be ready - up to 30 seconds
-                        let mut ready = false;
-                        for i in 0..60 {
+                        println!("Server starting on port 3000...");
+                        // Wait for server to be ready
+                        for i in 0..30 {
                             std::thread::sleep(std::time::Duration::from_millis(500));
                             if std::net::TcpStream::connect("127.0.0.1:3000").is_ok() {
-                                println!("Server is ready after {}ms", (i + 1) * 500);
-                                ready = true;
+                                println!("Server ready after {}ms", (i + 1) * 500);
                                 break;
                             }
                         }
-                        if !ready {
-                            eprintln!("Server failed to start within 30 seconds");
-                        }
                     }
-                    Err(e) => eprintln!("Failed to start server with {}: {}", node_exe, e),
+                    Err(e) => eprintln!("Failed to start server: {}", e),
                 }
-            });
+            } else {
+                eprintln!("server.mjs not found at {:?}", server_path);
+            }
 
             Ok(())
         })

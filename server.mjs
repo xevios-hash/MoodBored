@@ -215,7 +215,7 @@ function notifyBoardChange(boardId, state) {
 // ─── Express App ────────────────────────────────────────────────────
 
 const app = express()
-app.set('trust proxy', true) // Railway, Cloudflare, etc. set X-Forwarded-Proto
+app.set('trust proxy', 1) // Railway, Cloudflare, etc. set X-Forwarded-Proto (single proxy)
 // Request logging
 app.use(morgan('combined', {
   skip: (req) => req.url === '/api/board/health' && req.method === 'GET',
@@ -252,6 +252,7 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
+  validate: { trustProxy: false }, // Disable trust proxy validation
 })
 app.use('/api/', apiLimiter)
 
@@ -259,6 +260,7 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: { error: 'Too many auth attempts' },
+  validate: { trustProxy: false }, // Disable trust proxy validation
 })
 
 app.use(express.json({ limit: '10mb' }))

@@ -639,15 +639,20 @@ export function normalizeItem(raw: any, existingItems: BoardItem[] = []): BoardI
     case 'video':
       item = {
         kind: 'video', id,
-        source: raw.source || '',
-        startTs: raw.startTs || raw.start_ts || 0,
-        duration: raw.duration || 0,
+        source: raw.source || raw.source_url || '',
+        sourceType: raw.sourceType || 'file',
+        title: raw.title || raw.subjectDesc || '',
         subjectDesc: raw.subjectDesc || raw.subject_desc || '',
         motionDesc: raw.motionDesc || raw.motion_desc || '',
+        duration: raw.duration || 0,
+        startTs: raw.startTs || raw.start_ts || 0,
+        muted: raw.muted !== undefined ? raw.muted : true,
+        autoplay: raw.autoplay || false,
+        loop: raw.loop !== undefined ? raw.loop : true,
         purpose: raw.purpose || '',
         importance: raw.importance || '',
-        sourceUrl: raw.sourceUrl || raw.source_url || '',
         tags: raw.tags || [],
+        timestamps: raw.timestamps || [],
         pos: preferredPos, size,
       }
       break
