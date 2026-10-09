@@ -227,6 +227,95 @@ export const BOARD_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'clear_board',
+      description: 'Remove all items from the board. Use this when the user wants to start fresh or clear the canvas.',
+      parameters: {
+        type: 'object' as const,
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'create_snapshot',
+      description: 'Save a named snapshot of the current board state. Use for versioning, checkpoints, or creating branches.',
+      parameters: {
+        type: 'object' as const,
+        required: ['name'],
+        properties: {
+          name: { type: 'string' as const, description: 'Snapshot name' },
+          description: { type: 'string' as const, description: 'What this snapshot captures' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'generate_lesson',
+      description: 'Generate an interactive educational lesson with slides, narration, and quizzes. Use when the user wants to learn about a topic.',
+      parameters: {
+        type: 'object' as const,
+        required: ['topic'],
+        properties: {
+          topic: { type: 'string' as const, description: 'Topic to teach' },
+          grade_level: {
+            type: 'string' as const,
+            enum: ['K-2', '3-5', '6-8', '9-12', 'adult'],
+            description: 'Target grade level',
+          },
+          slide_count: { type: 'number' as const, description: 'Number of slides (default: 8)' },
+          include_quizzes: { type: 'boolean' as const, description: 'Include quiz questions' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'summarize_across',
+      description: 'Summarize content across multiple items on the board. Use to find themes, patterns, or create narratives.',
+      parameters: {
+        type: 'object' as const,
+        properties: {
+          item_ids: { type: 'array' as const, items: { type: 'string' as const }, description: 'Specific item IDs to summarize' },
+          focus: { type: 'string' as const, description: 'What to focus on (e.g., "color themes", "key decisions")' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'search_semantic',
+      description: 'Search items by meaning, not just keywords. Finds conceptually related items even if they use different words.',
+      parameters: {
+        type: 'object' as const,
+        required: ['query'],
+        properties: {
+          query: { type: 'string' as const, description: 'What to search for (by meaning)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'find_related',
+      description: 'Find items semantically related to a given item. Use to discover connections and build relationships.',
+      parameters: {
+        type: 'object' as const,
+        required: ['item_id'],
+        properties: {
+          item_id: { type: 'string' as const, description: 'ID of the item to find relations for' },
+        },
+      },
+    },
+  },
   // ─── File Tools (IDE Features) ──────────────────────────────────
   {
     type: 'function' as const,
@@ -304,37 +393,133 @@ export const BOARD_TOOLS = [
   },
 ]
 
-// System prompt for tool-calling mode — shorter than the JSON-block prompt
-// because the tool schemas carry the item type information.
+// System prompt for tool-calling mode — comprehensive coverage of all agent capabilities.
 export function buildToolSystemPrompt(projectSummary: string, boardDescription: string, viewportName?: string): string {
   const vpInfo = viewportName ? `\nYou are currently working on the "${viewportName}" board.` : ''
 
-  return `You are MoodBored's AI assistant — a creative collaborator that builds visual mood boards AND a coding IDE.
+  return `You are MoodBored's AI — a creative collaborator, visual designer, and coding IDE combined. You work on an infinite canvas where users build mood boards, design systems, and code projects.
+
 ${vpInfo}
-CAPABILITIES:
-- Build visual mood boards with add_items
-- Create/edit/read files with create_file, update_file, read_file, list_files
-- Commit changes with git_commit
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR TOOLKIT (15 tools)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-RULES:
-1. Whenever the user describes ANYTHING, immediately add items using the add_items tool.
-2. Always add items. Every response should place 2-8 items on the canvas.
-3. Use REAL Unsplash URLs for images: source "https://images.unsplash.com/photo-XXXXXXXXX?w=800"
-4. For generated images, set source to "generated" and include a detailed description.
-5. Spread items across the canvas. Vary positions.
-6. When the user asks to create/write/generate code or files, use create_file tool.
-7. When the user asks to see/read/show file contents, use read_file tool.
-8. When the user asks to modify/edit/change files, use update_file tool.
-9. When the user asks to save/commit/checkpoint, use git_commit tool.
-6. Use containers to organize related items. Group by theme, type, or concept.
-7. If the board is empty, populate it with items matching the user's request.
-8. NEVER ask clarifying questions. Choose a strong direction and add concrete items.
-9. You may write a short friendly message alongside your tool calls.
-10. Use open_url to open web pages as live browser cards on the board.
-11. Use draw_connection to show relationships between items (citation, dependency, contradiction, related).
-12. When the user asks about connections or relationships between items, draw them visually.
+📦 CANVAS TOOLS — Build and manage visual mood boards
+  add_items        Add notes, text, images, links, palettes, gradients, fonts,
+                   swatches, size guides, videos, containers, web pages
+  remove_items     Delete items by ID
+  update_item      Modify any item's properties
+  search_items     Find items by text or tag
+  arrange_items    Auto-layout: grid, stack-h, stack-v, spiral
+  group_items      Group items into a named container
+  generate_image   Create custom AI images (when Unsplash isn't enough)
+  open_url         Open web pages as live interactive browser cards
+  draw_connection  Draw typed connections between items
+  export_brief     Export board as structured creative brief
 
-CURRENT BOARD:
+💻 FILE TOOLS — Full coding IDE in your workspace
+  create_file      Create files (code, configs, docs, anything)
+  read_file        Read file contents
+  update_file      Modify existing files
+  list_files       Browse workspace directory
+  git_commit       Commit changes to version control
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ITEM TYPES (13 kinds)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  note        Text thoughts, quotes, keywords
+  text        Raw content snippet
+  image       Visual reference (Unsplash URL, generated, or uploaded)
+  link        Reference URL with title and summary
+  palette     Color palette with hex codes
+  gradient    Gradient preview with stops and direction
+  font        Typography preview with sample text
+  swatch      Single color with usage notes
+  sizeguide   Dimensions and orientation reference
+  video       Video reference with subject and motion
+  container   Group of items (free/grid/stack-h/stack-v layout)
+  web         Live web page with browser controls
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONNECTION TYPES (7 kinds)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  citation       Source/reference relationship
+  dependency     A requires/depends on B
+  contradiction  Items conflict or disagree
+  related        General association
+  mcp            MCP tool connection
+  api            API integration
+  custom         User-defined relationship
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CREATIVE DIRECTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When the user describes ANYTHING creative:
+1. IMMEDIATELY add items — never ask questions first
+2. Place 2-8 items per response — build momentum
+3. Use REAL Unsplash URLs: https://images.unsplash.com/photo-XXXXXXXXX?w=800
+4. For custom images: source="generated" + detailed description
+5. Vary positions — spread across the canvas
+6. Use containers to group related items by theme
+7. Draw connections to show relationships visually
+8. Choose strong creative direction — commit to it
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CODE & FILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When the user asks to create/write/generate code or files:
+1. Use create_file with proper file extensions
+2. Include complete, runnable code (not snippets)
+3. Add file headers/comments explaining purpose
+4. Follow language conventions and best practices
+5. Create supporting files when needed (e.g., index.html + style.css + app.js)
+
+When the user asks to modify/edit/update code:
+1. Read the file first if you need context (read_file)
+2. Use update_file with the COMPLETE new content
+3. Maintain existing code style
+
+When the user asks to save/commit:
+1. Use git_commit with a descriptive message
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WEB & RESEARCH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When the user mentions websites or URLs:
+1. Use open_url to create live browser cards
+2. Add link items for reference URLs
+3. Use draw_connection to relate web content to other items
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ORGANIZATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When the board gets messy:
+1. Use arrange_items for auto-layout (grid/stack/spiral)
+2. Use group_items to create containers
+3. Use draw_connection to show relationships
+4. Use search_items to find what's on the board
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STYLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Be creative and decisive — pick a direction and run with it
+- Use emojis in note text for visual interest
+- Write concise, punchy copy (not verbose paragraphs)
+- Think like a designer: color, typography, composition matter
+- Think like a developer: clean code, proper structure, documentation
+- NEVER ask clarifying questions — make strong choices
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT BOARD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ${projectSummary}
 
 ${boardDescription}`
@@ -440,6 +625,32 @@ export function processToolCalls(toolCalls: any[]): { toolCallId: string; action
         break
       case 'list_files':
         actions.push({ type: 'list_files', path: args.path })
+        break
+      case 'clear_board':
+        actions.push({ type: 'clear_board' })
+        break
+      case 'create_snapshot':
+        if (args.name) {
+          actions.push({ type: 'create_snapshot', name: args.name, description: args.description })
+        }
+        break
+      case 'generate_lesson':
+        if (args.topic) {
+          actions.push({ type: 'generate_lesson', topic: args.topic, gradeLevel: args.grade_level, slideCount: args.slide_count, includeQuizzes: args.include_quizzes })
+        }
+        break
+      case 'summarize_across':
+        actions.push({ type: 'summarize_across', itemIds: args.item_ids, focus: args.focus })
+        break
+      case 'search_semantic':
+        if (args.query) {
+          actions.push({ type: 'search_semantic', query: args.query })
+        }
+        break
+      case 'find_related':
+        if (args.item_id) {
+          actions.push({ type: 'find_related', itemId: args.item_id })
+        }
         break
       case 'git_commit':
         if (args.message) {

@@ -292,6 +292,91 @@ export function ChatPanel() {
 
                       results.push({ tool_call_id: group.toolCallId, content: `Files in ${filePath || 'workspace'}:\n\n${fileList}` })
                     }
+                  } else if (action.type === 'clear_board') {
+                    const s = useStore.getState()
+                    const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+                    const itemIds = (vp?.items || []).filter(i => i.kind !== 'connector').map(i => i.id)
+                    if (itemIds.length > 0) s.removeItems(itemIds)
+                    results.push({ tool_call_id: group.toolCallId, content: `Cleared ${itemIds.length} items from board` })
+                  } else if (action.type === 'create_snapshot' && (action as any).name) {
+                    const s = useStore.getState()
+                    await s.createSnapshot((action as any).name, (action as any).description)
+                    results.push({ tool_call_id: group.toolCallId, content: `Snapshot "${(action as any).name}" created` })
+                  } else if (action.type === 'generate_lesson' && (action as any).topic) {
+                    // Generate lesson via API
+                    const lessonRes = await fetch('/api/board/' + useStore.getState().project.id + '/lesson', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        topic: (action as any).topic,
+                        grade_level: (action as any).gradeLevel || '9-12',
+                        slide_count: (action as any).slideCount || 8,
+                        include_quizzes: (action as any).includeQuizzes !== false,
+                      }),
+                    })
+                    if (lessonRes.ok) {
+                      const lessonData = await lessonRes.json()
+                      results.push({ tool_call_id: group.toolCallId, content: `Generated ${lessonData.slideCount}-slide lesson on "${(action as any).topic}"` })
+                    } else {
+                      results.push({ tool_call_id: group.toolCallId, content: 'Failed to generate lesson' })
+                    }
+                  } else if (action.type === 'summarize_across') {
+                    const s = useStore.getState()
+                    const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+                    const allItems = vp?.items || []
+                    const targetItems = (action as any).itemIds?.length > 0
+                      ? allItems.filter(i => (action as any).itemIds.includes(i.id))
+                      : allItems.filter(i => ['note', 'text', 'link'].includes(i.kind))
+
+                    const summary = targetItems.slice(0, 10).map((i: any) => {
+                      const text = i.text || i.raw || i.title || ''
+                      return `- ${text.slice(0, 100)}`
+                    }).join('\n')
+
+                    results.push({
+                      tool_call_id: group.toolCallId,
+                      content: `Summary of ${targetItems.length} items${(action as any).focus ? ` (focus: ${(action as any).focus})` : ''}:\n${summary}`,
+                    })
+                  } else if (action.type === 'search_semantic' && (action as any).query) {
+                    // Use text search as fallback for semantic search
+                    const s = useStore.getState()
+                    const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+                    const allItems = vp?.items || []
+                    const query = (action as any).query.toLowerCase()
+                    const matches = allItems.filter(i => {
+                      const text = ((i as any).text || (i as any).raw || (i as any).description || (i as any).title || '').toLowerCase()
+                      return text.includes(query)
+                    }).slice(0, 5)
+
+                    results.push({
+                      tool_call_id: group.toolCallId,
+                      content: matches.length > 0
+                        ? `Found ${matches.length} matching items:\n${matches.map((m: any) => `- ${m.text || m.raw || m.description || m.title}`).join('\n')}`
+                        : 'No matching items found',
+                    })
+                  } else if (action.type === 'find_related' && (action as any).itemId) {
+                    // Find items with same tags or similar content
+                    const s = useStore.getState()
+                    const vp = s.project.viewports.find(v => v.id === s.activeViewportId)
+                    const allItems = vp?.items || []
+                    const target = allItems.find(i => i.id === (action as any).itemId)
+
+                    if (target) {
+                      const targetTags = (target as any).tags || []
+                      const related = allItems.filter(i =>
+                        i.id !== target.id &&
+                        ((i as any).tags || []).some((t: string) => targetTags.includes(t))
+                      ).slice(0, 5)
+
+                      results.push({
+                        tool_call_id: group.toolCallId,
+                        content: related.length > 0
+                          ? `Related items:\n${related.map((r: any) => `- ${r.text || r.raw || r.description || r.title}`).join('\n')}`
+                          : 'No related items found',
+                      })
+                    } else {
+                      results.push({ tool_call_id: group.toolCallId, content: 'Item not found' })
+                    }
                   } else if (action.type === 'git_commit' && (action as any).message) {
                     const commitRes = await fetch('/api/git/commit', {
                       method: 'POST',
