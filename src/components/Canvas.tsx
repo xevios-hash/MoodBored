@@ -1537,6 +1537,61 @@ Example response:
         window.dispatchEvent(event)
         break
       }
+      case 'delete-file': {
+        // Delete file from disk and remove from canvas
+        if (contextMenu.itemId) {
+          const item = items.find(i => i.id === contextMenu.itemId)
+          if (item && item.kind === 'file') {
+            const filePath = (item as any).filePath
+            if (filePath) {
+              fetch('/api/files/delete', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath }),
+              }).then(res => {
+                if (res.ok) {
+                  state.removeItem(contextMenu.itemId!)
+                  showToast('File deleted', 'success')
+                } else {
+                  showToast('Failed to delete file', 'error')
+                }
+              })
+            }
+          }
+        }
+        break
+      }
+      case 'rename-file': {
+        // Rename file on disk
+        if (contextMenu.itemId) {
+          const item = items.find(i => i.id === contextMenu.itemId)
+          if (item && item.kind === 'file') {
+            const oldPath = (item as any).filePath
+            if (oldPath) {
+              const newPath = prompt('New file path:', oldPath)
+              if (newPath && newPath !== oldPath) {
+                fetch('/api/files/rename', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ oldPath, newPath }),
+                }).then(res => {
+                  if (res.ok) {
+                    state.updateItem(contextMenu.itemId!, {
+                      filePath: newPath,
+                      fileName: newPath.split('/').pop() || newPath.split('\\').pop() || 'untitled',
+                      fileExtension: newPath.split('.').pop() || '',
+                    })
+                    showToast('File renamed', 'success')
+                  } else {
+                    showToast('Failed to rename file', 'error')
+                  }
+                })
+              }
+            }
+          }
+        }
+        break
+      }
     }
     setContextMenu(null)
   }
@@ -2084,6 +2139,21 @@ Example response:
               })()}
 
               <div className="status-divider" style={{ margin: '4px 0' }} />
+              
+              {/* File operations */}
+              {contextMenu.itemId && (() => {
+                const item = items.find(i => i.id === contextMenu.itemId)
+                if (item && item.kind === 'file') {
+                  return (
+                    <>
+                      <CtxItem label="✏️  Rename File" onClick={() => handleContextAction('rename-file')} />
+                      <CtxItem label="🗑️  Delete File" onClick={() => handleContextAction('delete-file')} danger />
+                      <div className="status-divider" style={{ margin: '4px 0' }} />
+                    </>
+                  )
+                }
+                return null
+              })()}
               
               {/* Export */}
               <CtxItem label="📤  Export as PNG" onClick={() => handleContextAction('export-png')} />
