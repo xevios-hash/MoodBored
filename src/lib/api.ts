@@ -57,11 +57,22 @@ export function detectProvider(model: string): AIProvider {
   return 'openrouter'
 }
 
-export function getProviderUrl(provider: AIProvider): string {
-  return `/api/ai/chat/${provider}`
+// Detect if running in Tauri desktop app
+const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined
+
+// Get the API base URL - uses localhost:3000 for Tauri, relative URLs for web
+function getApiBaseUrl(): string {
+  if (isTauri) {
+    return 'http://localhost:3000'
+  }
+  return ''
 }
 
-const OPENROUTER_URL = '/api/ai/chat'  // Default provider endpoint
+export function getProviderUrl(provider: AIProvider): string {
+  return `${getApiBaseUrl()}/api/ai/chat/${provider}`
+}
+
+const OPENROUTER_URL = `${getApiBaseUrl()}/api/ai/chat`
 
 // ─── Streaming ──────────────────────────────────────────────────────
 
@@ -298,7 +309,7 @@ export async function generateImage(
   prompt: string,
 ): Promise<string | null> {
   try {
-    const res = await fetch('/api/ai/generate-image', {
+    const res = await fetch(`${getApiBaseUrl()}/api/ai/generate-image`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1033,7 +1044,7 @@ export interface ProviderInfo {
 
 export async function fetchAvailableProviders(): Promise<ProviderInfo[]> {
   try {
-    const res = await fetch('/api/ai/providers')
+    const res = await fetch(`${getApiBaseUrl()}/api/ai/providers`)
     if (!res.ok) return []
     const data = await res.json()
     return data.providers || []

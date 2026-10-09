@@ -8,6 +8,12 @@ import { AnnotationLayer } from '@/components/AnnotationLayer'
 import { getDefaultPorts } from '@/types'
 import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner, WebItem, ConnectionType } from '@/types'
 
+// Detect if running in Tauri desktop app
+const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined
+function getApiBaseUrl(): string {
+  return isTauri ? 'http://localhost:3000' : ''
+}
+
 // Simple X icon component
 const XIcon = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -418,7 +424,7 @@ IMPORTANT RULES:
 Example response:
 [{"kind":"note","text":"Great idea! Consider...","purpose":"Building on your thought"},{"kind":"text","raw":"Additional details...","purpose":"Supporting info"}]`
 
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch(`${getApiBaseUrl()}/api/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

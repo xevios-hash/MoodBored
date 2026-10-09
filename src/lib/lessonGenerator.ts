@@ -2,6 +2,12 @@ import type { Lesson, Slide, GradeLevel, QuizQuestion, Narration, LessonMetadata
 import { v4 as uuid } from 'uuid'
 import { createSlide, createQuizSlide, createProjectSlide, createBranchSlide } from './lesson'
 
+// Detect if running in Tauri desktop app
+const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined
+function getApiBaseUrl(): string {
+  return isTauri ? 'http://localhost:3000' : ''
+}
+
 interface LessonGenerationOptions {
   topic: string
   gradeLevel: GradeLevel
@@ -25,7 +31,7 @@ export async function generateLesson(options: LessonGenerationOptions): Promise<
   } = options
 
   try {
-    const response = await fetch('/api/ai/chat', {
+    const response = await fetch(`${getApiBaseUrl()}/api/ai/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

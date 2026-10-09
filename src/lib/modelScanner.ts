@@ -1,6 +1,12 @@
 // Native Model Scanner
 // Scans local filesystem for AI models and runtimes
 
+// Detect if running in Tauri desktop app
+const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined
+function getApiBaseUrl(): string {
+  return isTauri ? 'http://localhost:3000' : ''
+}
+
 export interface ScannedModel {
   id: string
   name: string
@@ -410,7 +416,7 @@ export class ModelScanner {
     // This would use fs.readdir in Node.js
     // For browser environment, we'll use the server API
     try {
-      const response = await fetch('/api/scan/models', {
+      const response = await fetch(`${getApiBaseUrl()}/api/scan/models`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ folder, depth, minSize: this.config.minFileSize }),
@@ -572,7 +578,7 @@ export const MODEL_CATALOG: CatalogModel[] = [
 export async function scanModelsOnServer(folder: string, depth: number, minSize: number): Promise<ScannedModel[]> {
   // This would call the server API
   try {
-    const response = await fetch('/api/scan/models', {
+    const response = await fetch(`${getApiBaseUrl()}/api/scan/models`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ folder, depth, minSize }),
