@@ -615,34 +615,59 @@ fn main() {
         ])
         .setup(|_app| {
             // Start the server on app launch in a background thread
+            // Use current working directory (where exe is launched from)
+            let work_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+            // Also try exe directory
             let exe_dir = std::env::current_exe()
                 .ok()
                 .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-                .unwrap_or_else(|| PathBuf::from("."));
+                .unwrap_or_else(|| work_dir.clone());
+
+            println!("Working directory: {:?}", work_dir);
+            println!("Exe directory: {:?}", exe_dir);
 
             std::thread::spawn(move || {
-                let server_path = exe_dir.join("server.mjs");
+                // Try multiple locations for server.mjs
+                let server_paths = vec![
+                    work_dir.join("server.mjs"),
+                    exe_dir.join("server.mjs"),
+                    PathBuf::from("server.mjs"),
+                ];
 
-                if server_path.exists() {
+                let mut server_path = None;
+                for path in &server_paths {
+                    println!("Checking: {:?}", path);
+                    if path.exists() {
+                        server_path = Some(path.clone());
+                        println!("Found server.mjs at: {:?}", path);
+                        break;
+                    }
+                }
+
+                if let Some(server_path) = server_path {
+                    println!("Starting server from: {:?}", server_path);
                     match Command::new("node")
                         .arg(server_path.to_str().unwrap())
                         .env("PORT", "3000")
-                        .current_dir(&exe_dir)
                         .spawn()
                     {
                         Ok(_child) => {
                             println!("MoodBored server started on port 3000");
                             // Wait for server to be ready
-                            for _ in 0..20 {
+                            for i in 0..30 {
                                 std::thread::sleep(std::time::Duration::from_millis(500));
                                 if std::net::TcpStream::connect("127.0.0.1:3000").is_ok() {
-                                    println!("Server is ready");
+                                    println!("Server is ready after {}ms", (i + 1) * 500);
                                     break;
                                 }
                             }
                         }
                         Err(e) => eprintln!("Failed to start server: {}", e),
                     }
+                } else {
+                    eprintln!("Could not find server.mjs in any location");
+                    eprintln!("Searched: {:?}", server_paths);
                 }
             });
 
