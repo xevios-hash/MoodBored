@@ -329,13 +329,40 @@ export function Canvas() {
       const target = e.target as HTMLElement
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
 
-      // Press '/' or 'Space' to open quick input
-      if (e.key === '/' || (e.key === ' ' && !quickInputOpen)) {
+      // Press '/' to open quick input
+      if (e.key === '/') {
         e.preventDefault()
         const state = useStore.getState()
         const rect = canvasRef.current?.getBoundingClientRect()
         if (rect) {
-          // Position at center of viewport
+          const cx = (rect.width / 2 - state.canvas.panX) / state.canvas.zoom
+          const cy = (rect.height / 2 - state.canvas.panY) / state.canvas.zoom
+          setQuickInputPos({ x: cx - 150, y: cy - 100 })
+        }
+        setQuickInputOpen(true)
+        setTimeout(() => quickInputRef.current?.focus(), 50)
+      }
+
+      // Press 'Space' on a selected note → ask AI to respond
+      if (e.key === ' ' && !quickInputOpen) {
+        e.preventDefault()
+        const state = useStore.getState()
+        const selectedIds = [...state.selectedIds]
+
+        if (selectedIds.length === 1) {
+          const vp = state.project.viewports.find(v => v.id === state.activeViewportId)
+          const selectedItem = vp?.items.find(i => i.id === selectedIds[0])
+
+          if (selectedItem && (selectedItem.kind === 'note' || selectedItem.kind === 'text')) {
+            // Ask AI to respond to this note
+            requestCanvasResponse(selectedItem)
+            return
+          }
+        }
+
+        // If no note selected, open quick input
+        const rect = canvasRef.current?.getBoundingClientRect()
+        if (rect) {
           const cx = (rect.width / 2 - state.canvas.panX) / state.canvas.zoom
           const cy = (rect.height / 2 - state.canvas.panY) / state.canvas.zoom
           setQuickInputPos({ x: cx - 150, y: cy - 100 })
