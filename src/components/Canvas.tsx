@@ -4,6 +4,7 @@ import { hitTestItem } from '@/lib/layout'
 import { loadFont } from '@/lib/fonts'
 import { showToast } from '@/lib/toasts'
 import { WebNode } from '@/components/WebNode'
+import { FileEditor } from '@/components/FileEditor'
 import { AnnotationLayer } from '@/components/AnnotationLayer'
 import { getDefaultPorts } from '@/types'
 import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner, WebItem, ConnectionType } from '@/types'
@@ -272,6 +273,7 @@ export function Canvas() {
   const [addToolbarOpen, setAddToolbarOpen] = useState(false)
   const [expandedLinks, setExpandedLinks] = useState<Set<string>>(new Set())
   const [editingItem, setEditingItem] = useState<{ id: string; field: string; value: string } | null>(null)
+  const [editingFile, setEditingFile] = useState<{ id: string; filePath: string; fileName: string; content: string; language: string } | null>(null)
   const [canvasConversations, setCanvasConversations] = useState<Map<string, { parentId: string; responseIds: string[] }>>(new Map())
   const [isGeneratingResponse, setIsGeneratingResponse] = useState<Set<string>>(new Set())
 
@@ -1195,6 +1197,19 @@ Example response:
       return
     }
 
+    // Double-click on file → open Monaco Editor
+    if (hit.kind === 'file') {
+      const fileItem = hit as any
+      setEditingFile({
+        id: fileItem.id,
+        filePath: fileItem.filePath || '',
+        fileName: fileItem.fileName || 'untitled',
+        content: fileItem.content || '',
+        language: fileItem.language || 'plaintext',
+      })
+      return
+    }
+
     // Double-click on image that's already selected → open lightbox
     if (hit.kind === 'image' && state.selectedIds.has(hit.id)) {
       window.dispatchEvent(new CustomEvent('moodbored:lightbox', { detail: hit }))
@@ -1829,6 +1844,21 @@ Example response:
           </svg>
         )
       })}
+
+      {/* File Editor (Monaco) */}
+      {editingFile && (
+        <FileEditor
+          filePath={editingFile.filePath}
+          fileName={editingFile.fileName}
+          content={editingFile.content}
+          language={editingFile.language}
+          onSave={(content) => {
+            useStore.getState().updateItem(editingFile.id, { content, isDirty: false, lastModified: new Date().toISOString() })
+            setEditingFile(null)
+          }}
+          onClose={() => setEditingFile(null)}
+        />
+      )}
 
       {/* Inline text editing overlay */}
       {editingItem && (() => {

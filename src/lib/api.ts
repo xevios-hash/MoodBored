@@ -168,7 +168,7 @@ export async function streamChatWithTools(
   model: string,
   tools: any[],
   onChunk: (text: string) => void,
-  onToolCalls: (calls: ToolCall[]) => ToolResult[],
+  onToolCalls: (calls: ToolCall[]) => Promise<ToolResult[]> | ToolResult[],
   onDone: () => void,
   onError: (err: string) => void,
   signal?: AbortSignal,
@@ -278,7 +278,7 @@ export async function streamChatWithTools(
     }
 
     // Execute tool calls and get results
-    const results = onToolCalls(toolCalls)
+    const results = await Promise.resolve(onToolCalls(toolCalls))
 
     // Add assistant message with tool calls to history
     currentMessages.push({

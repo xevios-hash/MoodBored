@@ -227,6 +227,81 @@ export const BOARD_TOOLS = [
       },
     },
   },
+  // ─── File Tools (IDE Features) ──────────────────────────────────
+  {
+    type: 'function' as const,
+    function: {
+      name: 'create_file',
+      description: 'Create a new file on disk and add it as a node on the canvas. Use this when the user asks to create, write, or generate code/files.',
+      parameters: {
+        type: 'object' as const,
+        required: ['path', 'content'],
+        properties: {
+          path: { type: 'string' as const, description: 'File path relative to workspace (e.g., "src/components/Button.tsx")' },
+          content: { type: 'string' as const, description: 'The file content' },
+          language: { type: 'string' as const, description: 'Programming language for syntax highlighting (auto-detected from extension if omitted)' },
+          description: { type: 'string' as const, description: 'Brief description of what the file does' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'read_file',
+      description: 'Read a file from the workspace. Use this when the user asks to see, show, or read file contents.',
+      parameters: {
+        type: 'object' as const,
+        required: ['path'],
+        properties: {
+          path: { type: 'string' as const, description: 'File path relative to workspace' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'update_file',
+      description: 'Update an existing file. Use this when the user asks to modify, edit, or change code in a file.',
+      parameters: {
+        type: 'object' as const,
+        required: ['path', 'content'],
+        properties: {
+          path: { type: 'string' as const, description: 'File path relative to workspace' },
+          content: { type: 'string' as const, description: 'New complete file content' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'list_files',
+      description: 'List files in the workspace. Use this when the user asks what files exist or to explore the project structure.',
+      parameters: {
+        type: 'object' as const,
+        properties: {
+          path: { type: 'string' as const, description: 'Directory path relative to workspace (defaults to root)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'git_commit',
+      description: 'Commit changes to git. Use this when the user asks to save, commit, or checkpoint their work.',
+      parameters: {
+        type: 'object' as const,
+        required: ['message'],
+        properties: {
+          message: { type: 'string' as const, description: 'Commit message' },
+          paths: { type: 'array' as const, items: { type: 'string' as const }, description: 'Specific file paths to commit (all changes if omitted)' },
+        },
+      },
+    },
+  },
 ]
 
 // System prompt for tool-calling mode — shorter than the JSON-block prompt
@@ -234,14 +309,23 @@ export const BOARD_TOOLS = [
 export function buildToolSystemPrompt(projectSummary: string, boardDescription: string, viewportName?: string): string {
   const vpInfo = viewportName ? `\nYou are currently working on the "${viewportName}" board.` : ''
 
-  return `You are MoodBored's AI assistant — a creative collaborator that builds visual mood boards.
+  return `You are MoodBored's AI assistant — a creative collaborator that builds visual mood boards AND a coding IDE.
 ${vpInfo}
+CAPABILITIES:
+- Build visual mood boards with add_items
+- Create/edit/read files with create_file, update_file, read_file, list_files
+- Commit changes with git_commit
+
 RULES:
 1. Whenever the user describes ANYTHING, immediately add items using the add_items tool.
 2. Always add items. Every response should place 2-8 items on the canvas.
 3. Use REAL Unsplash URLs for images: source "https://images.unsplash.com/photo-XXXXXXXXX?w=800"
 4. For generated images, set source to "generated" and include a detailed description.
 5. Spread items across the canvas. Vary positions.
+6. When the user asks to create/write/generate code or files, use create_file tool.
+7. When the user asks to see/read/show file contents, use read_file tool.
+8. When the user asks to modify/edit/change files, use update_file tool.
+9. When the user asks to save/commit/checkpoint, use git_commit tool.
 6. Use containers to organize related items. Group by theme, type, or concept.
 7. If the board is empty, populate it with items matching the user's request.
 8. NEVER ask clarifying questions. Choose a strong direction and add concrete items.
@@ -331,6 +415,36 @@ export function processToolCalls(toolCalls: any[]): { toolCallId: string; action
         break
       case 'export_brief':
         actions.push({ type: 'export_brief', creation_type: args.creation_type })
+        break
+      // ─── File Tools ─────────────────────────────────────────────
+      case 'create_file':
+        if (args.path && args.content) {
+          actions.push({
+            type: 'create_file',
+            path: args.path,
+            content: args.content,
+            language: args.language,
+            description: args.description,
+          })
+        }
+        break
+      case 'read_file':
+        if (args.path) {
+          actions.push({ type: 'read_file', path: args.path })
+        }
+        break
+      case 'update_file':
+        if (args.path && args.content) {
+          actions.push({ type: 'update_file', path: args.path, content: args.content })
+        }
+        break
+      case 'list_files':
+        actions.push({ type: 'list_files', path: args.path })
+        break
+      case 'git_commit':
+        if (args.message) {
+          actions.push({ type: 'git_commit', message: args.message, paths: args.paths })
+        }
         break
     }
 

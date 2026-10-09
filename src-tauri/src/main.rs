@@ -658,13 +658,18 @@ fn main() {
                 {
                     Ok(_child) => {
                         println!("MoodBored server started on port 3000");
-                        // Wait for server to be ready
-                        for i in 0..30 {
+                        // Wait for server to be ready - up to 30 seconds
+                        let mut ready = false;
+                        for i in 0..60 {
                             std::thread::sleep(std::time::Duration::from_millis(500));
                             if std::net::TcpStream::connect("127.0.0.1:3000").is_ok() {
                                 println!("Server is ready after {}ms", (i + 1) * 500);
+                                ready = true;
                                 break;
                             }
+                        }
+                        if !ready {
+                            eprintln!("Server failed to start within 30 seconds");
                         }
                     }
                     Err(e) => eprintln!("Failed to start server with {}: {}", node_exe, e),

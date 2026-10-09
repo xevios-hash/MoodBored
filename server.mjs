@@ -11,7 +11,8 @@ import rateLimit from 'express-rate-limit'
 import morgan from 'morgan'
 import compression from 'compression'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, renameSync } from 'fs'
-import { join, dirname } from 'path'
+import { join, dirname, resolve, basename, extname, relative, isAbsolute } from 'path'
+import { homedir } from 'os'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
 
@@ -1888,7 +1889,7 @@ app.get('/api/ai/status/:provider', async (req, res) => {
 // Scans local filesystem for AI models
 
 import { statSync } from 'fs'
-import { homedir } from 'os'
+
 
 const MODEL_EXTENSIONS = {
   llm: ['.gguf', '.ggml', '.bin'],
@@ -2056,6 +2057,229 @@ app.get('/api/scan/auto', (req, res) => {
     count: allModels.length,
     foldersScanned: commonFolders.length,
   })
+})
+
+// ─── File API for IDE Features ─────────────────────────────────────
+
+const WORKSPACE_DIR = process.env.MOODBORED_WORKSPACE || join(homedir(), 'MoodBored-Workspace')
+
+function ensureWorkspace() {
+  if (!existsSync(WORKSPACE_DIR)) {
+    mkdirSync(WORKSPACE_DIR, { recursive: true })
+    console.log(`[MoodBored] Created workspace at: ${WORKSPACE_DIR}`)
+  }
+}
+
+function resolveWorkspacePath(path) {
+  if (!path) return null
+  const expanded = path.startsWith('~') ? join(homedir(), path.slice(2)) : path
+  const full = isAbsolute(expanded) ? expanded : join(WORKSPACE_DIR, expanded)
+  const resolved = resolve(full)
+  if (!resolved.startsWith(WORKSPACE_DIR)) return null
+  return resolved
+}
+
+function detectLanguage(ext) {
+  const langMap = {
+    '.ts': 'typescript', '.tsx': 'typescriptreact',
+    '.js': 'javascript', '.jsx': 'javascriptreact', '.mjs': 'javascript',
+    '.py': 'python', '.rs': 'rust', '.go': 'go', '.java': 'java',
+    '.c': 'c', '.cpp': 'cpp', '.h': 'c', '.hpp': 'cpp',
+    '.cs': 'csharp', '.rb': 'ruby', '.php': 'php', '.swift': 'swift',
+    '.html': 'html', '.css': 'css', '.scss': 'scss', '.less': 'less',
+    '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml', '.toml': 'toml', '.xml': 'xml',
+    '.md': 'markdown', '.txt': 'plaintext', '.sh': 'bash', '.ps1': 'powershell',
+    '.sql': 'sql', '.graphql': 'graphql', '.tf': 'terraform',
+  }
+  return langMap[ext.toLowerCase()] || 'plaintext'
+}
+
+// Write file
+app.post('/api/files/write', (req, res) => {
+  const { path: filePath, content } = req.body
+  const resolved = resolveWorkspacePath(filePath)
+  if (!resolved) return res.status(400).json({ error: 'Invalid path' })
+  
+  try {
+    const dir = dirname(resolved)
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    writeFileSync(resolved, content, 'utf-8')
+    const stat = statSync(resolved)
+    
+    res.json({
+      success: true,
+      path: relative(WORKSPACE_DIR, resolved),
+      size: stat.size,
+      modified: stat.mtime.toISOString(),
+      language: detectLanguage(extname(resolved)),
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Read file
+app.get('/api/files/read', (req, res) => {
+  const { path: filePath } = req.query
+  const resolved = resolveWorkspacePath(filePath)
+  if (!resolved) return res.status(400).json({ error: 'Invalid path' })
+  if (!existsSync(resolved)) return res.status(404).json({ error: 'File not found' })
+  
+  try {
+    const content = readFileSync(resolved, 'utf-8')
+    const stat = statSync(resolved)
+    res.json({
+      path: relative(WORKSPACE_DIR, resolved),
+      content,
+      size: stat.size,
+      modified: stat.mtime.toISOString(),
+      language: detectLanguage(extname(resolved)),
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// List files
+app.get('/api/files/list', (req, res) => {
+  const { path: dirPath = '' } = req.query
+  const resolved = resolveWorkspacePath(dirPath) || WORKSPACE_DIR
+  
+  try {
+    const files = []
+    function scan(dir, depth) {
+      if (depth > 3) return
+      const entries = readdirSync(dir, { withFileTypes: true })
+      for (const entry of entries) {
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
+        const fullPath = join(dir, entry.name)
+        const relPath = relative(WORKSPACE_DIR, fullPath)
+        
+        if (entry.isDirectory()) {
+          files.push({ type: 'directory', path: relPath, name: entry.name })
+          scan(fullPath, depth + 1)
+        } else {
+          try {
+            const stat = statSync(fullPath)
+            files.push({
+              type: 'file',
+              path: relPath,
+              name: entry.name,
+              extension: extname(entry.name),
+              language: detectLanguage(extname(entry.name)),
+              size: stat.size,
+              modified: stat.mtime.toISOString(),
+            })
+          } catch {}
+        }
+      }
+    }
+    scan(resolved, 0)
+    res.json({ workspace: WORKSPACE_DIR, files })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Delete file
+app.delete('/api/files/delete', (req, res) => {
+  const { path: filePath } = req.body
+  const resolved = resolveWorkspacePath(filePath)
+  if (!resolved) return res.status(400).json({ error: 'Invalid path' })
+  if (!existsSync(resolved)) return res.status(404).json({ error: 'Not found' })
+  
+  try {
+    unlinkSync(resolved)
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Rename file
+app.post('/api/files/rename', (req, res) => {
+  const { oldPath, newPath } = req.body
+  const resolvedOld = resolveWorkspacePath(oldPath)
+  const resolvedNew = resolveWorkspacePath(newPath)
+  if (!resolvedOld || !resolvedNew) return res.status(400).json({ error: 'Invalid path' })
+  
+  try {
+    const dir = dirname(resolvedNew)
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    renameSync(resolvedOld, resolvedNew)
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Get workspace info
+app.get('/api/workspace', (req, res) => {
+  ensureWorkspace()
+  res.json({ path: WORKSPACE_DIR })
+})
+
+// ─── Git Integration ──────────────────────────────────────────────
+
+app.get('/api/git/status', async (req, res) => {
+  try {
+    const { default: simpleGit } = await import('simple-git')
+    const git = simpleGit(WORKSPACE_DIR)
+    const status = await git.status()
+    
+    res.json({
+      isRepo: true,
+      branch: status.current,
+      files: status.files.map(f => ({ path: f.path, status: f.index + f.working_dir })),
+      ahead: status.ahead,
+      behind: status.behind,
+    })
+  } catch (err) {
+    res.json({ isRepo: false, error: err.message, files: [] })
+  }
+})
+
+app.post('/api/git/commit', async (req, res) => {
+  const { message, paths } = req.body
+  if (!message) return res.status(400).json({ error: 'Message required' })
+  
+  try {
+    const { default: simpleGit } = await import('simple-git')
+    const git = simpleGit(WORKSPACE_DIR)
+    
+    if (paths && paths.length > 0) {
+      await git.add(paths)
+    } else {
+      await git.add('.')
+    }
+    
+    const result = await git.commit(message)
+    res.json({ success: true, hash: result.commit, files: result.files })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/git/log', async (req, res) => {
+  try {
+    const { default: simpleGit } = await import('simple-git')
+    const git = simpleGit(WORKSPACE_DIR)
+    const log = await git.log({ maxCount: 20 })
+    res.json({ commits: log.all })
+  } catch (err) {
+    res.json({ commits: [], error: err.message })
+  }
+})
+
+app.post('/api/git/init', async (req, res) => {
+  try {
+    const { default: simpleGit } = await import('simple-git')
+    const git = simpleGit(WORKSPACE_DIR)
+    await git.init()
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // ─── SPA Fallback (catch-all, last) ─────────────────────────────────

@@ -130,7 +130,7 @@ export function ChatPanel() {
             if (!updated.some(m => m.id === assistantMsg.id)) updated.push({ ...assistantMsg, content: fullResponse })
             saveMessages(updated)
           },
-          (toolCalls) => {
+          async (toolCalls) => {
             // Execute tool calls and return results
             const groupedResults = processToolCalls(toolCalls)
             const results: { tool_call_id: string; content: string }[] = []
@@ -198,6 +198,113 @@ export function ChatPanel() {
                       created: new Date().toISOString(),
                     })
                     results.push({ tool_call_id: group.toolCallId, content: `Drew ${connType} connection` })
+                  } else if (action.type === 'create_file' && (action as any).path && (action as any).content) {
+                    const filePath = (action as any).path
+                    const content = (action as any).content
+                    const language = (action as any).language || 'plaintext'
+
+                    // Write file to disk
+                    const writeRes = await fetch('/api/files/write', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ path: filePath, content }),
+                    })
+
+                    if (writeRes.ok) {
+                      const writeData = await writeRes.json()
+
+                      // Create FileItem node on canvas
+                      const fileItem = {
+                        kind: 'file',
+                        id: crypto.randomUUID(),
+                        filePath: filePath,
+                        fileName: filePath.split('/').pop() || 'untitled',
+                        fileExtension: filePath.split('.').pop() || '',
+                        language: writeData.language || language,
+                        fileSize: writeData.size || content.length,
+                        lastModified: writeData.modified || new Date().toISOString(),
+                        content: content.slice(0, 5000),
+                        previewLines: 50,
+                        isEditing: false,
+                        isDirty: false,
+                        purpose: (action as any).description || 'AI generated file',
+                        importance: '',
+                        tags: ['ai-generated', 'file'],
+                        pos: { x: 100 + Math.random() * 500, y: 100 + Math.random() * 300 },
+                        size: { w: 400, h: 300 },
+                      }
+
+                      useStore.getState().addItem(fileItem as any)
+                      results.push({ tool_call_id: group.toolCallId, content: `Created file: ${filePath} (${writeData.size} bytes)` })
+                    } else {
+                      results.push({ tool_call_id: group.toolCallId, content: `Failed to create file: ${filePath}` })
+                    }
+                  } else if (action.type === 'read_file' && (action as any).path) {
+                    const filePath = (action as any).path
+                    const readRes = await fetch(`/api/files/read?path=${encodeURIComponent(filePath)}`)
+
+                    if (readRes.ok) {
+                      const readData = await readRes.json()
+                      results.push({
+                        tool_call_id: group.toolCallId,
+                        content: `File: ${filePath}\n\n${readData.content?.slice(0, 1000) || ''}${readData.content?.length > 1000 ? '\n...' : ''}`,
+                      })
+                    } else {
+                      results.push({ tool_call_id: group.toolCallId, content: `File not found: ${filePath}` })
+                    }
+                  } else if (action.type === 'update_file' && (action as any).path && (action as any).content) {
+                    const filePath = (action as any).path
+                    const content = (action as any).content
+
+                    const writeRes = await fetch('/api/files/write', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ path: filePath, content }),
+                    })
+
+                    if (writeRes.ok) {
+                      // Update the FileItem on canvas if it exists
+                      const s = useStore.getState()
+                      const viewport = s.project.viewports.find(v => v.id === s.activeViewportId)
+                      const fileItem = viewport?.items.find((i: any) => i.kind === 'file' && i.filePath === filePath)
+
+                      if (fileItem) {
+                        s.updateItem((fileItem as any).id, {
+                          content: content.slice(0, 5000),
+                          fileSize: content.length,
+                          lastModified: new Date().toISOString(),
+                        })
+                      }
+
+                      results.push({ tool_call_id: group.toolCallId, content: `Updated file: ${filePath}` })
+                    } else {
+                      results.push({ tool_call_id: group.toolCallId, content: `Failed to update file: ${filePath}` })
+                    }
+                  } else if (action.type === 'list_files') {
+                    const filePath = (action as any).path || ''
+                    const listRes = await fetch(`/api/files/list?path=${encodeURIComponent(filePath)}`)
+
+                    if (listRes.ok) {
+                      const listData = await listRes.json()
+                      const fileList = listData.files?.slice(0, 20).map((f: any) => 
+                        f.type === 'directory' ? `📁 ${f.path}` : `📄 ${f.path}`
+                      ).join('\n') || 'No files found'
+
+                      results.push({ tool_call_id: group.toolCallId, content: `Files in ${filePath || 'workspace'}:\n\n${fileList}` })
+                    }
+                  } else if (action.type === 'git_commit' && (action as any).message) {
+                    const commitRes = await fetch('/api/git/commit', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ message: (action as any).message, paths: (action as any).paths }),
+                    })
+
+                    if (commitRes.ok) {
+                      const commitData = await commitRes.json()
+                      results.push({ tool_call_id: group.toolCallId, content: `Committed: ${commitData.hash?.slice(0, 8)} - ${(action as any).message}` })
+                    } else {
+                      results.push({ tool_call_id: group.toolCallId, content: `Commit failed` })
+                    }
                   } else {
                     results.push({ tool_call_id: group.toolCallId, content: 'Unknown action' })
                   }
