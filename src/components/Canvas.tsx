@@ -6,6 +6,7 @@ import { showToast } from '@/lib/toasts'
 import { WebNode } from '@/components/WebNode'
 import { FileEditor } from '@/components/FileEditor'
 import { AnnotationLayer } from '@/components/AnnotationLayer'
+import { CanvasTools, ColorPickerOverlay, MeasureOverlay, GrabOverlay, FrameCaptureOverlay, type CanvasTool } from '@/components/CanvasTools'
 import { getDefaultPorts } from '@/types'
 import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner, WebItem, ConnectionType } from '@/types'
 
@@ -276,6 +277,10 @@ export function Canvas() {
   const [editingFile, setEditingFile] = useState<{ id: string; filePath: string; fileName: string; content: string; language: string } | null>(null)
   const [canvasConversations, setCanvasConversations] = useState<Map<string, { parentId: string; responseIds: string[] }>>(new Map())
   const [isGeneratingResponse, setIsGeneratingResponse] = useState<Set<string>>(new Set())
+
+  // ─── Canvas Tools ─────────────────────────────────────────────────
+  const [activeTool, setActiveTool] = useState<CanvasTool>('select')
+  const [capturedColor, setCapturedColor] = useState<string | null>(null)
 
   // ─── Quick Input Box ──────────────────────────────────────────────
   const [quickInputOpen, setQuickInputOpen] = useState(false)
@@ -1724,6 +1729,60 @@ Example response:
         <span className="text-xs tabular-nums min-w-[32px] text-center">{Math.round(canvas.zoom * 100)}%</span>
         <button className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { useStore.getState().setZoom(canvas.zoom * 1.25); needsRedraw.current = true }}>+</button>
       </div>
+
+      {/* Canvas Tools */}
+      <CanvasTools activeTool={activeTool} onToolChange={setActiveTool} />
+
+      {/* Tool Overlays */}
+      {activeTool === 'color-picker' && (
+        <ColorPickerOverlay
+          canvasRef={canvasRef}
+          onColorPick={(color) => {
+            setCapturedColor(color)
+            showToast(`Color picked: ${color}`, 'success')
+          }}
+          onClose={() => setActiveTool('select')}
+        />
+      )}
+      {activeTool === 'measure' && (
+        <MeasureOverlay
+          canvasRef={canvasRef}
+          onClose={() => setActiveTool('select')}
+        />
+      )}
+      {activeTool === 'grab' && (
+        <GrabOverlay
+          canvasRef={canvasRef}
+          onGrab={(region) => {
+            showToast(`Grabbed region: ${region.width}×${region.height}`, 'success')
+          }}
+          onClose={() => setActiveTool('select')}
+        />
+      )}
+      {activeTool === 'frame-capture' && (
+        <FrameCaptureOverlay
+          canvasRef={canvasRef}
+          onCapture={(imageData) => {
+            // Create image node from captured frame
+            const state = useStore.getState()
+            state.addItem({
+              kind: 'image',
+              id: crypto.randomUUID(),
+              thumbnail: imageData,
+              fullSource: imageData,
+              description: 'Captured frame',
+              source: 'canvas-capture',
+              purpose: 'Frame capture',
+              importance: 'User capture',
+              tags: ['capture', 'frame'],
+              pos: { x: 100 + Math.random() * 400, y: 100 + Math.random() * 300 },
+              size: { w: 300, h: 200 },
+            })
+            showToast('Frame captured and added to canvas', 'success')
+          }}
+          onClose={() => setActiveTool('select')}
+        />
+      )}
 
       {/* Floating Add Toolbar — bottom-right */}
       <div className="add-toolbar">
