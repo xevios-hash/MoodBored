@@ -9,6 +9,10 @@ import { AnnotationLayer } from '@/components/AnnotationLayer'
 import { CanvasTools, ColorPickerOverlay, MeasureOverlay, GrabOverlay, FrameCaptureOverlay, type CanvasTool } from '@/components/CanvasTools'
 import { getDefaultPorts } from '@/types'
 import type { BoardItem, Position, PortConnection, ContainerItem, ConnectorOwner, WebItem, ConnectionType } from '@/types'
+import { imageToDataUrl } from '@/lib/imageData'
+import {
+  isVisionModel, collectVisionImages, buildImageContentParts, describeVisionImages,
+} from '@/lib/vision'
 
 // Detect if running in Tauri desktop app
 const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined
@@ -458,6 +462,18 @@ IMPORTANT RULES:
 Example response:
 [{"kind":"note","text":"Great idea! Consider...","purpose":"Building on your thought"},{"kind":"text","raw":"Additional details...","purpose":"Supporting info"}]`
 
+      const userText = `My note says: "${noteText}"\n\nRespond with related items for the canvas. Return ONLY valid JSON array.`
+      const boardItems = state.project.viewports.find(v => v.id === state.activeViewportId)?.items ?? []
+      const visionImages = isVisionModel(settings.defaultModel || '')
+        ? collectVisionImages(boardItems, undefined, 3)
+        : []
+      const userContent = visionImages.length > 0
+        ? [
+            { type: 'text' as const, text: `${userText}\n\nAttached board images:\n${describeVisionImages(visionImages)}` },
+            ...buildImageContentParts(visionImages),
+          ]
+        : userText
+
       const response = await fetch(`${getApiBaseUrl()}/api/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -475,7 +491,7 @@ Example response:
           },
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: `My note says: "${noteText}"\n\nRespond with related items for the canvas. Return ONLY valid JSON array.` },
+            { role: 'user', content: userContent },
           ],
           temperature: 0.7,
           max_tokens: 2000,
@@ -1118,8 +1134,10 @@ Example response:
     const wy = (e.clientY - rect.top - state.canvas.panY) / state.canvas.zoom
     for (const file of Array.from(e.dataTransfer.files)) {
       if (file.type.startsWith('image/')) {
-        const url = URL.createObjectURL(file); blobUrls.add(url)
-        state.addItem({ kind: 'image', id: crypto.randomUUID(), thumbnail: url, fullSource: url, description: file.name, purpose: 'Dropped by user', importance: 'User reference', source: `file:${file.name}`, tags: [], pos: { x: wx, y: wy }, size: { w: 300, h: 200 } })
+        // Store as a data URL so the image survives reloads and is visible to vision LLMs
+        imageToDataUrl(file).then((url) => {
+          state.addItem({ kind: 'image', id: crypto.randomUUID(), thumbnail: url, fullSource: url, description: file.name, purpose: 'Dropped by user', importance: 'User reference', source: `file:${file.name}`, tags: [], pos: { x: wx, y: wy }, size: { w: 300, h: 200 } })
+        }).catch(() => {})
       } else if (file.type.startsWith('video/')) {
         const url = URL.createObjectURL(file); blobUrls.add(url)
         state.addItem({ kind: 'video', id: crypto.randomUUID(), source: url, sourceType: 'file', title: file.name, subjectDesc: file.name, motionDesc: '', duration: 0, startTs: 0, muted: true, autoplay: false, loop: true, purpose: 'Dropped by user', importance: 'User video', tags: [], pos: { x: wx, y: wy }, size: { w: 320, h: 240 } })
@@ -1160,7 +1178,8 @@ Example response:
             for (const type of item.types) {
               if (type.startsWith('image/')) {
                 const blob = await item.getType(type)
-                const url = URL.createObjectURL(blob); blobUrls.add(url)
+                const url = await imageToDataUrl(blob).catch(() => '')
+                if (!url) continue
                 s.addItem({
                   kind: 'image', id: crypto.randomUUID(),
                   thumbnail: url, fullSource: url,

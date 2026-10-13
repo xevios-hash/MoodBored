@@ -11,6 +11,9 @@ import { Send, Trash2, StopCircle, AlertCircle, MessageSquare, Activity } from '
 import { v4 as uuid } from 'uuid'
 import type { ChatMessage, AgentAction } from '@/types'
 import { showToast } from '@/lib/toasts'
+import {
+  isVisionModel, collectVisionImages, buildImageContentParts, describeVisionImages,
+} from '@/lib/vision'
 
 // Helper to safely truncate tool responses
 function truncateResponse(text: string, maxLength: number = 2000): string {
@@ -113,7 +116,7 @@ export function ChatPanel() {
 
     const currentMessages = useStore.getState().project.viewports
       .find(v => v.id === activeViewportId)?.messages ?? []
-    const apiMessages = [
+    const apiMessages: { role: string; content: any }[] = [
       { role: 'system', content: systemPrompt },
       ...currentMessages
         .filter((m) => m.role !== 'system')
@@ -122,6 +125,27 @@ export function ChatPanel() {
         ? [{ role: 'system', content: 'Refine your last proposal.\n' + correctiveNotes.join('\n') } as { role: string; content: string }]
         : []),
     ]
+
+    // Vision models get the actual board images attached to the latest user turn
+    if (isVisionModel(settings.defaultModel)) {
+      const sel = useStore.getState().selectedIds
+      const images = collectVisionImages(items, sel, 6)
+      if (images.length > 0) {
+        for (let i = apiMessages.length - 1; i >= 0; i--) {
+          if (apiMessages[i].role !== 'user') continue
+          const prev = apiMessages[i].content
+          const text = typeof prev === 'string' ? prev : ''
+          apiMessages[i].content = [
+            {
+              type: 'text' as const,
+              text: `${text}\n\nAttached board images:\n${describeVisionImages(images)}`,
+            },
+            ...buildImageContentParts(images),
+          ]
+          break
+        }
+      }
+    }
 
     let fullResponse = ''
     const pendingActions: AgentAction[] = []

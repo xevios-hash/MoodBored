@@ -6,7 +6,7 @@ When the user mentions moodboard, mood board, visual board, brand board, or desi
 
 ```bash
 cd /Users/x.hyperdex/OpenCodeApps/MoodBored
-npm run dev   # http://localhost:5173
+npm run dev   # http://localhost:1420
 ```
 
 ## MCP Tools (stdio)

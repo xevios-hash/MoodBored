@@ -4,13 +4,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'fs'
-import { join, dirname } from 'path'
+import { join, dirname, basename as pathBasename } from 'path'
 import { v4 as uuid } from 'uuid'
 import { VectorStore } from './vector-store.js'
+import { boardUrl, showBoard } from './window.js'
+import { fetchImageForVision, imageRefOf } from './image-utils.js'
 
 // ─── State File ─────────────────────────────────────────────────────
 
-const BOARDS_DIR = process.env.MOODBORED_BOARDS_DIR || join(
+const BOARDS_DIR = process.env.MOODBORED_BOARDS_DIR || process.env.BOARDS_DIR || join(
   process.env.HOME || process.env.USERPROFILE || '/tmp',
   '.moodbored', 'boards',
 )
@@ -100,6 +102,54 @@ function getItems(state: any): any[] {
   return getActiveViewport(state)?.items ?? []
 }
 
+// ─── Board Window (auto-open harness) ──────────────────────────────
+
+function boardId(): string {
+  return pathBasename(STATE_PATH).replace(/\.json$/, '')
+}
+
+function boardLink(): string {
+  return boardUrl(boardId())
+}
+
+function withBoardLink(text: string): string {
+  return `${text}\n\nBoard: ${boardLink()}`
+}
+
+function announceBoard() {
+  showBoard(boardId()).catch((err: any) => console.error('[MCP] window:', err?.message))
+}
+
+// Returns state with an active viewport guaranteed — creates the board
+// on first write instead of erroring with "No active viewport".
+function ensureBoardState(): { state: any; vp: any } {
+  const state = readState()
+  const existing = getActiveViewport(state)
+  if (existing) return { state, vp: existing }
+  const fresh = {
+    project: {
+      id: boardId(),
+      name: state?.project?.name || 'Untitled Board',
+      viewports: [{
+        id: uuid(), name: 'Main', items: [], connections: [], typedConnections: [], messages: [],
+        camX: 0, camY: 0, zoom: 1,
+      }],
+      components: [],
+      settings: {
+        apiKey: '', defaultModel: 'anthropic/claude-sonnet-4',
+        jevThreshold: 0.2, multiAgent: false, theme: 'dark',
+        canvasBg: '#0c0814', canvasBgType: 'color', canvasBgVideo: '',
+        customBgUrls: [], customBgLabels: {},
+      },
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    },
+    lastModified: new Date().toISOString(),
+  }
+  writeState(fresh)
+  return { state: fresh, vp: getActiveViewport(fresh) }
+}
+
 // ─── Server ─────────────────────────────────────────────────────────
 
 const server = new McpServer({
@@ -142,7 +192,7 @@ server.resource('summary', 'board://summary', async (uri) => {
 
 // ─── Tools ──────────────────────────────────────────────────────────
 
-server.tool('get_board', 'Read the full mood board — items, palette, typography, spatial layout, and relationships', {}, async () => {
+server.tool('get_board', 'Read the full mood board — items, palette, typography, spatial layout, and relationships. Image items are listed with ids, descriptions and URLs; call view_images to actually see the pixels.', { include_images: z.boolean().optional().describe('Also attach up to 4 images inline (for vision models). Default false.') }, async ({ include_images }) => {
   const state = readState()
   const items = getItems(state)
   const nonConn = items.filter((i: any) => i.kind !== 'connector')
@@ -160,7 +210,7 @@ server.tool('get_board', 'Read the full mood board — items, palette, typograph
     if (item.kind === 'gradient') gradients.push({ id: item.id, label: item.label, stops: item.stops, direction: item.direction, pos: item.pos })
     if (item.kind === 'font') typography.push({ id: item.id, family: item.fontFamily, weights: item.weights, sample: item.sampleText, pos: item.pos })
     if (item.kind === 'note' || item.kind === 'text') notes.push({ id: item.id, text: item.text || item.raw, purpose: item.purpose, importance: item.importance, tags: item.tags, pos: item.pos })
-    if (item.kind === 'image') images.push({ id: item.id, description: item.description, source: item.source, purpose: item.purpose, tags: item.tags, pos: item.pos })
+    if (item.kind === 'image') images.push({ id: item.id, description: item.description, source: item.source, url: imageRefOf(item), purpose: item.purpose, tags: item.tags, pos: item.pos })
     if (item.kind === 'link') links.push({ id: item.id, url: item.url, title: item.title, summary: item.summary, pos: item.pos })
     if (item.kind === 'video') images.push({ id: item.id, description: item.subjectDesc, motion: item.motionDesc, source: item.sourceUrl, pos: item.pos })
     if (item.kind === 'container') containers.push({ id: item.id, label: item.label, layout: item.layout, childCount: item.children?.length || 0, collapsed: item.collapsed, pos: item.pos })
@@ -170,24 +220,79 @@ server.tool('get_board', 'Read the full mood board — items, palette, typograph
     from: c.fromId, to: c.toId, label: c.label, style: c.style,
   }))
 
-  return {
-    content: [{
-      type: 'text',
-      text: JSON.stringify({
-        projectName: state.project?.name,
-        itemCount: nonConn.length,
-        palette,
-        gradients,
-        typography,
-        notes,
-        images,
-        links,
-        containers,
-        connectors,
-      }, null, 2),
-    }],
+  const content: any[] = [{
+    type: 'text',
+    text: JSON.stringify({
+      url: boardLink(),
+      projectName: state.project?.name,
+      itemCount: nonConn.length,
+      palette,
+      gradients,
+      typography,
+      notes,
+      images,
+      links,
+      containers,
+      connectors,
+    }, null, 2),
+  }]
+
+  if (include_images && images.length > 0) {
+    const shown = await attachImageBlocks(content, items, 4)
+    if (shown > 0) {
+      content.push({
+        type: 'text',
+        text: `\n${shown} of ${images.length} board image(s) attached. Use view_images for specific image ids.`,
+      })
+    }
   }
+
+  return { content }
 })
+
+// Fetch board images as vision-ready base64 blocks (MCP image content).
+async function attachImageBlocks(content: any[], items: any[], limit: number, onlyIds?: string[]): Promise<number> {
+  const targets = items.filter((i: any) => i.kind === 'image' && (!onlyIds || onlyIds.includes(i.id)))
+  let shown = 0
+  for (const item of targets) {
+    if (shown >= limit) break
+    const img = await fetchImageForVision(imageRefOf(item))
+    if (!img) continue
+    content.push({ type: 'image', data: img.data, mimeType: img.mimeType })
+    shown++
+  }
+  return shown
+}
+
+server.tool(
+  'view_images',
+  'Actually see images from the board — returns the pixels as vision-ready image blocks so you can look at them and talk about them. Prefer this over guessing from descriptions.',
+  {
+    item_ids: z.array(z.string()).optional().describe('Specific image item ids (from get_board). Omit to view recent images.'),
+    limit: z.number().optional().describe('Max images to return (default 6, max 12)'),
+  },
+  async ({ item_ids, limit }) => {
+    const state = readState()
+    const items = getItems(state)
+    const images = items.filter((i: any) => i.kind === 'image' && (!item_ids || item_ids.includes(i.id)))
+    if (images.length === 0) {
+      return { content: [{ type: 'text', text: item_ids ? `No images found for ids: ${item_ids.join(', ')}` : 'No images on the board.' }] }
+    }
+    const cap = Math.min(limit ?? 6, 12)
+    const content: any[] = []
+    const captions = images.slice(0, cap).map((img: any, i: number) =>
+      `${i + 1}. [${img.id}] ${img.description || 'image'} — ${imageRefOf(img).slice(0, 80) || 'no url'}`)
+    content.push({
+      type: 'text',
+      text: `Board images (${Math.min(cap, images.length)} of ${images.length}):\n${captions.join('\n')}`,
+    })
+    const shown = await attachImageBlocks(content, images, cap)
+    if (shown === 0) {
+      content.push({ type: 'text', text: 'Could not fetch image data (blob:/file: refs are not reachable from the MCP server).' })
+    }
+    return { content }
+  },
+)
 
 server.tool(
   'add_items',
@@ -211,9 +316,7 @@ server.tool(
     })),
   },
   async ({ items: newItems }) => {
-    const state = readState()
-    const vp = getActiveViewport(state)
-    if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport. Open a project first.' }] }
+    const { state, vp } = ensureBoardState()
 
     const added: string[] = []
     for (const raw of newItems) {
@@ -229,7 +332,7 @@ server.tool(
           item = { kind: 'text', id, raw: raw.text || '', pos, size: { w: 300, h: 200 } }
           break
         case 'image':
-          item = { kind: 'image', id, description: raw.description || '', source: raw.source || raw.url || '', fullSource: raw.source || raw.url || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
+          item = { kind: 'image', id, description: raw.description || '', source: raw.source || raw.url || '', fullSource: raw.source || raw.url || '', thumbnail: raw.source || raw.url || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos, size: { w: 300, h: 200 } }
           break
         case 'link':
           item = { kind: 'link', id, url: raw.url || '', title: raw.label || '', description: raw.description || '', purpose: raw.purpose || '', importance: raw.importance || '', tags: raw.tags || [], pos }
@@ -272,10 +375,11 @@ server.tool(
       await vecStore.indexItem(item)
     }
     vecStore.persist()
+    announceBoard()
     return {
       content: [{
         type: 'text',
-        text: `Added ${added.length} item(s) to the board:\n${added.map(a => `- ${a}`).join('\n')}`,
+        text: withBoardLink(`Added ${added.length} item(s) to the board:\n${added.map(a => `- ${a}`).join('\n')}`),
       }],
     }
   },
@@ -284,32 +388,30 @@ server.tool(
 server.tool('remove_items', 'Remove items from the mood board by their IDs', {
   ids: z.array(z.string()),
 }, async ({ ids }) => {
-  const state = readState()
-  const vp = getActiveViewport(state)
-  if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport.' }] }
+  const { state, vp } = ensureBoardState()
 
   const before = vp.items.length
   vp.items = vp.items.filter((i: any) => !ids.includes(i.id))
   const removed = before - vp.items.length
   writeState(state)
+  announceBoard()
 
-  return { content: [{ type: 'text', text: `Removed ${removed} item(s).` }] }
+  return { content: [{ type: 'text', text: withBoardLink(`Removed ${removed} item(s).`) }] }
 })
 
 server.tool('update_item', 'Update properties of an existing item on the board', {
   id: z.string(),
   updates: z.record(z.any()),
 }, async ({ id, updates }) => {
-  const state = readState()
-  const vp = getActiveViewport(state)
-  if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport.' }] }
+  const { state, vp } = ensureBoardState()
 
   const item = vp.items.find((i: any) => i.id === id)
   if (!item) return { content: [{ type: 'text', text: `Item ${id} not found.` }] }
 
   Object.assign(item, updates)
   writeState(state)
-  return { content: [{ type: 'text', text: `Updated item ${id}.` }] }
+  announceBoard()
+  return { content: [{ type: 'text', text: withBoardLink(`Updated item ${id}.`) }] }
 })
 
 server.tool('search_items', 'Search items on the board by text query and/or tag filter', {
@@ -341,9 +443,7 @@ server.tool('arrange_items', 'Organize items on the board — grid, horizontal s
   cols: z.number().optional(),
   gap: z.number().optional(),
 }, async ({ layout, cols, gap }) => {
-  const state = readState()
-  const vp = getActiveViewport(state)
-  if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport.' }] }
+  const { state, vp } = ensureBoardState()
 
   const positioned = vp.items.filter((i: any) => i.kind !== 'connector' && i.pos)
   const g = gap ?? 20
@@ -379,7 +479,8 @@ server.tool('arrange_items', 'Organize items on the board — grid, horizontal s
   }
 
   writeState(state)
-  return { content: [{ type: 'text', text: `Arranged ${positioned.length} items in ${layout} layout.` }] }
+  announceBoard()
+  return { content: [{ type: 'text', text: withBoardLink(`Arranged ${positioned.length} items in ${layout} layout.`) }] }
 })
 
 server.tool(
@@ -437,13 +538,12 @@ server.tool(
 )
 
 server.tool('clear_board', 'Remove all items from the current board', {}, async () => {
-  const state = readState()
-  const vp = getActiveViewport(state)
-  if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport.' }] }
+  const { state, vp } = ensureBoardState()
   const count = vp.items.filter((i: any) => i.kind !== 'connector').length
   vp.items = vp.items.filter((i: any) => i.kind === 'connector')
   writeState(state)
-  return { content: [{ type: 'text', text: `Cleared ${count} items from the board.` }] }
+  announceBoard()
+  return { content: [{ type: 'text', text: withBoardLink(`Cleared ${count} items from the board.`) }] }
 })
 
 // ─── Spatial Browser Tools ────────────────────────────────────────────
@@ -458,9 +558,7 @@ server.tool(
     y: z.number().optional().describe('Y position on the board'),
   },
   async ({ url, title, x, y }) => {
-    const state = readState()
-    const vp = getActiveViewport(state)
-    if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport.' }] }
+    const { state, vp } = ensureBoardState()
 
     const id = uuid()
     let domain = ''
@@ -486,11 +584,12 @@ server.tool(
 
     vp.items.push(item)
     writeState(state)
+    announceBoard()
 
     return {
       content: [{
         type: 'text',
-        text: `Opened ${url} as a web node on the board. Item ID: ${id}`,
+        text: withBoardLink(`Opened ${url} as a web node on the board. Item ID: ${id}`),
       }],
     }
   }
@@ -506,9 +605,7 @@ server.tool(
     label: z.string().optional().describe('Optional label for the connection'),
   },
   async ({ from_id, to_id, connection_type, label }) => {
-    const state = readState()
-    const vp = getActiveViewport(state)
-    if (!vp) return { content: [{ type: 'text', text: 'Error: No active viewport.' }] }
+    const { state, vp } = ensureBoardState()
 
     const fromItem = vp.items.find((i: any) => i.id === from_id)
     const toItem = vp.items.find((i: any) => i.id === to_id)
@@ -530,11 +627,12 @@ server.tool(
 
     vp.typedConnections.push(conn)
     writeState(state)
+    announceBoard()
 
     return {
       content: [{
         type: 'text',
-        text: `Drew ${connection_type} connection from "${fromItem.text || fromItem.description || fromItem.label || from_id}" to "${toItem.text || toItem.description || toItem.label || to_id}".`,
+        text: withBoardLink(`Drew ${connection_type} connection from "${fromItem.text || fromItem.description || fromItem.label || from_id}" to "${toItem.text || toItem.description || toItem.label || to_id}".`),
       }],
     }
   }
@@ -615,13 +713,16 @@ server.tool(
 
     const targetItems = item_ids
       ? items.filter((i: any) => item_ids.includes(i.id))
-      : items.filter((i: any) => ['note', 'text', 'link', 'web'].includes(i.kind))
+      : items.filter((i: any) => ['note', 'text', 'link', 'web', 'image'].includes(i.kind))
 
     if (targetItems.length === 0) {
       return { content: [{ type: 'text', text: 'No items to summarize.' }] }
     }
 
     const contents = targetItems.map((item: any) => {
+      if (item.kind === 'image') {
+        return `[image] ${item.description || 'image'} (${imageRefOf(item).slice(0, 120) || 'no url'})`.slice(0, 500)
+      }
       const text = item.text || item.raw || item.content || item.description || item.summary || item.title || ''
       return `[${item.kind}] ${text}`.slice(0, 500)
     })
@@ -743,15 +844,7 @@ server.tool(
     }
 
     // Add slides as items to the board
-    const state = readState()
-    if (!state.project) {
-      return { content: [{ type: 'text', text: 'No board found. Create a board first.' }] }
-    }
-
-    const vp = getActiveViewport(state)
-    if (!vp) {
-      return { content: [{ type: 'text', text: 'No viewport found.' }] }
-    }
+    const { state, vp } = ensureBoardState()
 
     // Add region for the lesson
     const regionId = uuid()
@@ -801,11 +894,12 @@ server.tool(
     })
 
     writeState(state)
+    announceBoard()
 
     return {
       content: [{
         type: 'text',
-        text: `Generated ${slides.length}-slide lesson on "${topic}" for ${gradeLevel} level.\n\nSlides:\n${slides.map((s: any, i: number) => `${i + 1}. [${s.type}] ${s.title}`).join('\n')}\n\nLesson added to board with region and ${slides.length * 2} items.`,
+        text: withBoardLink(`Generated ${slides.length}-slide lesson on "${topic}" for ${gradeLevel} level.\n\nSlides:\n${slides.map((s: any, i: number) => `${i + 1}. [${s.type}] ${s.title}`).join('\n')}\n\nLesson added to board with region and ${slides.length * 2} items.`),
       }],
     }
   }
@@ -856,31 +950,29 @@ server.tool(
       const preview = content.split('\n').slice(0, preview_lines).join('\n')
 
       if (add_to_board) {
-        const state = readState()
-        const vp = getActiveViewport(state)
-        if (vp) {
-          const item = {
-            kind: 'file',
-            id: uuid(),
-            filePath,
-            fileName,
-            fileExtension: ext.slice(1),
-            language,
-            fileSize: stat.size,
-            lastModified: stat.mtime.toISOString(),
-            content: preview,
-            previewLines: preview_lines,
-            isEditing: false,
-            isDirty: false,
-            purpose: '',
-            importance: '',
-            tags: [],
-            pos: { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 },
-            size: { w: 400, h: 300 },
-          }
-          vp.items.push(item)
-          writeState(state)
+        const { state, vp } = ensureBoardState()
+        const item = {
+          kind: 'file',
+          id: uuid(),
+          filePath,
+          fileName,
+          fileExtension: ext.slice(1),
+          language,
+          fileSize: stat.size,
+          lastModified: stat.mtime.toISOString(),
+          content: preview,
+          previewLines: preview_lines,
+          isEditing: false,
+          isDirty: false,
+          purpose: '',
+          importance: '',
+          tags: [],
+          pos: { x: 80 + Math.random() * 600, y: 80 + Math.random() * 400 },
+          size: { w: 400, h: 300 },
         }
+        vp.items.push(item)
+        writeState(state)
+        announceBoard()
       }
 
       return {
@@ -895,6 +987,7 @@ server.tool(
             lines: content.split('\n').length,
             preview,
             addedToBoard: add_to_board,
+            url: add_to_board ? boardLink() : undefined,
           }, null, 2),
         }],
       }

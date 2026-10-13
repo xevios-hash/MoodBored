@@ -1,5 +1,7 @@
 import type { BoardItem, ChatMessage, AgentAction, Position, ConnectorItem } from '@/types'
 import { getDefaultPorts } from '@/types'
+import type { MessageContent } from './vision'
+import { imageItemUrl } from './vision'
 import { v4 as uuid } from 'uuid'
 import { findFreePosition } from './layout'
 
@@ -77,7 +79,7 @@ const OPENROUTER_URL = `${getApiBaseUrl()}/api/ai/chat`
 // ─── Streaming ──────────────────────────────────────────────────────
 
 export async function streamChat(
-  messages: { role: string; content: string }[],
+  messages: { role: string; content: MessageContent }[],
   model: string,
   onChunk: (text: string) => void,
   onDone: () => void,
@@ -164,7 +166,7 @@ export interface ToolResult {
 }
 
 export async function streamChatWithTools(
-  messages: { role: string; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string }[],
+  messages: { role: string; content: MessageContent | null; tool_calls?: ToolCall[]; tool_call_id?: string }[],
   model: string,
   tools: any[],
   onChunk: (text: string) => void,
@@ -796,7 +798,7 @@ export function describeBoard(items: BoardItem[]): string {
     switch (item.kind) {
       case 'note': lines.push(`- Note ${pos}: "${item.text.slice(0, 60)}" [${asTags(item.tags).join(', ')}]`); break
       case 'text': lines.push(`- Text ${pos}: "${item.raw.slice(0, 60)}"`); break
-      case 'image': lines.push(`- Image ${pos}: ${item.description} src=${item.source} [${asTags(item.tags).join(', ')}]`); break
+      case 'image': lines.push(`- Image ${pos}: ${item.description} src=${item.source} url=${imageItemUrl(item) || 'n/a'} [${asTags(item.tags).join(', ')}]`); break
       case 'link': lines.push(`- Link ${pos}: ${item.title || item.url} [${asTags(item.tags).join(', ')}]`); break
       case 'video': lines.push(`- Video ${pos}: ${item.subjectDesc} [${asTags(item.tags).join(', ')}]`); break
       case 'palette': lines.push(`- Palette ${pos}: "${item.label}" colors=${item.colors.map(c => c.hex).join(',')}`); break

@@ -5,6 +5,8 @@ All notable changes to MoodBored will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Vision LLM Support**: `view_images` MCP tool returns board images as vision-ready pixels; `get_board` accepts `include_images`; board chat and canvas conversations attach images for vision models (OpenAI/Anthropic/Gemini image formats)
+- **Auto-Opening Board Window**: mutating MCP tools open a chromeless localhost window (auto-starting the server if needed) and return `Board: <url>`; open windows live-update via SSE on MCP writes
 - **File Nodes (IDE Layer)**: Files become first-class canvas nodes with syntax-highlighted preview, language badges, and full editor support
 - **Chunking Mechanism**: Generic content chunking for large files arriving in segments from agents
 - **File MCP Tools**: `read_file`, `write_file`, `list_files`, `delete_file`, `rename_file` for filesystem operations
@@ -35,6 +37,9 @@ All notable changes to MoodBored will be documented in this file.
 - Trackpad pinch-to-zoom now works
 
 ### Fixed
+- Chat streaming called `/api/ai/chat/:provider`, which did not exist (404)
+- Dropped/pasted images were session-only `blob:` URLs that died on reload — now persisted as data URLs
+- Images omitted from `summarize_across` and board descriptions
 - Undo/redo history ordering
 - Chat messages being lost
 - AI tool calls producing duplicate items

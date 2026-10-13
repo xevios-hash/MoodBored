@@ -10,11 +10,12 @@ import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import morgan from 'morgan'
 import compression from 'compression'
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, renameSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, renameSync, watch } from 'fs'
 import { join, dirname, resolve, basename, extname, relative, isAbsolute } from 'path'
 import { homedir } from 'os'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
+import { toAnthropicMessages, toGeminiContents, toText } from './lib/ai-transforms.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -26,7 +27,7 @@ function cosineSimilarity(a, b) {
 }
 
 const PORT = process.env.PORT || 3000
-const BOARDS_DIR = process.env.BOARDS_DIR || join(process.env.HOME || '/tmp', '.moodbored', 'boards')
+const BOARDS_DIR = process.env.BOARDS_DIR || join(process.env.HOME || process.env.USERPROFILE || '/tmp', '.moodbored', 'boards')
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
 
@@ -169,6 +170,11 @@ function listBoards() {
     .sort((a, b) => (b.lastModified || '').localeCompare(a.lastModified || ''))
 }
 
+function boardUrl(id) {
+  const origin = process.env.PUBLIC_URL || `http://localhost:${PORT}`
+  return `${origin.replace(/\/+$/, '')}/board/${id}`
+}
+
 function createBoard(name, template) {
   const id = randomUUID()
   const state = {
@@ -194,7 +200,7 @@ function createBoard(name, template) {
     state.project.viewports[0].items = template.items
   }
   writeBoard(id, state)
-  return { id, name: state.project.name }
+  return { id, name: state.project.name, url: boardUrl(id) }
 }
 
 // ─── SSE Board Events ───────────────────────────────────────────────
@@ -211,6 +217,32 @@ function notifyBoardChange(boardId, state) {
     try { res.write(`data: ${data}\n\n`) } catch { subs.delete(res) }
   }
 }
+
+// External writers (e.g. the stdio MCP server) touch board files directly
+// and bypass writeBoard(); watch the boards dir and push SSE so already-open
+// board windows stay live.
+const externalNotifyTimers = new Map()
+function startBoardFileWatcher() {
+  try {
+    ensureDir(BOARDS_DIR)
+    watch(BOARDS_DIR, (_event, filename) => {
+      if (!filename || !filename.endsWith('.json')) return
+      if (filename.startsWith('snapshot-') || filename.endsWith('.tmp') || filename.endsWith('.backup')) return
+      const id = filename.replace(/\.json$/, '')
+      clearTimeout(externalNotifyTimers.get(id))
+      externalNotifyTimers.set(id, setTimeout(() => {
+        externalNotifyTimers.delete(id)
+        try {
+          const state = readBoard(id)
+          if (state?.project) notifyBoardChange(id, state)
+        } catch {}
+      }, 250))
+    })
+  } catch (err) {
+    console.warn('[MoodBored] Board file watcher unavailable:', err.message)
+  }
+}
+startBoardFileWatcher()
 
 // ─── Express App ────────────────────────────────────────────────────
 
@@ -1048,7 +1080,7 @@ async function executeTool(name, args, sessionBoardId) {
   }
   if (name === 'create_project') {
     const board = createBoard(args.name)
-    return `Created board "${board.name}" (${board.id})`
+    return `Created board "${board.name}" (${board.id})\nBoard: ${board.url}`
   }
   if (name === 'get_project') {
     const id = args.id || sessionBoardId
@@ -1361,16 +1393,11 @@ const AI_PROVIDERS = {
       'Content-Type': 'application/json',
     }),
     transform: (body) => {
-      const messages = body.messages || []
-      const system = messages.find(m => m.role === 'system')?.content || ''
-      const userMessages = messages.filter(m => m.role !== 'system').map(m => ({
-        role: m.role,
-        content: m.content,
-      }))
+      const { messages, system } = toAnthropicMessages(body.messages || [])
       return {
         model: body.model?.replace('anthropic/', '') || 'claude-3-5-sonnet-20241022',
         max_tokens: body.max_tokens || 4096,
-        messages: userMessages,
+        messages,
         ...(system && { system }),
         ...(body.temperature && { temperature: body.temperature }),
       }
@@ -1388,14 +1415,9 @@ const AI_PROVIDERS = {
     envKey: 'GEMINI_API_KEY',
     headers: () => ({ 'Content-Type': 'application/json' }),
     transform: (body) => {
-      const messages = body.messages || []
-      const system = messages.find(m => m.role === 'system')?.content || ''
-      const userMessages = messages.filter(m => m.role !== 'system').map(m => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }],
-      }))
+      const system = toText((body.messages || []).find(m => m.role === 'system')?.content)
       return {
-        contents: userMessages,
+        contents: toGeminiContents(body.messages || []),
         ...(system && { systemInstruction: { parts: [{ text: system }] } }),
         generationConfig: {
           ...(body.temperature && { temperature: body.temperature }),
@@ -1443,10 +1465,10 @@ const AI_PROVIDERS = {
     }),
     transform: (body) => ({
       model: body.model || 'command-r-plus',
-      message: body.messages?.[body.messages.length - 1]?.content || '',
+      message: toText(body.messages?.[body.messages.length - 1]?.content),
       chat_history: body.messages?.slice(0, -1).map(m => ({
         role: m.role === 'assistant' ? 'CHATBOT' : 'USER',
-        message: m.content,
+        message: toText(m.content),
       })) || [],
       ...(body.temperature && { temperature: body.temperature }),
       ...(body.max_tokens && { max_tokens: body.max_tokens }),
@@ -1559,7 +1581,7 @@ function getProviderConfig(provider) {
   return AI_PROVIDERS[provider] || AI_PROVIDERS.openrouter
 }
 
-app.post('/api/ai/chat', async (req, res) => {
+async function handleAiChat(req, res) {
   // Detect provider from model name OR from explicit provider field
   let provider = detectProvider(req.body?.model)
 
@@ -1667,6 +1689,12 @@ app.post('/api/ai/chat', async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: `${provider} proxy error: ${err.message}` })
   }
+}
+
+app.post('/api/ai/chat', handleAiChat)
+app.post('/api/ai/chat/:provider', (req, res) => {
+  if (req.body && typeof req.body === 'object') req.body.provider = req.params.provider
+  return handleAiChat(req, res)
 })
 
 // List available providers

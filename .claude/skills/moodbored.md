@@ -17,7 +17,7 @@ Use MoodBored when the user asks to:
 
 ```bash
 cd /Users/x.hyperdex/OpenCodeApps/MoodBored
-npm run dev        # starts at http://localhost:5173
+npm run dev        # starts at http://localhost:1420
 # or
 npm run build && npm start   # production at http://localhost:3000
 ```
@@ -44,11 +44,24 @@ If you know which board to target, pass an env var:
 
 Without a board ID, the server picks the most recently modified board.
 
+## Board window (auto-open)
+
+The first mutating MCP tool call opens the board in a chromeless window
+(`chrome`/`edge --app=http://localhost:3000/board/<id>`, default browser as
+fallback) and starts `server.mjs` if nothing is listening. Every mutating
+tool response ends with `Board: <url>`. An already-open window live-updates
+via SSE.
+
+Env vars: `MOODBORED_URL` (base URL, default `http://localhost:3000`),
+`MOODBORED_AUTO_OPEN=0` (disable window), `MOODBORED_NO_SERVER=1` (never
+auto-start the server), `MOODBORED_BOARD_ID`, `MOODBORED_BOARDS_DIR`.
+
 ## MCP tools available
 
 | Tool | What it does |
 |------|-------------|
 | `get_board` | Read the full board — items, palette, typography, layout, relationships |
+| `view_images` | See board images as pixels (vision-ready blocks) so you can talk about how they look |
 | `add_items` | Add items (notes, images, palettes, gradients, fonts, links, videos, containers, swatches, sizeguides) |
 | `remove_items` | Delete items by ID |
 | `update_item` | Edit any item's properties |
@@ -101,7 +114,7 @@ All items accept `pos: {x, y}`, `size: {w, h}`, `purpose`, `importance`, `tags`.
 ```
 1. POST /api/boards — get board ID
 2. POST /api/board/{id}/items — add items in bulk
-3. Tell user the URL: http://localhost:3000/board/{id}
+3. The board window opens automatically; report the `Board:` URL from the tool response
 ```
 
 ### Add items to an existing board via MCP

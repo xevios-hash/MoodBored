@@ -21,6 +21,13 @@ if (existsSync(serverSrc)) {
   console.log('  ✓ server.mjs')
 }
 
+// Copy lib/ (AI transforms used by server.mjs)
+const libSrc = join(rootDir, 'lib')
+if (existsSync(libSrc)) {
+  copyDir(libSrc, join(releaseDir, 'lib'))
+  console.log('  ✓ lib/')
+}
+
 // Copy dist folder
 function copyDir(src, dst) {
   if (!existsSync(dst)) mkdirSync(dst, { recursive: true })

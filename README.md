@@ -58,7 +58,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser.
+Open `http://localhost:1420` in your browser.
 
 ### Production
 
@@ -261,6 +261,15 @@ list_files, delete_file, rename_file
   }
 }
 ```
+
+### Auto-opening board window
+
+The first mutating MCP tool call opens the board in a chromeless window
+(`chrome`/`edge --app=http://localhost:3000/board/<id>`, default browser as
+fallback) and starts `server.mjs` automatically if nothing is listening.
+Tool responses include `Board: <url>`, and an already-open window live-updates
+via SSE. Env vars: `MOODBORED_URL`, `MOODBORED_BOARD_ID`, `MOODBORED_BOARDS_DIR`,
+`MOODBORED_AUTO_OPEN=0` (disable), `MOODBORED_NO_SERVER=1` (never auto-start).
 
 ---
 
