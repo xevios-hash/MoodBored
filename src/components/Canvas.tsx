@@ -13,6 +13,7 @@ import { imageToDataUrl } from '@/lib/imageData'
 import {
   isVisionModel, collectVisionImages, buildImageContentParts, describeVisionImages,
 } from '@/lib/vision'
+import { buildSelectionContext } from '@/lib/selectionContext'
 
 // Detect if running in Tauri desktop app
 const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined
@@ -462,10 +463,11 @@ IMPORTANT RULES:
 Example response:
 [{"kind":"note","text":"Great idea! Consider...","purpose":"Building on your thought"},{"kind":"text","raw":"Additional details...","purpose":"Supporting info"}]`
 
-      const userText = `My note says: "${noteText}"\n\nRespond with related items for the canvas. Return ONLY valid JSON array.`
       const boardItems = state.project.viewports.find(v => v.id === state.activeViewportId)?.items ?? []
+      const selection = buildSelectionContext(boardItems, state.selectedIds)
+      const userText = `My note says: "${noteText}"\n\n${selection.ids.length > 1 ? `The user also has these items selected on the board:\n${selection.text}\n\n` : ''}Respond with related items for the canvas. Return ONLY valid JSON array.`
       const visionImages = isVisionModel(settings.defaultModel || '')
-        ? collectVisionImages(boardItems, undefined, 3)
+        ? (selection.images.length > 0 ? selection.images.slice(0, 3) : collectVisionImages(boardItems, undefined, 3))
         : []
       const userContent = visionImages.length > 0
         ? [

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useStore } from '@/stores/useStore'
-import { Settings } from 'lucide-react'
+import { Settings, MessageSquare } from 'lucide-react'
 import { Sidebar } from '@/components/Sidebar'
 import { Canvas } from '@/components/Canvas'
 import { ChatPanel } from '@/components/ChatPanel'
@@ -150,6 +150,7 @@ export default function App() {
   const [shareOpen, setShareOpen] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const [embedSettingsOpen, setEmbedSettingsOpen] = useState(false)
+  const [embedChatOpen, setEmbedChatOpen] = useState(false)
   const [snapshotTimelineOpen, setSnapshotTimelineOpen] = useState(false)
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false)
   const [chromeImportOpen, setChromeImportOpen] = useState(false)
@@ -437,6 +438,14 @@ export default function App() {
       <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: 'var(--bg-surface-0)', position: 'relative' }}>
         <Canvas />
         <button
+          onClick={() => setEmbedChatOpen(v => !v)}
+          className="toolbar-btn"
+          style={{ position: 'absolute', top: 12, right: 52, zIndex: 20, background: isDark() ? 'rgba(12,8,20,0.8)' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', borderRadius: 8, padding: 8, border: `1px solid ${isDark() ? 'rgba(124,108,191,0.1)' : 'rgba(0,0,0,0.06)'}` }}
+          title="Chat about selected items"
+        >
+          <MessageSquare size={16} />
+        </button>
+        <button
           onClick={() => setEmbedSettingsOpen(true)}
           className="toolbar-btn"
           style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, background: isDark() ? 'rgba(12,8,20,0.8)' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', borderRadius: 8, padding: 8, border: `1px solid ${isDark() ? 'rgba(124,108,191,0.1)' : 'rgba(0,0,0,0.06)'}` }}
@@ -444,6 +453,13 @@ export default function App() {
         >
           <Settings size={16} />
         </button>
+        {embedChatOpen && (
+          <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 320, maxWidth: '90vw', zIndex: 15, display: 'flex', boxShadow: '-8px 0 24px rgba(0,0,0,0.25)', background: 'var(--bg-surface-1)' }}>
+            <div className="flex-1 min-w-0 h-full">
+              <ChatPanel />
+            </div>
+          </div>
+        )}
         {embedSettingsOpen && <SettingsModal embed onClose={() => setEmbedSettingsOpen(false)} />}
       </div>
     )

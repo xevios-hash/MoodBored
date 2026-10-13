@@ -316,6 +316,21 @@ export const BOARD_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'discuss_items',
+      description: 'Select specific board items by id and receive their full contents so you can talk about them with the user. Use when the user asks about particular objects or a selection.',
+      parameters: {
+        type: 'object' as const,
+        required: ['item_ids'],
+        properties: {
+          item_ids: { type: 'array' as const, items: { type: 'string' as const }, description: 'IDs of the items to discuss' },
+          topic: { type: 'string' as const, description: 'Optional focus for the discussion (e.g., "color harmony", "layout")' },
+        },
+      },
+    },
+  },
   // ─── File Tools (IDE Features) ──────────────────────────────────
   {
     type: 'function' as const,
@@ -428,6 +443,7 @@ YOUR TOOLKIT (15 tools)
   open_url         Open web pages as live interactive browser cards
   draw_connection  Draw typed connections between items
   export_brief     Export board as structured creative brief
+  discuss_items    Select specific items and get their full contents to talk about
 
 💻 FILE TOOLS — Full coding IDE in your workspace
   create_file      Create files (code, configs, docs, anything)
@@ -691,6 +707,9 @@ export function processToolCalls(toolCalls: any[]): { toolCallId: string; action
         if (args.item_id) {
           actions.push({ type: 'find_related', itemId: args.item_id })
         }
+        break
+      case 'discuss_items':
+        actions.push({ type: 'discuss_items', itemIds: args.item_ids, topic: args.topic })
         break
       case 'git_commit':
         if (args.message) {

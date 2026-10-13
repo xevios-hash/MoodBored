@@ -62,6 +62,7 @@ auto-start the server), `MOODBORED_BOARD_ID`, `MOODBORED_BOARDS_DIR`.
 |------|-------------|
 | `get_board` | Read the full board — items, palette, typography, layout, relationships |
 | `view_images` | See board images as pixels (vision-ready blocks) so you can talk about how they look |
+| `discuss_items` | Select items by id and get their full contents (text + pixels) to talk about them |
 | `add_items` | Add items (notes, images, palettes, gradients, fonts, links, videos, containers, swatches, sizeguides) |
 | `remove_items` | Delete items by ID |
 | `update_item` | Edit any item's properties |
@@ -132,6 +133,7 @@ semantic_search — meaning-based ("warm tones" matches "amber", "sunset")
 ### Export a creative brief
 ```
 GET /api/board/:id/brief?format=markdown|json
+GET /api/board/:id/context?ids=&topic=  — full contents of selected items (select-and-talk)
 ```
 
 ## Board data lives at

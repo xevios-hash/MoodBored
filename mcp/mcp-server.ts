@@ -294,6 +294,53 @@ server.tool(
   },
 )
 
+function describeItemForDiscussion(item: any): string {
+  const tags = (item.tags || []).length > 0 ? ` [${(item.tags || []).join(', ')}]` : ''
+  const clip = (s: any, max = 400) => (typeof s === 'string' ? (s.length > max ? s.slice(0, max) + '...' : s) : '')
+  switch (item.kind) {
+    case 'note': return `note: "${clip(item.text)}"${item.purpose ? ` purpose=${clip(item.purpose, 120)}` : ''}${tags}`
+    case 'text': return `text: "${clip(item.raw)}"${tags}`
+    case 'image': return `image: ${clip(item.description, 200)}${item.source ? ` source=${clip(item.source, 120)}` : ''}${imageRefOf(item) ? ` url=${clip(imageRefOf(item), 160)}` : ''}${tags}`
+    case 'link': return `link: ${clip(item.title, 120)} ${clip(item.url, 160)}${item.description ? ` — ${clip(item.description, 200)}` : ''}${tags}`
+    case 'video': return `video: ${clip(item.subjectDesc, 200)}${item.sourceUrl || item.source ? ` url=${clip(item.sourceUrl || item.source, 160)}` : ''}${tags}`
+    case 'web': return `web: ${clip(item.title, 120)} ${clip(item.url, 160)}${tags}`
+    case 'palette': return `palette: "${clip(item.label, 120)}" colors=${(item.colors || []).map((c: any) => `${c.hex}${c.label ? `(${c.label})` : ''}`).join(', ')}${tags}`
+    case 'gradient': return `gradient: "${clip(item.label, 120)}" ${item.direction ?? 90}deg ${(item.stops || []).map((s: any) => `${s.color}@${s.position}`).join(' -> ')}${tags}`
+    case 'font': return `font: ${item.fontFamily}${item.weights ? ` weights=${item.weights.join(',')}` : ''}${item.sampleText ? ` sample="${clip(item.sampleText, 120)}"` : ''}${tags}`
+    case 'swatch': return `swatch: ${item.hex} ${clip(item.name, 80)}${item.usage ? ` usage=${clip(item.usage, 120)}` : ''}${tags}`
+    case 'sizeguide': return `sizeguide: ${item.width}x${item.height}${item.unit || 'px'} (${item.orientation || 'landscape'})${item.label ? ` "${clip(item.label, 80)}"` : ''}${tags}`
+    case 'container': return `container: "${clip(item.label, 120)}" layout=${item.layout} children=${(item.children || []).length}${tags}`
+    case 'file': return `file: ${clip(item.fileName, 80)} (${item.language}) ${clip(item.filePath, 160)}`
+    default: return `${item.kind}: ${clip(item.text || item.raw || item.description || item.label || item.title || item.url || '')}${tags}`
+  }
+}
+
+server.tool(
+  'discuss_items',
+  "Select specific board items by id and get everything about them (full text + image pixels) so you can talk about them with the user. This is the LLM-side mirror of the user's select-and-discuss flow.",
+  {
+    item_ids: z.array(z.string()).describe('IDs of the items to discuss (from get_board/search_items)'),
+    topic: z.string().optional().describe('Optional focus for the discussion (e.g. "color harmony", "layout")'),
+  },
+  async ({ item_ids, topic }) => {
+    const state = readState()
+    const items = getItems(state)
+    const selected = items.filter((i: any) => item_ids.includes(i.id))
+    if (selected.length === 0) {
+      return { content: [{ type: 'text', text: `No board items found for ids: ${item_ids.join(', ')}` }] }
+    }
+    const lines = selected.map((i: any) => `- [${i.id}] ${describeItemForDiscussion(i)}`)
+    const content: any[] = [{
+      type: 'text',
+      text: withBoardLink(
+        `Discussing ${selected.length} selected item(s)${topic ? ` (focus: ${topic})` : ''}:\n\n${lines.join('\n')}\n\nAttached image pixels for any image items above. Now talk about these items with the user.`,
+      ),
+    }]
+    await attachImageBlocks(content, selected, 8)
+    return { content }
+  },
+)
+
 server.tool(
   'add_items',
   'Add one or more items to the mood board. Items are placed on the canvas automatically.',

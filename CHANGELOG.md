@@ -5,6 +5,8 @@ All notable changes to MoodBored will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Select and Talk**: select any objects on the board and talk about them with the LLM — chat shows a "Talking about N items" chip and sends full selected-item context (with pixels for vision models); works in full app, mobile, and embed/board windows (MCP, REST, native)
+- **`discuss_items`**: MCP / HTTP-MCP / chat tool mirroring the user flow — the LLM selects items by id and gets their full contents (text + image pixels) to talk about; REST `GET /api/board/:id/context?ids=` for external LLMs
 - **Vision LLM Support**: `view_images` MCP tool returns board images as vision-ready pixels; `get_board` accepts `include_images`; board chat and canvas conversations attach images for vision models (OpenAI/Anthropic/Gemini image formats)
 - **Auto-Opening Board Window**: mutating MCP tools open a chromeless localhost window (auto-starting the server if needed) and return `Board: <url>`; open windows live-update via SSE on MCP writes
 - **File Nodes (IDE Layer)**: Files become first-class canvas nodes with syntax-highlighted preview, language badges, and full editor support

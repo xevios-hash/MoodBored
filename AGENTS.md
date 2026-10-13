@@ -22,11 +22,13 @@ Collaborative mood-board canvas where humans and LLMs brainstorm together.
 
 ## Tools
 
-`get_board`, `view_images`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`
+`get_board`, `view_images`, `discuss_items`, `add_items`, `remove_items`, `update_item`, `search_items`, `semantic_search`, `related_items`, `arrange_items`, `clear_board`
 
 `view_images` returns board images as vision-ready pixels — use it when the
-user asks about how images look. Chat with a vision model also sees board
-images automatically.
+user asks about how images look. `discuss_items` selects specific items by id
+and returns their full contents (text + pixels) — use it when the user asks
+about particular objects; this mirrors the user's select-and-talk flow in chat.
+Chat with a vision model also sees board images automatically.
 
 ## REST API
 

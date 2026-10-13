@@ -285,6 +285,7 @@ GET    /api/board/:id/search?q=&tag=     — Text search
 GET    /api/board/:id/semantic?q=        — Semantic search
 POST   /api/board/:id/arrange            — Layout arrangement
 GET    /api/board/:id/brief              — Creative brief export
+GET    /api/board/:id/context?ids=       — Full contents of selected items (talk about them)
 POST   /api/board/:id/lesson             — Generate lesson
 GET    /api/board/:id/lesson             — Get lesson data
 ```

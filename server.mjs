@@ -684,6 +684,28 @@ app.post('/api/board/:id/arrange', (req, res) => {
 })
 
 // Export as creative brief
+function itemLine(item) {
+  const clip = (s, max = 400) => (typeof s === 'string' ? (s.length > max ? s.slice(0, max) + '...' : s) : '')
+  const tags = (item.tags || []).length > 0 ? ` [${(item.tags || []).join(', ')}]` : ''
+  const url = item.fullSource || item.thumbnail || item.source || ''
+  switch (item.kind) {
+    case 'note': return `note: "${clip(item.text)}"${item.purpose ? ` purpose=${clip(item.purpose, 120)}` : ''}${tags}`
+    case 'text': return `text: "${clip(item.raw)}"${tags}`
+    case 'image': return `image: ${clip(item.description, 200)}${item.source ? ` source=${clip(item.source, 120)}` : ''}${url ? ` url=${clip(url, 160)}` : ''}${tags}`
+    case 'link': return `link: ${clip(item.title, 120)} ${clip(item.url, 160)}${item.description ? ` — ${clip(item.description, 200)}` : ''}${tags}`
+    case 'video': return `video: ${clip(item.subjectDesc, 200)}${item.sourceUrl || item.source ? ` url=${clip(item.sourceUrl || item.source, 160)}` : ''}${tags}`
+    case 'web': return `web: ${clip(item.title, 120)} ${clip(item.url, 160)}${tags}`
+    case 'palette': return `palette: "${clip(item.label, 120)}" colors=${(item.colors || []).map(c => `${c.hex}${c.label ? `(${c.label})` : ''}`).join(', ')}${tags}`
+    case 'gradient': return `gradient: "${clip(item.label, 120)}" ${item.direction ?? 90}deg ${(item.stops || []).map(s => `${s.color}@${s.position}`).join(' -> ')}${tags}`
+    case 'font': return `font: ${item.fontFamily}${item.weights ? ` weights=${item.weights.join(',')}` : ''}${item.sampleText ? ` sample="${clip(item.sampleText, 120)}"` : ''}${tags}`
+    case 'swatch': return `swatch: ${item.hex} ${clip(item.name, 80)}${item.usage ? ` usage=${clip(item.usage, 120)}` : ''}${tags}`
+    case 'sizeguide': return `sizeguide: ${item.width}x${item.height}${item.unit || 'px'} (${item.orientation || 'landscape'})${item.label ? ` "${clip(item.label, 80)}"` : ''}${tags}`
+    case 'container': return `container: "${clip(item.label, 120)}" layout=${item.layout} children=${(item.children || []).length}${tags}`
+    case 'file': return `file: ${clip(item.fileName, 80)} (${item.language}) ${clip(item.filePath, 160)}`
+    default: return `${item.kind}: ${clip(item.text || item.raw || item.description || item.label || item.title || item.url || '')}${tags}`
+  }
+}
+
 app.get('/api/board/:id/brief', (req, res) => {
   const state = getBoardOr404(req.params.id, res)
   if (!state) return
@@ -712,6 +734,37 @@ app.get('/api/board/:id/brief', (req, res) => {
   if (images.length) lines.push('## Visual References', ...images.map(i => `- ${i.description} ${i.source || ''}`), '')
   if (notes.length) lines.push('## Notes', ...notes.map(n => `- ${n.text}`), '')
   res.type('text').send(lines.join('\n'))
+})
+
+// Selection context: full contents of specific items (by id) so external LLMs
+// can select objects and talk about them. Mirrors MCP discuss_items.
+// GET /api/board/:id/context?ids=a,b,c&topic=color%20harmony
+app.get('/api/board/:id/context', (req, res) => {
+  const state = getBoardOr404(req.params.id, res)
+  if (!state) return
+  const vp = getVpOr404(state, res)
+  if (!vp) return
+
+  const ids = String(req.query.ids || '').split(',').map(s => s.trim()).filter(Boolean)
+  const topic = req.query.topic ? String(req.query.topic) : ''
+  const all = vp.items.filter(i => i.kind !== 'connector')
+  const selected = ids.length > 0 ? all.filter(i => ids.includes(i.id)) : all
+
+  const images = selected
+    .filter(i => i.kind === 'image')
+    .map(i => ({ id: i.id, description: i.description || '', url: i.fullSource || i.thumbnail || i.source || '' }))
+  const text = selected.map(i => `- [${i.id}] ${itemLine(i)}`).join('\n')
+
+  res.json({
+    board: state.project?.name || '',
+    url: boardUrl(req.params.id),
+    count: selected.length,
+    ids: selected.map(i => i.id),
+    topic,
+    items: selected,
+    text,
+    images,
+  })
 })
 
 // ─── Lesson Generation ──────────────────────────────────────────────
@@ -1054,6 +1107,7 @@ async function handleMcpMessage(message, sessionBoardId) {
           { name: 'remove_items', description: 'Remove items by ID', inputSchema: { type: 'object', properties: { ids: { type: 'array' } }, required: ['ids'] } },
           { name: 'update_item', description: 'Update an item\'s properties', inputSchema: { type: 'object', properties: { id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] } },
           { name: 'search_items', description: 'Search items by text or tag', inputSchema: { type: 'object', properties: { query: { type: 'string' }, tag: { type: 'string' } } } },
+          { name: 'discuss_items', description: 'Select specific items by id and get their full contents so you can talk about them', inputSchema: { type: 'object', properties: { item_ids: { type: 'array' }, topic: { type: 'string' } }, required: ['item_ids'] } },
           { name: 'arrange_items', description: 'Arrange items into a layout', inputSchema: { type: 'object', properties: { layout: { type: 'string', enum: ['grid', 'stack-h', 'stack-v', 'spiral'] }, cols: { type: 'number' }, gap: { type: 'number' } }, required: ['layout'] } },
           { name: 'clear_board', description: 'Remove all items', inputSchema: { type: 'object', properties: {} } },
           { name: 'export_brief', description: 'Export board as a creative brief', inputSchema: { type: 'object', properties: { creation_type: { type: 'string' }, format: { type: 'string' } } } },
@@ -1184,6 +1238,13 @@ async function executeTool(name, args, sessionBoardId) {
         if (item.kind === 'font') lines.push(`- Font: ${item.fontFamily}`)
       }
       return lines.join('\n')
+    }
+    case 'discuss_items': {
+      const ids = Array.isArray(args.item_ids) ? args.item_ids : []
+      const selected = vp.items.filter(i => ids.includes(i.id))
+      if (selected.length === 0) return `No board items found for ids: ${ids.join(', ')}`
+      const lines = selected.map(i => `- [${i.id}] ${itemLine(i)}`)
+      return `Discussing ${selected.length} selected item(s)${args.topic ? ` (focus: ${args.topic})` : ''}:\n\n${lines.join('\n')}\n\nNow talk about these items with the user.`
     }
     default:
       return `Unknown tool: ${name}`

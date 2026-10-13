@@ -496,6 +496,7 @@ export interface ChatMessage {
   content: string
   timestamp: string
   actions?: AgentAction[]
+  about?: string[]
 }
 
 export interface AgentAction {

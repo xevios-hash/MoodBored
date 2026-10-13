@@ -14,6 +14,7 @@ import { showToast } from '@/lib/toasts'
 import {
   isVisionModel, collectVisionImages, buildImageContentParts, describeVisionImages,
 } from '@/lib/vision'
+import { buildSelectionContext } from '@/lib/selectionContext'
 
 // Helper to safely truncate tool responses
 function truncateResponse(text: string, maxLength: number = 2000): string {
@@ -50,6 +51,7 @@ export function ChatPanel() {
   const project = useStore((s) => s.project)
   const settings = project.settings
   const activeViewportId = useStore((s) => s.activeViewportId)
+  const selectedIds = useStore((s) => s.selectedIds)
   const activeViewport = project.viewports.find(v => v.id === activeViewportId) ?? project.viewports[0]
   const allItems = activeViewport?.items ?? []
   const messages = activeViewport?.messages ?? []
@@ -80,7 +82,11 @@ export function ChatPanel() {
     const text = input.trim()
     if (!text || isStreaming) return
 
-    addMessage({ id: uuid(), role: 'user', content: text, timestamp: new Date().toISOString() })
+    const about = [...useStore.getState().selectedIds]
+    addMessage({
+      id: uuid(), role: 'user', content: text, timestamp: new Date().toISOString(),
+      ...(about.length > 0 ? { about } : {}),
+    })
     setInput('')
     resetAgentDiagnostics()
     await requestCompletion([], 1)
@@ -126,24 +132,31 @@ export function ChatPanel() {
         : []),
     ]
 
-    // Vision models get the actual board images attached to the latest user turn
-    if (isVisionModel(settings.defaultModel)) {
-      const sel = useStore.getState().selectedIds
-      const images = collectVisionImages(items, sel, 6)
-      if (images.length > 0) {
-        for (let i = apiMessages.length - 1; i >= 0; i--) {
-          if (apiMessages[i].role !== 'user') continue
-          const prev = apiMessages[i].content
-          const text = typeof prev === 'string' ? prev : ''
-          apiMessages[i].content = [
-            {
-              type: 'text' as const,
-              text: `${text}\n\nAttached board images:\n${describeVisionImages(images)}`,
-            },
-            ...buildImageContentParts(images),
-          ]
-          break
+    // Selection context: whatever the user has selected becomes the focus of
+    // the conversation. Vision models also get the actual pixels attached.
+    const sel = useStore.getState().selectedIds
+    const selection = buildSelectionContext(items, sel)
+    const useVision = isVisionModel(settings.defaultModel)
+    const images = selection.images.length > 0
+      ? selection.images
+      : (useVision ? collectVisionImages(items, sel, 6) : [])
+
+    if (selection.ids.length > 0 || images.length > 0) {
+      for (let i = apiMessages.length - 1; i >= 0; i--) {
+        if (apiMessages[i].role !== 'user') continue
+        const prev = apiMessages[i].content
+        const text = typeof prev === 'string' ? prev : ''
+        let out = text
+        if (selection.ids.length > 0) {
+          out += `\n\nI am talking about these ${selection.ids.length} selected item(s) on the board:\n${selection.text}`
         }
+        if (images.length > 0) {
+          out += `\n\nAttached images:\n${describeVisionImages(images)}`
+        }
+        apiMessages[i].content = images.length > 0 && useVision
+          ? [{ type: 'text' as const, text: out }, ...buildImageContentParts(images)]
+          : out
+        break
       }
     }
 
@@ -431,6 +444,18 @@ export function ChatPanel() {
                     } else {
                       results.push({ tool_call_id: group.toolCallId, content: `Commit failed` })
                     }
+                  } else if (action.type === 'discuss_items') {
+                    const ids: string[] = (action as any).itemIds || []
+                    const vpItems = useStore.getState().project.viewports
+                      .find(v => v.id === activeViewportId)?.items ?? []
+                    const ctx = buildSelectionContext(vpItems, ids)
+                    const topic = (action as any).topic
+                    results.push({
+                      tool_call_id: group.toolCallId,
+                      content: ctx.ids.length > 0
+                        ? `Discussing ${ctx.ids.length} selected item(s)${topic ? ` (focus: ${topic})` : ''}:\n${ctx.text}\n\nNow write your discussion of these items for the user.`
+                        : `No board items found for ids: ${ids.join(', ')}`,
+                    })
                   } else {
                     results.push({ tool_call_id: group.toolCallId, content: 'Unknown action' })
                   }
@@ -575,6 +600,11 @@ export function ChatPanel() {
           return (
             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
               <div className={`${isSystem ? 'w-full text-center text-xs px-3 py-1.5 rounded-lg bg-surface-2 text-text-muted' : `chat-bubble ${msg.content.startsWith('Error:') ? 'error' : msg.role}`}`}>
+                {msg.about && msg.about.length > 0 && !isSystem && (
+                  <div className="mb-1 px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px] font-medium inline-block">
+                    about {msg.about.length} selected item{msg.about.length > 1 ? 's' : ''}
+                  </div>
+                )}
                 <div className="whitespace-pre-wrap">{cleanContent(msg.content)}</div>
                 {msg.actions && msg.actions.length > 0 && !isSystem && (
                   <div className="mt-2 px-2 py-1 rounded text-xs bg-accent/10">
@@ -601,6 +631,26 @@ export function ChatPanel() {
       </div>
 
       <div className="p-3 border-t border-surface-4">
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mb-2">
+            <span className="text-[10px] text-text-muted uppercase tracking-wider">Talking about</span>
+            {allItems.filter(i => selectedIds.has(i.id)).slice(0, 4).map(i => (
+              <span key={i.id} className="px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px] font-medium">
+                {i.kind}
+              </span>
+            ))}
+            {selectedIds.size > 4 && (
+              <span className="px-1.5 py-0.5 rounded bg-surface-2 text-text-muted text-[10px]">+{selectedIds.size - 4}</span>
+            )}
+            <button
+              onClick={() => useStore.getState().clearSelection()}
+              className="ml-auto text-[10px] text-text-muted hover:text-danger"
+              title="Stop talking about the selection"
+            >
+              clear
+            </button>
+          </div>
+        )}
         <div className="flex gap-2">
           <textarea
             value={input}
