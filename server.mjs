@@ -2377,6 +2377,15 @@ app.post('/api/git/init', async (req, res) => {
 
 // Serve static files with proper caching
 // index.html should NOT be cached (always get fresh version)
+// Service worker + manifest must always revalidate — an immutably cached
+// sw.js poisons the app-shell cache across rebuilds (blank screens).
+app.get(['/sw.js', '/manifest.json'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  res.sendFile(join(__dirname, 'dist', req.path.replace(/^\//, '')))
+})
+
 app.use(express.static(join(__dirname, 'dist'), {
   maxAge: '1y',
   immutable: true,
@@ -2391,12 +2400,37 @@ app.get(['/', '/index.html'], (_req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'))
 })
 
+// Resolve the current built entry script/stylesheet from dist/index.html.
+// Used to self-heal stale cached app shells after a rebuild: an old
+// index.html references entry chunks that no longer exist on disk.
+function currentEntry(kind) {
+  try {
+    const html = readFileSync(join(__dirname, 'dist', 'index.html'), 'utf-8')
+    const m = html.match(new RegExp(`src="(/assets/index-[^"]+\\.${kind})"`)) ||
+              html.match(new RegExp(`href="(/assets/index-[^"]+\\.${kind})"`))
+    if (!m) return null
+    return existsSync(join(__dirname, 'dist', m[1].replace(/^\//, ''))) ? m[1] : null
+  } catch {
+    return null
+  }
+}
+
 // SPA fallback - only for routes that don't match static files
 // This allows Express static middleware to serve JS/CSS/assets first
 app.get('/{*splat}', (req, res, next) => {
   // Skip if it's an API route (should have been handled above)
   if (req.path.startsWith('/api/') || req.path.startsWith('/mcp/')) {
     return next()
+  }
+  // Missing build assets must 404 — never answer with HTML (that turns a
+  // stale index.html into a blank page via module-script MIME errors).
+  if (extname(req.path)) {
+    const m = /^\/assets\/index-[^/]+\.(js|css)$/.exec(req.path)
+    if (m) {
+      const current = currentEntry(m[1])
+      if (current && current !== req.path) return res.redirect(302, current)
+    }
+    return res.status(404).type('text').send('Not found')
   }
   res.sendFile(join(__dirname, 'dist', 'index.html'))
 })

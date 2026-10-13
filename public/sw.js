@@ -19,26 +19,53 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+function isShellPath(pathname) {
+  return SHELL.includes(pathname)
+}
+
+// Content-hashed assets: cache-first is safe (the hash changes with content).
+function cacheFirst(request) {
+  return caches.match(request).then((cached) => {
+    if (cached) return cached
+    return fetch(request).then((response) => {
+      if (response.ok) {
+        const clone = response.clone()
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+      }
+      return response
+    })
+  })
+}
+
+// App shell + navigations: NETWORK-FIRST so a rebuild is never masked by a
+// stale cached index.html (which would reference deleted assets and blank
+// the app). Cache is only the offline fallback.
+function networkFirst(request) {
+  return fetch(request).then((response) => {
+    if (response.ok) {
+      const clone = response.clone()
+      caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+    }
+    return response
+  }).catch(() =>
+    caches.match(request).then((cached) => cached || caches.match('/'))
+  )
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
-  // Only cache GET requests for same-origin assets
   if (request.method !== 'GET') return
   if (!request.url.startsWith(self.location.origin)) return
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached
-      return fetch(request).then((response) => {
-        // Cache successful responses for app shell assets
-        if (response.ok && (request.url.includes('/assets/') || SHELL.some(s => request.url.endsWith(s)))) {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-        }
-        return response
-      }).catch(() => {
-        // Offline fallback: return cached index.html for navigation
-        if (request.mode === 'navigate') return caches.match('/')
-      })
-    })
-  )
+  const path = new URL(request.url).pathname
+
+  if (path.startsWith('/assets/')) {
+    event.respondWith(cacheFirst(request))
+    return
+  }
+
+  if (request.mode === 'navigate' || isShellPath(path)) {
+    event.respondWith(networkFirst(request))
+  }
+  // Everything else (videos, favicons, …) goes straight to the network.
 })
